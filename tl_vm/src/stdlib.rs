@@ -1,8 +1,8 @@
 use std::{fs::File, io::Read, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
-use lang_core::Module;
-use lang_util::Rf;
+use tl_core::Module;
+use tl_util::Rf;
 
 use crate::{
     const_value::{ConstValue, ConstValueKind, Type},

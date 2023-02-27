@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 use colored::Colorize;
-use lang_core::token::{Operator, Range};
+use tl_core::token::{Operator, Range};
 
 use crate::const_value::Type;
 

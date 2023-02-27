@@ -1,12 +1,12 @@
 [package]
-name = "lang_core"
+name = "tl_core"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lang_util = { path = "../lang_util" }
+tl_util = { path = "../tl_util" }
 log = { version = "*", features = ["std"] }
 tower-lsp = "*"
 pollster = "*"

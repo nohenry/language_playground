@@ -2,8 +2,8 @@
 use std::{fs::File, io::Read, path::Path, sync::Arc};
 
 use evaluator::Evaluator;
-use lang_core::Module;
-use lang_util::{format::TreeDisplay, Rf};
+use tl_core::Module;
+use tl_util::{format::TreeDisplay, Rf};
 
 use crate::{
     pass::CodePass,

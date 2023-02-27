@@ -1,12 +1,12 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use linked_hash_map::LinkedHashMap;
-use lang_core::{
+use tl_core::{
     ast::{Expression, ParamaterList, Statement},
     token::{SpannedToken, Token},
     Module,
 };
-use lang_util::Rf;
+use tl_util::Rf;
 
 use crate::{
     const_value::{ConstValue, Type},
@@ -214,14 +214,14 @@ impl CodePass {
         LinkedHashMap::from_iter(iter)
     }
 
-    fn evaluate_type(&self, ty: &lang_core::ast::Type) -> Type {
+    fn evaluate_type(&self, ty: &tl_core::ast::Type) -> Type {
         match ty {
-            lang_core::ast::Type::Integer { width, signed, .. } => Type::Integer {
+            tl_core::ast::Type::Integer { width, signed, .. } => Type::Integer {
                 width: *width,
                 signed: *signed,
             },
-            lang_core::ast::Type::Float { width, .. } => Type::Float { width: *width },
-            lang_core::ast::Type::Ident(id) => {
+            tl_core::ast::Type::Float { width, .. } => Type::Float { width: *width },
+            tl_core::ast::Type::Ident(id) => {
                 if let Some(sym) = { self.rstate().scope.find_symbol(id.as_str()) } {
                     return Type::Symbol(sym);
                 }

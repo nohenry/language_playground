@@ -4,8 +4,8 @@ use std::{
 };
 
 use linked_hash_map::LinkedHashMap;
-use lang_core::ast::Statement;
-use lang_util::{
+use tl_core::ast::Statement;
+use tl_util::{
     format::{NodeDisplay, TreeDisplay},
     Rf,
 };

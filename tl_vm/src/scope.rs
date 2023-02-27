@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use linked_hash_map::LinkedHashMap;
-use lang_core::{
+use tl_core::{
     ast::Expression,
     token::{Operator, SpannedToken, Token},
     Module,
 };
-use lang_util::{
+use tl_util::{
     format::{BoxedGrouper, BoxedGrouperIter, GrouperIter, NodeDisplay, TreeDisplay},
     Rf,
 };

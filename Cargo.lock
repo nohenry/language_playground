@@ -279,44 +279,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fad582f4b9e86b6caa621cabeb0963332d92eea04729ab12892c2533951e6440"
 
 [[package]]
-name = "lang_compiler"
-version = "0.1.0"
-dependencies = [
- "lang_core",
- "lang_vm",
-]
-
-[[package]]
-name = "lang_core"
-version = "0.1.0"
-dependencies = [
- "handlebars",
- "lang_util",
- "linked-hash-map",
- "log",
- "pollster",
- "tower-lsp",
-]
-
-[[package]]
-name = "lang_util"
-version = "0.1.0"
-dependencies = [
- "linked-hash-map",
-]
-
-[[package]]
-name = "lang_vm"
-version = "0.1.0"
-dependencies = [
- "colored",
- "handlebars",
- "lang_core",
- "lang_util",
- "linked-hash-map",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -370,12 +332,12 @@ dependencies = [
 name = "lsp_server"
 version = "0.1.0"
 dependencies = [
- "lang_core",
- "lang_util",
- "lang_vm",
  "log",
  "serde",
  "serde_json",
+ "tl_core",
+ "tl_util",
+ "tl_vm",
  "tokio",
  "tower-lsp",
 ]
@@ -720,6 +682,44 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "tl_compiler"
+version = "0.1.0"
+dependencies = [
+ "tl_core",
+ "tl_vm",
+]
+
+[[package]]
+name = "tl_core"
+version = "0.1.0"
+dependencies = [
+ "handlebars",
+ "linked-hash-map",
+ "log",
+ "pollster",
+ "tl_util",
+ "tower-lsp",
+]
+
+[[package]]
+name = "tl_util"
+version = "0.1.0"
+dependencies = [
+ "linked-hash-map",
+]
+
+[[package]]
+name = "tl_vm"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "handlebars",
+ "linked-hash-map",
+ "tl_core",
+ "tl_util",
+]
 
 [[package]]
 name = "tokio"

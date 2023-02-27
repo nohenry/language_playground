@@ -8,17 +8,17 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::request::Request;
 use tower_lsp::{lsp_types::*, LanguageServer};
 use tower_lsp::{Client, LspService, Server};
-use lang_core::ast::{
+use tl_core::ast::{
     ArgList, AstNode, Expression, ParamaterList, ParsedTemplate, Statement, Type,
 };
-use lang_core::token::{Operator, Span, SpannedToken, Token};
-use lang_core::Module;
-use lang_util::Rf;
-use lang_vm::const_value::{ConstValue, ConstValueKind};
-use lang_vm::error::ErrorLevel;
-use lang_vm::pass::CodePass;
-use lang_vm::scope::{Scope, ScopeManager, ScopeValue};
-use lang_vm::stdlib::fill_module;
+use tl_core::token::{Operator, Span, SpannedToken, Token};
+use tl_core::Module;
+use tl_util::Rf;
+use tl_vm::const_value::{ConstValue, ConstValueKind};
+use tl_vm::error::ErrorLevel;
+use tl_vm::pass::CodePass;
+use tl_vm::scope::{Scope, ScopeManager, ScopeValue};
+use tl_vm::stdlib::fill_module;
 
 struct ReadDirectoryRequest {}
 
@@ -558,7 +558,7 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let out = lang_core::Module::parse_str(&params.text_document.text, "mymod");
+        let out = tl_core::Module::parse_str(&params.text_document.text, "mymod");
 
         for err in out.1 {
             self.client.log_message(MessageType::ERROR, err).await;
@@ -598,7 +598,7 @@ impl LanguageServer for Backend {
         for change in params.content_changes {
             let text = change.text;
 
-            let out = lang_core::Module::parse_str(&text, "mymod");
+            let out = tl_core::Module::parse_str(&text, "mymod");
 
             for err in out.1 {
                 self.client.log_message(MessageType::ERROR, err).await;
@@ -692,7 +692,7 @@ async fn main() {
 }
 
 #[inline]
-fn to_rng(range: &lang_core::token::Range) -> Range {
+fn to_rng(range: &tl_core::token::Range) -> Range {
     if range.start == range.end {
         Range::new(
             Position {

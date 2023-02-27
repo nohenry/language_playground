@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::RwLock};
 
-use lang_util::format::{NodeDisplay, TreeDisplay};
+use tl_util::format::{NodeDisplay, TreeDisplay};
 
 use crate::lexer::Template;
 

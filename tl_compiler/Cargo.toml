@@ -1,9 +1,10 @@
 [package]
-name = "lang_util"
+name = "tl_compiler"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-linked-hash-map = "0.5.6"
+tl_core = { path = "../tl_core" }
+tl_vm = { path = "../tl_vm" }

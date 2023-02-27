@@ -5,7 +5,7 @@ use lexer::Lexer;
 use linked_hash_map::LinkedHashMap;
 use log::{Log, SetLoggerError};
 use parser::Parser;
-use lang_util::{
+use tl_util::{
     format::{NodeDisplay, TreeDisplay},
     Rf,
 };

@@ -1,13 +1,9 @@
 [package]
-name = "lang_vm"
+name = "tl_util"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-colored = "2.0.0"
-handlebars = "4.3.6"
 linked-hash-map = "0.5.6"
-lang_core = { path = "../lang_core" }
-lang_util = { path = "../lang_util" }

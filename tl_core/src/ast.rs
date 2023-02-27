@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use lang_util::format::{NodeDisplay, TreeDisplay};
+use tl_util::format::{NodeDisplay, TreeDisplay};
 
 use crate::token::{Range, SpannedToken, Token, Unit};
 
