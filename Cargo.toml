@@ -1,0 +1,4 @@
+[workspace]
+members = ["lang_core", "lang_util", "lang_compiler", "lang_vm", "lang_lsp/lsp_server"]
+resolver = "2"
+

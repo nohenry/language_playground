@@ -1,0 +1,60 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "scopeName": "source.lang",
+    "patterns": [
+        {
+            "include": "#node_type"
+        },
+        {
+            "include": "#node_range_index"
+        },
+        {
+            "include": "#token_text"
+        }
+    ],
+    "repository": {
+        "node_type": {
+            "match": "^\\s*([A-Z_][A-Z_0-9]*?)@",
+            "captures": {
+                "1": {
+                    "name": "entity.name.class"
+                }
+            }
+        },
+        "node_range_index": {
+            "match": "\\d+",
+            "name": "constant.numeric"
+        },
+        "token_text": {
+            "begin": "\"",
+            "end": "\"",
+            "beginCaptures": { "0": {"name": "string.interpolated"} },
+            "endCaptures": { "0": {"name": "string.interpolated"} },
+            "patterns": [
+                {
+                    "match": ".*({)",
+                    "captures": {
+                        "0": {
+                            "name": "string.interpolated"
+                        },
+                        "1": {
+                            "name": "punctuation.section.embedded"
+                        }
+                    }
+                },
+                {
+                    "match": "(})[^\"]*",
+                    "captures": {
+                        "0": {
+                            "name": "string.interpolated"
+                        },
+                        "1": {
+                            "name": "punctuation.section.embedded"
+                        }
+                    }
+                }
+                
+            ]
+        }
+    }
+}
