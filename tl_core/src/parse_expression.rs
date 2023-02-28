@@ -187,8 +187,39 @@ impl Parser {
         }
     }
 
-    pub fn parse_type(&self) -> Option<Type> {
-        match self.tokens.peek() {
+    pub fn parse_type(&self, last_prec: u32) -> Option<Type> {
+        let left = self.parse_type_lit();
+
+        while let Some(t) = self.tokens.peek() {
+            left = match t {
+                Token::Operator(o) => {
+                    let prec = self.precedence_of_operator_for_ty(o);
+                    if prec <= last_prec || prec == 0 {
+                        break;
+                    }
+
+                    let op_token = self.tokens.next().cloned();
+
+                    let right = self.parse_type(prec);
+
+                    Some(Expression::BinaryExpression {
+                        left: left.map(Box::new),
+                        right: right.map(Box::new),
+                        op_token,
+                    })
+                }
+                _ => break,
+            }
+        }
+
+        // match self.tokens.peek() {
+        //     Some(Token::Operator(Operator::Ampersand)) => 
+        //     _ => left
+        // }
+    }
+
+    pub fn parse_type_lit(&self) -> Option<Type> {
+        let ty_first = match self.tokens.peek() {
             Some(Token::Ident(id)) => match id.as_str() {
                 "i8" => Some(Type::Integer {
                     width: 8,
@@ -238,10 +269,22 @@ impl Parser {
                     width: 64,
                     token: self.tokens.next().unwrap().clone(),
                 }),
+                "bool" => Some(Type::Boolean(self.tokens.next().unwrap().clone())),
+                "char" => Some(Type::Char(self.tokens.next().unwrap().clone())),
                 _ => Some(Type::Ident(self.tokens.next().unwrap().clone())),
             },
             _ => None,
+        };
+
+        match self.tokens.peek() {
+            Some(Token::Operator(Operator::Ampersand)) => Type::Ref {
+                ref_token: self.tokens.next().unwrap().clone(),
+                base_type: Box::new(ty_first),
+            },
+            _ => ty_first,
         }
+
+        ty_first
     }
 
     pub fn precedence_of_operator(&self, operator: &Operator) -> u32 {
@@ -254,6 +297,13 @@ impl Parser {
             Operator::Exponent => 4,
             Operator::Dot => 5,
             Operator::OpenParen => 6,
+            _ => 0, // TODO: error
+        }
+    }
+
+    pub fn precedence_of_operator_for_ty(&self, operator: &Operator) -> u32 {
+        match operator {
+            Operator::Ampersand => 20, 
             _ => 0, // TODO: error
         }
     }

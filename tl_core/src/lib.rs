@@ -1,4 +1,5 @@
 #![feature(trait_upcasting)]
+#![feature(iter_intersperse)]
 
 use ast::{Expression, ParamaterList, Statement, Type};
 use lexer::Lexer;
@@ -24,15 +25,15 @@ impl Module {
     pub fn parse_str(input: &str, mod_name: &str) -> (Module, Vec<ParseError>) {
         let lexer = Lexer {};
         let tokens = lexer.lex(input);
-        // for p in &tokens {
-        //     println!("{p:#?}");
-        // }
+        for p in &tokens {
+            println!("{p:#?}");
+        }
 
         let parser = Parser::new(tokens);
         let parsed = parser.parse().unwrap();
-        // for p in &parsed {
-        //     println!("{}", p.format());
-        // }
+        for p in &parsed {
+            println!("{}", p.format());
+        }
 
         let er = parser.get_errors().clone();
 

@@ -3,14 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
-use tokio::net::TcpListener;
-use tower_lsp::jsonrpc::Result;
-use tower_lsp::lsp_types::request::Request;
-use tower_lsp::{lsp_types::*, LanguageServer};
-use tower_lsp::{Client, LspService, Server};
-use tl_core::ast::{
-    ArgList, AstNode, Expression, ParamaterList, ParsedTemplate, Statement, Type,
-};
+use tl_core::ast::{ArgList, AstNode, Expression, ParamaterList, ParsedTemplate, Statement, Type};
 use tl_core::token::{Operator, Span, SpannedToken, Token};
 use tl_core::Module;
 use tl_util::Rf;
@@ -19,6 +12,11 @@ use tl_vm::error::ErrorLevel;
 use tl_vm::pass::CodePass;
 use tl_vm::scope::{Scope, ScopeManager, ScopeValue};
 use tl_vm::stdlib::fill_module;
+use tokio::net::TcpListener;
+use tower_lsp::jsonrpc::Result;
+use tower_lsp::lsp_types::request::Request;
+use tower_lsp::{lsp_types::*, LanguageServer};
+use tower_lsp::{Client, LspService, Server};
 
 struct ReadDirectoryRequest {}
 
@@ -336,6 +334,7 @@ impl Backend {
                     0,
                 );
             }
+            _ => (),
         }
     }
 
@@ -394,6 +393,7 @@ impl Backend {
                     );
                 });
             }
+            _ => (),
         }
     }
 

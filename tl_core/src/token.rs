@@ -12,7 +12,6 @@ pub enum Operator {
     CloseParen,
     OpenBrace,
     CloseBrace,
-    Quote,
 
     Dot,
     Colon,
@@ -24,6 +23,21 @@ pub enum Operator {
     Multiply,
     Divide,
     Exponent,
+
+    Ampersand,
+    Exclamation,
+    At,
+    Pound,
+    Dollar,
+    Percent,
+    Carot,
+    Pipe,
+    SemiColon,
+    Tilde,
+    BackTick,
+    Quote,
+    SingleQuote,
+
     Equals,
 }
 
@@ -36,7 +50,6 @@ impl Operator {
             Self::CloseParen => ")",
             Self::OpenBrace => "{",
             Self::CloseBrace => "}",
-            Self::Quote => "\"",
 
             Self::Dot => ".",
             Self::Colon => ":",
@@ -48,6 +61,20 @@ impl Operator {
             Self::Multiply => "*",
             Self::Divide => "/",
             Self::Exponent => "**",
+
+            Self::Ampersand => "&",
+            Self::Exclamation => "!",
+            Self::At => "@",
+            Self::Pound => "#",
+            Self::Dollar => "$",
+            Self::Percent => "%",
+            Self::Carot => "^",
+            Self::Pipe => "|",
+            Self::SemiColon => ";",
+            Self::Tilde => "~",
+            Self::BackTick => "`",
+            Self::SingleQuote => "'",
+            Self::Quote => "\"",
 
             Self::Equals => "=",
         }
@@ -81,7 +108,6 @@ pub enum Token {
     String,
     TemplateString(Vec<Template>),
 
-    // Keyword(Keyword),
     Newline,
     Whitespace,
 }

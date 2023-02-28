@@ -231,6 +231,7 @@ impl CodePass {
                 // });
                 Type::Empty
             }
+            _ => Type::Empty,
         }
     }
 

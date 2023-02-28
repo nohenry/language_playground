@@ -11,6 +11,27 @@ pub struct Parser {
     pub(crate) errors: RwLock<Vec<ParseError>>,
 }
 
+macro_rules! restore {
+    ($self:expr, $e:expr) => {{
+        let index = $self.tokens.get_index();
+        let res = $e;
+        index.restore(&$self.tokens);
+        res
+    }};
+}
+
+macro_rules! fallback {
+    ($self:expr, $e:expr) => {{
+        let index = $self.tokens.get_index();
+        let res = $e;
+        index.restore(&$self.tokens);
+        if res.is_none() {
+            return None;
+        }
+        res
+    }};
+}
+
 impl Parser {
     pub fn new(token_stream: impl Into<TokenStream>) -> Self {
         Self {
@@ -52,6 +73,20 @@ impl Parser {
             Some(Token::Ident(s)) if s == "use" => {
                 if let Some(us) = self.parse_use() {
                     return Some(us);
+                }
+            }
+            Some(Token::Ident(s)) if s == "type" => {
+                let ty_tok = self.tokens.next().unwrap();
+                let symb = self.expect(Token::Ident(String::new())).unwrap();
+                let eq = self.expect_operator(Operator::Equals).unwrap();
+
+                if let Some(us) = self.parse_type_lit() {
+                    return Some(Statement::TypeAlias {
+                        ty_tok: ty_tok.clone(),
+                        ident: symb.clone(),
+                        eq: eq.clone(),
+                        ty: Box::new(us),
+                    });
                 }
             }
             Some(Token::Ident(_)) => {
@@ -175,7 +210,7 @@ impl Parser {
     }
 
     fn parse_parameter(&self) -> Option<Param> {
-        let ty = self.parse_type();
+        let ty = self.parse_type_lit();
         let ident = self.expect(Token::Ident("".into()));
 
         match (ident, ty) {

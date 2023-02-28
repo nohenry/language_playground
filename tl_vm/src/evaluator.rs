@@ -627,6 +627,7 @@ impl Evaluator {
                 });
                 Type::Empty
             }
+            _ => Type::Empty,
         }
     }
 

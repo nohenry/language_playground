@@ -113,7 +113,6 @@ impl Lexer {
                 Some(')') => return Some(Token::Operator(Operator::CloseParen)),
                 Some('{') => return Some(Token::Operator(Operator::OpenBrace)),
                 Some('}') => return Some(Token::Operator(Operator::CloseBrace)),
-                Some('"') => return Some(Token::Operator(Operator::Quote)),
 
                 Some(':') => return Some(Token::Operator(Operator::Colon)),
                 Some('.') => return Some(Token::Operator(Operator::Dot)),
@@ -129,6 +128,21 @@ impl Lexer {
                     _ => return Some(Token::Operator(Operator::Multiply)),
                 },
                 Some('/') => return Some(Token::Operator(Operator::Divide)),
+
+                Some('&') => return Some(Token::Operator(Operator::Ampersand)),
+                Some('!') => return Some(Token::Operator(Operator::Exclamation)),
+                Some('@') => return Some(Token::Operator(Operator::At)),
+                Some('#') => return Some(Token::Operator(Operator::Pound)),
+                Some('$') => return Some(Token::Operator(Operator::Dollar)),
+                Some('%') => return Some(Token::Operator(Operator::Percent)),
+                Some('^') => return Some(Token::Operator(Operator::Carot)),
+                Some('|') => return Some(Token::Operator(Operator::Pipe)),
+                Some(';') => return Some(Token::Operator(Operator::SemiColon)),
+                Some('~') => return Some(Token::Operator(Operator::Tilde)),
+                Some('`') => return Some(Token::Operator(Operator::BackTick)),
+                Some('\'') => return Some(Token::Operator(Operator::SingleQuote)),
+                Some('"') => return Some(Token::Operator(Operator::Quote)),
+
                 Some('=') => return Some(Token::Operator(Operator::Equals)),
 
                 Some('\r' | '\n') => return Some(Token::Newline),
