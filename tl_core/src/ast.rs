@@ -371,34 +371,34 @@ impl PartialEq for Type {
                 Self::Integer {
                     width: l_width,
                     signed: l_signed,
-                    token: l_token,
+                    token: _l_token,
                 },
                 Self::Integer {
                     width: r_width,
                     signed: r_signed,
-                    token: r_token,
+                    token: _r_token,
                 },
             ) => l_width == r_width && l_signed == r_signed,
             (
                 Self::Float {
                     width: l_width,
-                    token: l_token,
+                    token: _l_token,
                 },
                 Self::Float {
                     width: r_width,
-                    token: r_token,
+                    token: _r_token,
                 },
             ) => l_width == r_width,
-            (Self::Boolean(l0), Self::Boolean(r0)) => true,
-            (Self::Char(l0), Self::Char(r0)) => true,
+            (Self::Boolean(_l0), Self::Boolean(_r0)) => true,
+            (Self::Char(_l0), Self::Char(_r0)) => true,
             (Self::Ident(l0), Self::Ident(r0)) => l0.as_str() == r0.as_str(),
             (
                 Self::Ref {
-                    ref_token: l_ref_token,
+                    ref_token: _l_ref_token,
                     base_type: Some(l_base_type),
                 },
                 Self::Ref {
-                    ref_token: r_ref_token,
+                    ref_token: _r_ref_token,
                     base_type: Some(r_base_type),
                 },
             ) => l_base_type == r_base_type,
@@ -439,20 +439,20 @@ impl PartialEq for Type {
             (
                 Self::Option {
                     base_type: Some(l_ty),
-                    question: l_question,
+                    question: _l_question,
                 },
                 Self::Option {
                     base_type: Some(r_ty),
-                    question: r_question,
+                    question: _r_question,
                 },
             ) => l_ty == r_ty,
             (
                 Self::Result {
-                    error: l_error,
+                    error: _l_error,
                     base_type: Some(l_ty),
                 },
                 Self::Result {
-                    error: r_error,
+                    error: _r_error,
                     base_type: Some(r_ty),
                 },
             ) => l_ty == r_ty,
@@ -549,7 +549,7 @@ impl NodeDisplay for Type {
             Self::Boolean(_) => f.write_str("bool"),
             Self::Char(_) => f.write_str("char"),
             Self::Ident(ident) => f.write_str(ident.as_str()),
-            Self::Array(a) => {
+            Self::Array(_a) => {
                 f.write_str("Array")
                 // write!(f, "{}", a.open.as_op_str())?;
                 // let p: String = a
@@ -560,7 +560,7 @@ impl NodeDisplay for Type {
                 //     .collect();
                 // write!(f, "{}{}", p, a.close.as_op_str())
             }
-            Self::Union(u) => {
+            Self::Union(_u) => {
                 f.write_str("Union")
                 // for item in u
                 //     .iter_items()
@@ -571,7 +571,7 @@ impl NodeDisplay for Type {
                 // }
                 // Ok(())
             }
-            Self::Tuple(a) => {
+            Self::Tuple(_a) => {
                 f.write_str("Tuple")
                 // write!(f, "{}", a.open.as_op_str())?;
                 // let p: String = a
@@ -593,9 +593,9 @@ impl NodeDisplay for Type {
                 //     .collect();
                 // write!(f, "{}{}", p, a.close.as_op_str())
             }
-            Self::Expression(e) => f.write_str("Expression"),
+            Self::Expression(_e) => f.write_str("Expression"),
             Self::Function {
-                parameters,
+                
                 ..
                 // return_type: None,
             } => {
@@ -630,14 +630,14 @@ impl NodeDisplay for Type {
 
             //     ret.fmt(f)
             // }
-            Self::Option { base_type: ty, question } => {
+            Self::Option { base_type: _ty, question: _ } => {
                 f.write_str("Optional")
                 // if let Some(ty) = &ty {
                 //     ty.fmt(f)?;
                 // }
                 // f.write_str(question.as_op_str())
             }
-            Self::Result { base_type: ty, error } => {
+            Self::Result { base_type: _ty, error: _ } => {
                 f.write_str("Result")
                 // if let Some(ty) = &ty {
                 //     ty.fmt(f)?;
@@ -645,8 +645,8 @@ impl NodeDisplay for Type {
                 // f.write_str(error.as_op_str())
             }
             Self::Ref {
-                ref_token,
-                base_type,
+                ref_token: _,
+                base_type: _,
             } => {
                 f.write_str("Reference")
 
@@ -675,7 +675,7 @@ impl TreeDisplay for Type {
                 base_type: Some(_), ..
             } => 2,
             Type::Generic { .. } => 1,
-            Type::Expression(e) => 1,
+            Type::Expression(_e) => 1,
             Type::Option { .. } => 1,
             Type::Result { .. } => 1,
             Type::Ref { .. } => 1,
@@ -762,7 +762,7 @@ impl NodeDisplay for ParsedTemplate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParsedTemplate::String(l) => write!(f, "Literal: `{}`", l.as_str()),
-            ParsedTemplate::Template(t, _, _) => write!(f, "Value"),
+            ParsedTemplate::Template(_t, _, _) => write!(f, "Value"),
         }
     }
 }

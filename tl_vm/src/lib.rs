@@ -3,7 +3,7 @@ use std::{fs::File, io::Read, path::Path, sync::Arc};
 
 use evaluator::Evaluator;
 use tl_core::Module;
-use tl_util::{format::TreeDisplay, Rf};
+use tl_util::{Rf};
 
 use crate::{
     pass::CodePass,
@@ -21,7 +21,7 @@ pub mod stdlib;
 #[cfg(windows)]
 const LINE_ENDING: &str = "\r\n";
 #[cfg(not(windows))]
-const LINE_ENDING: &'static str = "\n";
+const LINE_ENDING: &str = "\n";
 
 pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     let mut file = match File::open(path.as_ref()) {
@@ -71,7 +71,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         fill_module(std_mod_scope);
     }
 
-    let code_pass = CodePass::new(symbol_tree.clone(), module.clone(), 1);
+    let code_pass = CodePass::new(symbol_tree, module.clone(), 1);
     let code_pass_state = code_pass.run();
 
     // println!("{}", symbol_tree.format());
@@ -86,7 +86,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         error.print(path.as_ref().as_os_str().to_str().unwrap(), &lines);
     }
 
-    for value in values {
+    for _value in values {
         // println!("{value}");
     }
 

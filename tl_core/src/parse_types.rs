@@ -25,11 +25,11 @@ impl Parser {
             ty = match self.tokens.peek() {
                 Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
                     ref_token: self.tokens.next().unwrap().clone(),
-                    base_type: ty.map(|ty| Box::new(ty)),
+                    base_type: ty.map(Box::new),
                 }),
                 Some(Token::Operator(Operator::Question)) => Some(Type::Option {
                     question: self.tokens.next().unwrap().clone(),
-                    base_type: ty.map(|ty| Box::new(ty)),
+                    base_type: ty.map(Box::new),
                 }),
                 Some(Token::Operator(Operator::OpenAngle)) => {
                     let enclosed_list = self.parse_enclosed_list(
@@ -39,7 +39,7 @@ impl Parser {
                         || self.parse_type().map(|ty| (ty, true)),
                     );
                     enclosed_list.map(|el| Type::Generic {
-                        base_type: ty.map(|ty| Box::new(ty)),
+                        base_type: ty.map(Box::new),
                         list: el,
                     })
                 }
@@ -71,7 +71,7 @@ impl Parser {
                     Operator::CloseSquare,
                     || self.parse_type().map(|ty| (ty, true)),
                 );
-                enclosed_list.map(|el| Type::Array(el))
+                enclosed_list.map(Type::Array)
             }
             Some(Token::Operator(Operator::OpenBrace)) => {
                 let enclosed_list = self.parse_enclosed_list(
@@ -80,7 +80,7 @@ impl Parser {
                     Operator::CloseBrace,
                     || self.parse_type().map(|ty| (ty, true)),
                 );
-                enclosed_list.map(|el| Type::Tuple(el))
+                enclosed_list.map(Type::Tuple)
             }
 
             Some(Token::Ident(id)) => match id.as_str() {
@@ -194,7 +194,7 @@ impl Parser {
                     }
                 }
 
-                return first.map(|first| GenericParameter::Unbounded(first));
+                return first.map(GenericParameter::Unbounded);
             }
             _ => (),
         };
