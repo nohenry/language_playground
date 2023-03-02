@@ -716,15 +716,15 @@ impl TreeDisplay for ParsedTemplate {
     fn num_children(&self) -> usize {
         match self {
             ParsedTemplate::Template(_, _, _) => 1,
-            _ => 0
-        } 
+            _ => 0,
+        }
     }
 
     fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
         match self {
             ParsedTemplate::Template(e, _, _) => Some(&**e),
-            _ => None
-        } 
+            _ => None,
+        }
     }
 }
 

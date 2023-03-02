@@ -15,6 +15,7 @@ pub mod ast;
 pub mod error;
 pub mod lexer;
 pub mod parse_expression;
+pub mod parse_types;
 pub mod parser;
 pub mod token;
 
