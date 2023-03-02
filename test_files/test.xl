@@ -1,2 +1,2 @@
 
-type Potato = 5
+type Potato <T: Poot> = 5

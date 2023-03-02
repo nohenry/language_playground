@@ -197,7 +197,11 @@ impl Parser {
 
             Operator::Plus | Operator::Minus => 20,
 
-            Operator::Multiply | Operator::Divide | Operator::Pipe | Operator::Ampersand | Operator::Percent  => 30,
+            Operator::Multiply
+            | Operator::Divide
+            | Operator::Pipe
+            | Operator::Ampersand
+            | Operator::Percent => 30,
 
             Operator::Exponent => 40,
 

@@ -1,4 +1,9 @@
-use crate::{parser::Parser, ast::Type, restore, token::{Token, Operator}};
+use crate::{
+    ast::{EnclosedList, GenericParameter, Type},
+    parser::Parser,
+    restore,
+    token::{Operator, Token},
+};
 
 impl Parser {
     pub fn parse_type(&self) -> Option<Type> {
@@ -137,5 +142,54 @@ impl Parser {
         };
 
         ty_first
+    }
+
+    pub fn parse_generic_parameters(&self) -> Option<EnclosedList<GenericParameter>> {
+        self.parse_enclosed_list(
+            Operator::OpenAngle,
+            Operator::Comma,
+            Operator::CloseAngle,
+            || self.parse_generic_parameter().map(|gn| (gn, true)),
+        )
+    }
+
+    pub fn parse_generic_parameter(&self) -> Option<GenericParameter> {
+        let ident = match self.tokens.peek() {
+            Some(Token::Ident(_)) => self.tokens.next().unwrap().clone(),
+            _ => return None,
+        };
+
+        match self.tokens.peek() {
+            Some(Token::Operator(Operator::Colon)) => {
+                let colon = self.tokens.next().unwrap().clone();
+
+                let first = if let Some(Token::Ident(_)) = self.tokens.peek() {
+                    self.tokens.next().unwrap().cloned()
+                } else {
+                    None
+                };
+
+                let list = self.parse_punctutation_list(first, Operator::Ampersand, || {
+                    if let Some(Token::Ident(_)) = self.tokens.peek() {
+                        Some((self.tokens.next().unwrap().clone(), true))
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(list) = list {
+                    return Some(GenericParameter::Bounded {
+                        ident,
+                        colon,
+                        bounds: list,
+                    });
+                } else {
+                    return None;
+                }
+            }
+            _ => (),
+        };
+
+        Some(GenericParameter::Unbounded(ident))
     }
 }

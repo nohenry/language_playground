@@ -82,12 +82,21 @@ impl Parser {
             Some(Token::Ident(s)) if s == "type" => {
                 let ty_tok = self.tokens.next().unwrap();
                 let symb = self.expect(Token::Ident(String::new())).unwrap();
+
+                let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek()
+                {
+                    self.parse_generic_parameters()
+                } else {
+                    None
+                };
+
                 let eq = self.expect_operator(Operator::Equals).unwrap();
 
                 if let Some(us) = self.parse_type() {
                     return Some(Statement::TypeAlias {
                         ty_tok: ty_tok.clone(),
                         ident: symb.clone(),
+                        generic,
                         eq: eq.clone(),
                         ty: Box::new(us),
                     });

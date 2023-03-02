@@ -698,6 +698,52 @@ impl TreeDisplay for Type {
 }
 
 #[derive(Clone)]
+pub enum GenericParameter {
+    Unbounded(SpannedToken),
+    Bounded {
+        ident: SpannedToken,
+        colon: SpannedToken,
+        bounds: PunctuationList<SpannedToken>,
+    },
+}
+
+impl AstNode for GenericParameter {
+    fn get_range(&self) -> Range {
+        match self {
+            GenericParameter::Unbounded(u) => u.get_range(),
+            GenericParameter::Bounded { ident, bounds, .. } => {
+                Range::from((*ident.span(), &bounds.get_range()))
+            }
+        }
+    }
+}
+
+impl NodeDisplay for GenericParameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            GenericParameter::Unbounded(u) => f.write_str(u.as_str()),
+            GenericParameter::Bounded { ident, .. } => f.write_str(ident.as_str()),
+        }
+    }
+}
+
+impl TreeDisplay for GenericParameter {
+    fn num_children(&self) -> usize {
+        match self {
+            GenericParameter::Bounded { bounds, .. } => bounds.num_children(),
+            _ => 0,
+        }
+    }
+
+    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+        match self {
+            GenericParameter::Bounded { bounds, .. } => bounds.child_at(index),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum ParsedTemplate {
     String(SpannedToken),
     Template(Box<Expression>, SpannedToken, SpannedToken),
@@ -953,6 +999,7 @@ pub enum Statement {
     TypeAlias {
         ty_tok: SpannedToken,
         ident: SpannedToken,
+        generic: Option<EnclosedList<GenericParameter>>,
         eq: SpannedToken,
         ty: Box<Type>,
     },
@@ -989,6 +1036,7 @@ impl TreeDisplay for Statement {
             Self::UseStatement { token, args } => addup!(token) + args.num_children(),
             Self::Expression(_) => 1,
             Self::List(list) => list.num_children(),
+            Self::TypeAlias { generic: Some(_), .. } => 3,
             Self::TypeAlias { .. } => 2,
         }
     }
@@ -1011,6 +1059,11 @@ impl TreeDisplay for Statement {
             }
             Self::Expression(e) => Some(e),
             Self::List(list) => list.child_at(index),
+
+            Self::TypeAlias { ident, generic: Some(_), .. } if index == 0 => Some(ident),
+            Self::TypeAlias { generic: Some(gen), .. } if index == 1 => Some(gen),
+            Self::TypeAlias { generic: Some(_), ty, .. } if index == 2 => Some(&**ty),
+
             Self::TypeAlias { ident, .. } if index == 0 => Some(ident),
             Self::TypeAlias { ty, .. } if index == 1 => Some(&**ty),
             _ => None,
