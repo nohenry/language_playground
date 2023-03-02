@@ -190,14 +190,21 @@ impl Parser {
 
     pub fn precedence_of_operator(&self, operator: &Operator) -> u32 {
         match operator {
-            Operator::Equals => 1,
-            Operator::Plus => 2,
-            Operator::Minus => 2,
-            Operator::Multiply => 3,
-            Operator::Divide => 3,
-            Operator::Exponent => 4,
-            Operator::Dot => 5,
-            Operator::OpenParen => 6,
+            Operator::Equals => 1, // Assignement
+
+            Operator::Or => 10,
+            Operator::And => 14,
+
+            Operator::Plus | Operator::Minus => 20,
+
+            Operator::Multiply | Operator::Divide | Operator::Pipe | Operator::Ampersand | Operator::Percent  => 30,
+
+            Operator::Exponent => 40,
+
+            Operator::Dot => 50,
+
+            Operator::OpenParen => 60,
+
             _ => 0, // TODO: error
         }
     }

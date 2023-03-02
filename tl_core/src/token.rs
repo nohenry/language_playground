@@ -25,6 +25,8 @@ pub enum Operator {
     Multiply,
     Divide,
     Exponent,
+    Or,
+    And,
 
     Ampersand,
     Exclamation,
@@ -66,6 +68,8 @@ impl Operator {
             Self::Multiply => "*",
             Self::Divide => "/",
             Self::Exponent => "**",
+            Self::Or => "||",
+            Self::And => "&&",
 
             Self::Ampersand => "&",
             Self::Exclamation => "!",

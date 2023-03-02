@@ -129,6 +129,14 @@ impl Lexer {
                     Some('*') => return None,
                     _ => return Some(Token::Operator(Operator::Multiply)),
                 },
+                Some('|') => match next {
+                    Some('|') => return None,
+                    _ => return Some(Token::Operator(Operator::Pipe)),
+                },
+                Some('&') => match next {
+                    Some('&') => return None,
+                    _ => return Some(Token::Operator(Operator::Ampersand)),
+                },
                 Some('/') => return Some(Token::Operator(Operator::Divide)),
 
                 Some('&') => return Some(Token::Operator(Operator::Ampersand)),
@@ -156,6 +164,8 @@ impl Lexer {
 
         match (input.chars().next(), input.chars().nth(1)) {
             (Some('*'), Some('*')) => return Some(Token::Operator(Operator::Exponent)),
+            (Some('|'), Some('|')) => return Some(Token::Operator(Operator::Or)),
+            (Some('&'), Some('&')) => return Some(Token::Operator(Operator::And)),
             (Some('-'), Some('>')) => return Some(Token::Operator(Operator::Arrow)),
             _ => (),
         }
