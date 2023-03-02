@@ -1,9 +1,8 @@
 use crate::{
-    ast::{Expression, ParsedTemplate, ParsedTemplateString, PunctuationList, Statement, Type},
+    ast::{Expression, ParsedTemplate, ParsedTemplateString, PunctuationList, Statement},
     error::{ParseError, ParseErrorKind},
     lexer::Template,
     parser::Parser,
-    restore,
     token::{Operator, Range, SpannedToken, Token},
 };
 

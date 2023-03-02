@@ -38,7 +38,7 @@ impl Lexer {
                     Token::Whitespace => position += 1,
                     Token::Newline => {
                         let _ce = end_index - 1;
-                        if &input[start_index..end_index + 1] == "\r\n" {
+                        if end_index + 1 < input.len() && &input[start_index..end_index + 1] == "\r\n" {
                             end_index += 1;
                         }
 
@@ -139,14 +139,12 @@ impl Lexer {
                 },
                 Some('/') => return Some(Token::Operator(Operator::Divide)),
 
-                Some('&') => return Some(Token::Operator(Operator::Ampersand)),
                 Some('!') => return Some(Token::Operator(Operator::Exclamation)),
                 Some('@') => return Some(Token::Operator(Operator::At)),
                 Some('#') => return Some(Token::Operator(Operator::Pound)),
                 Some('$') => return Some(Token::Operator(Operator::Dollar)),
                 Some('%') => return Some(Token::Operator(Operator::Percent)),
                 Some('^') => return Some(Token::Operator(Operator::Carot)),
-                Some('|') => return Some(Token::Operator(Operator::Pipe)),
                 Some(';') => return Some(Token::Operator(Operator::SemiColon)),
                 Some('~') => return Some(Token::Operator(Operator::Tilde)),
                 Some('`') => return Some(Token::Operator(Operator::BackTick)),

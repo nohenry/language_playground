@@ -7,7 +7,7 @@ use crate::{
 
 impl Parser {
     pub fn parse_type(&self) -> Option<Type> {
-        let ty = self.parse_type_primary();
+        let mut ty = self.parse_type_primary();
 
         if let Some(Token::Operator(Operator::Pipe)) = self.tokens.peek() {
             let p = self.parse_punctutation_list(ty, Operator::Pipe, || {
@@ -20,6 +20,32 @@ impl Parser {
                 return None;
             }
         }
+
+        let ty = loop {
+            ty = match self.tokens.peek() {
+                Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
+                    ref_token: self.tokens.next().unwrap().clone(),
+                    base_type: ty.map(|ty| Box::new(ty)),
+                }),
+                Some(Token::Operator(Operator::Question)) => Some(Type::Option {
+                    question: self.tokens.next().unwrap().clone(),
+                    base_type: ty.map(|ty| Box::new(ty)),
+                }),
+                Some(Token::Operator(Operator::OpenAngle)) => {
+                    let enclosed_list = self.parse_enclosed_list(
+                        Operator::OpenAngle,
+                        Operator::Comma,
+                        Operator::CloseAngle,
+                        || self.parse_type().map(|ty| (ty, true)),
+                    );
+                    enclosed_list.map(|el| Type::Generic {
+                        base_type: ty.map(|ty| Box::new(ty)),
+                        list: el,
+                    })
+                }
+                _ => break ty,
+            };
+        };
 
         ty
     }
@@ -117,30 +143,6 @@ impl Parser {
             _ => None,
         };
 
-        let ty_first = match self.tokens.peek() {
-            Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
-                ref_token: self.tokens.next().unwrap().clone(),
-                base_type: ty_first.map(|ty| Box::new(ty)),
-            }),
-            Some(Token::Operator(Operator::Question)) => Some(Type::Option {
-                question: self.tokens.next().unwrap().clone(),
-                ty: ty_first.map(|ty| Box::new(ty)),
-            }),
-            Some(Token::Operator(Operator::OpenAngle)) => {
-                let enclosed_list = self.parse_enclosed_list(
-                    Operator::OpenAngle,
-                    Operator::Comma,
-                    Operator::CloseAngle,
-                    || self.parse_type().map(|ty| (ty, true)),
-                );
-                enclosed_list.map(|el| Type::Generic {
-                    base_type: ty_first.map(|ty| Box::new(ty)),
-                    list: el,
-                })
-            }
-            _ => ty_first,
-        };
-
         ty_first
     }
 
@@ -164,28 +166,35 @@ impl Parser {
                 let colon = self.tokens.next().unwrap().clone();
 
                 let first = if let Some(Token::Ident(_)) = self.tokens.peek() {
-                    self.tokens.next().unwrap().cloned()
+                    self.tokens.next().cloned()
                 } else {
                     None
                 };
 
-                let list = self.parse_punctutation_list(first, Operator::Ampersand, || {
-                    if let Some(Token::Ident(_)) = self.tokens.peek() {
-                        Some((self.tokens.next().unwrap().clone(), true))
-                    } else {
-                        None
-                    }
-                });
+                if let Some(Token::Operator(Operator::Ampersand)) = self.tokens.peek() {
+                    let list = restore!(
+                        self,
+                        self.parse_punctutation_list(first, Operator::Ampersand, || {
+                            if let Some(Token::Ident(_)) = self.tokens.peek() {
+                                Some((self.tokens.next().unwrap().clone(), true))
+                            } else {
+                                None
+                            }
+                        })
+                    );
 
-                if let Some(list) = list {
-                    return Some(GenericParameter::Bounded {
-                        ident,
-                        colon,
-                        bounds: list,
-                    });
-                } else {
-                    return None;
+                    if let Some(list) = list {
+                        return Some(GenericParameter::Bounded {
+                            ident,
+                            colon,
+                            bounds: list,
+                        });
+                    } else {
+                        return None;
+                    }
                 }
+
+                return first.map(|first| GenericParameter::Unbounded(first));
             }
             _ => (),
         };

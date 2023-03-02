@@ -1,5 +1,4 @@
 use core::fmt;
-use std::fmt::Write;
 
 use tl_util::format::{NodeDisplay, TreeDisplay};
 
@@ -356,12 +355,12 @@ pub enum Type {
         return_type: Option<(SpannedToken, Box<Type>)>,
     },
     Option {
-        ty: Option<Box<Type>>,
+        base_type: Option<Box<Type>>,
         question: SpannedToken,
     },
     Result {
         error: SpannedToken,
-        ty: Option<Box<Type>>,
+        base_type: Option<Box<Type>>,
     },
 }
 
@@ -439,22 +438,22 @@ impl PartialEq for Type {
             ) => l_parameters == r_parameters,
             (
                 Self::Option {
-                    ty: Some(l_ty),
+                    base_type: Some(l_ty),
                     question: l_question,
                 },
                 Self::Option {
-                    ty: Some(r_ty),
+                    base_type: Some(r_ty),
                     question: r_question,
                 },
             ) => l_ty == r_ty,
             (
                 Self::Result {
                     error: l_error,
-                    ty: Some(l_ty),
+                    base_type: Some(l_ty),
                 },
                 Self::Result {
                     error: r_error,
-                    ty: Some(r_ty),
+                    base_type: Some(r_ty),
                 },
             ) => l_ty == r_ty,
             _ => false,
@@ -515,12 +514,12 @@ impl AstNode for Type {
                 return_type: Some((_, ty)),
             } => Range::from((&parameters.get_range(), &ty.get_range())),
             Self::Option {
-                ty: Some(ty),
+                base_type: Some(ty),
                 question,
             } => Range::from((&ty.get_range(), &question.get_range())),
             Self::Option { question, .. } => question.get_range(),
             Self::Result {
-                ty: Some(ty),
+                base_type: Some(ty),
                 error,
             } => Range::from((&error.get_range(), &ty.get_range())),
             Self::Result { error, .. } => error.get_range(),
@@ -631,26 +630,30 @@ impl NodeDisplay for Type {
 
             //     ret.fmt(f)
             // }
-            Self::Option { ty, question } => {
-                if let Some(ty) = &ty {
-                    ty.fmt(f)?;
-                }
-                f.write_str(question.as_op_str())
+            Self::Option { base_type: ty, question } => {
+                f.write_str("Optional")
+                // if let Some(ty) = &ty {
+                //     ty.fmt(f)?;
+                // }
+                // f.write_str(question.as_op_str())
             }
-            Self::Result { ty, error } => {
-                if let Some(ty) = &ty {
-                    ty.fmt(f)?;
-                }
-                f.write_str(error.as_op_str())
+            Self::Result { base_type: ty, error } => {
+                f.write_str("Result")
+                // if let Some(ty) = &ty {
+                //     ty.fmt(f)?;
+                // }
+                // f.write_str(error.as_op_str())
             }
             Self::Ref {
                 ref_token,
                 base_type,
             } => {
-                if let Some(base_type) = &base_type {
-                    base_type.fmt(f)?;
-                }
-                f.write_str(ref_token.as_op_str())
+                f.write_str("Reference")
+
+                // if let Some(base_type) = &base_type {
+                //     base_type.fmt(f)?;
+                // }
+                // f.write_str(ref_token.as_op_str())
             }
         }
     }
@@ -673,6 +676,9 @@ impl TreeDisplay for Type {
             } => 2,
             Type::Generic { .. } => 1,
             Type::Expression(e) => 1,
+            Type::Option { .. } => 1,
+            Type::Result { .. } => 1,
+            Type::Ref { .. } => 1,
             _ => 0,
         }
     }
@@ -692,6 +698,9 @@ impl TreeDisplay for Type {
             },
             Type::Generic { list, .. } => Some(list),
             Type::Expression(e) => Some(&**e),
+            Type::Option { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
+            Type::Result { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
+            Type::Ref { base_type, .. } => base_type.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
             _ => None,
         }
     }
