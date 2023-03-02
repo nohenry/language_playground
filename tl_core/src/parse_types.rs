@@ -23,7 +23,7 @@ impl Parser {
 
         let ty = loop {
             ty = match self.tokens.peek() {
-                Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
+                Some(Token::Operator(Operator::At)) => Some(Type::Ref {
                     ref_token: self.tokens.next().unwrap().clone(),
                     base_type: ty.map(Box::new),
                 }),
