@@ -68,6 +68,10 @@ impl<T: AstNode> PunctuationList<T> {
         self.tokens.iter()
     }
 
+    pub fn take(self) -> Vec<(T, Option<SpannedToken>)> {
+        self.tokens
+    }
+
     pub fn len(&self) -> usize {
         self.tokens.len()
     }
@@ -337,24 +341,27 @@ pub enum Type {
     Ident(SpannedToken),
     Ref {
         ref_token: SpannedToken,
-        base_type: Box<Type>,
+        base_type: Option<Box<Type>>,
     },
     Array(EnclosedList<Type>),
     Union(PunctuationList<Type>),
     Tuple(EnclosedList<Type>),
-    Generic(EnclosedList<Type>),
+    Generic {
+        base_type: Option<Box<Type>>,
+        list: EnclosedList<Type>,
+    },
     Expression(Box<Expression>),
     Function {
         parameters: ParamaterList,
         return_type: Option<(SpannedToken, Box<Type>)>,
     },
     Option {
-        ty: Box<Type>,
+        ty: Option<Box<Type>>,
         question: SpannedToken,
     },
     Result {
         error: SpannedToken,
-        ty: Box<Type>,
+        ty: Option<Box<Type>>,
     },
 }
 
@@ -389,17 +396,26 @@ impl PartialEq for Type {
             (
                 Self::Ref {
                     ref_token: l_ref_token,
-                    base_type: l_base_type,
+                    base_type: Some(l_base_type),
                 },
                 Self::Ref {
                     ref_token: r_ref_token,
-                    base_type: r_base_type,
+                    base_type: Some(r_base_type),
                 },
             ) => l_base_type == r_base_type,
             (Self::Array(l0), Self::Array(r0)) => l0 == r0,
             (Self::Union(l0), Self::Union(r0)) => l0 == r0,
             (Self::Tuple(l0), Self::Tuple(r0)) => l0 == r0,
-            (Self::Generic(l0), Self::Generic(r0)) => l0 == r0,
+            (
+                Self::Generic {
+                    base_type: Some(btl0),
+                    list: l0,
+                },
+                Self::Generic {
+                    base_type: Some(btr0),
+                    list: r0,
+                },
+            ) => l0 == r0 && btl0 == btr0,
             // (Self::Expression(l0), Self::Expression(r0)) => l0 == r0,
             (
                 Self::Function {
@@ -423,22 +439,22 @@ impl PartialEq for Type {
             ) => l_parameters == r_parameters,
             (
                 Self::Option {
-                    ty: l_ty,
+                    ty: Some(l_ty),
                     question: l_question,
                 },
                 Self::Option {
-                    ty: r_ty,
+                    ty: Some(r_ty),
                     question: r_question,
                 },
             ) => l_ty == r_ty,
             (
                 Self::Result {
                     error: l_error,
-                    ty: l_ty,
+                    ty: Some(l_ty),
                 },
                 Self::Result {
                     error: r_error,
-                    ty: r_ty,
+                    ty: Some(r_ty),
                 },
             ) => l_ty == r_ty,
             _ => false,
@@ -484,7 +500,11 @@ impl AstNode for Type {
             Self::Array(a) => a.get_range(),
             Self::Union(a) => a.get_range(),
             Self::Tuple(a) => a.get_range(),
-            Self::Generic(a) => a.get_range(),
+            Self::Generic {
+                base_type: Some(base_type),
+                list,
+            } => Range::from((&base_type.get_range(), &list.get_range())),
+            Self::Generic { list, .. } => list.get_range(),
             Self::Expression(a) => a.get_range(),
             Self::Function {
                 parameters,
@@ -494,12 +514,21 @@ impl AstNode for Type {
                 parameters,
                 return_type: Some((_, ty)),
             } => Range::from((&parameters.get_range(), &ty.get_range())),
-            Self::Option { ty, question } => Range::from((&ty.get_range(), &question.get_range())),
-            Self::Result { ty, error } => Range::from((&error.get_range(), &ty.get_range())),
+            Self::Option {
+                ty: Some(ty),
+                question,
+            } => Range::from((&ty.get_range(), &question.get_range())),
+            Self::Option { question, .. } => question.get_range(),
+            Self::Result {
+                ty: Some(ty),
+                error,
+            } => Range::from((&error.get_range(), &ty.get_range())),
+            Self::Result { error, .. } => error.get_range(),
             Self::Ref {
                 ref_token,
-                base_type,
+                base_type: Some(base_type),
             } => Range::from((&base_type.get_range(), &ref_token.get_range())),
+            Self::Ref { ref_token, .. } => ref_token.get_range(),
         }
     }
 }
@@ -520,96 +549,108 @@ impl NodeDisplay for Type {
             } => write!(f, "u{width}"),
             Self::Boolean(_) => f.write_str("bool"),
             Self::Char(_) => f.write_str("char"),
-            Self::Ident(ident) => <SpannedToken as NodeDisplay>::fmt(ident, f),
+            Self::Ident(ident) => f.write_str(ident.as_str()),
             Self::Array(a) => {
-                write!(f, "{}", a.open.as_str())?;
-                let p: String = a
-                    .items
-                    .iter_items()
-                    .map(|f| format!("{}", f.format()))
-                    .intersperse(", ".to_string())
-                    .collect();
-                write!(f, "{}", a.close.as_str())
+                f.write_str("Array")
+                // write!(f, "{}", a.open.as_op_str())?;
+                // let p: String = a
+                //     .items
+                //     .iter_items()
+                //     .map(|f| format!("{}", f.format()))
+                //     .intersperse(", ".to_string())
+                //     .collect();
+                // write!(f, "{}{}", p, a.close.as_op_str())
             }
             Self::Union(u) => {
-                for item in u
-                    .iter_items()
-                    .map(|f| format!("{}", f.format()))
-                    .intersperse(" | ".to_string())
-                {
-                    f.write_str(item.as_str())?;
-                }
-                Ok(())
+                f.write_str("Union")
+                // for item in u
+                //     .iter_items()
+                //     .map(|f| format!("{}", f.format()))
+                //     .intersperse(" | ".to_string())
+                // {
+                //     f.write_str(item.as_str())?;
+                // }
+                // Ok(())
             }
             Self::Tuple(a) => {
-                write!(f, "{}", a.open.as_str())?;
-                let p: String = a
-                    .items
-                    .iter_items()
-                    .map(|f| format!("{}", f.format()))
-                    .intersperse(", ".to_string())
-                    .collect();
-                write!(f, "{}", a.close.as_str())
+                f.write_str("Tuple")
+                // write!(f, "{}", a.open.as_op_str())?;
+                // let p: String = a
+                //     .items
+                //     .iter_items()
+                //     .map(|f| format!("{}", f.format()))
+                //     .intersperse(", ".to_string())
+                //     .collect();
+                // write!(f, "{}{}", p, a.close.as_op_str())
             }
-            Self::Generic(a) => {
-                write!(f, "{}", a.open.as_str())?;
-                let p: String = a
-                    .items
-                    .iter_items()
-                    .map(|f| format!("{}", f.format()))
-                    .intersperse(", ".to_string())
-                    .collect();
-                write!(f, "{}", a.close.as_str())
+            Self::Generic { .. } => {
+                f.write_str("Generic")
+                // write!(f, "{}", a.open.as_op_str())?;
+                // let p: String = a
+                //     .items
+                //     .iter_items()
+                //     .map(|f| format!("{}", f.format()))
+                //     .intersperse(", ".to_string())
+                //     .collect();
+                // write!(f, "{}{}", p, a.close.as_op_str())
             }
-            Self::Expression(e) => e.fmt(f),
+            Self::Expression(e) => f.write_str("Expression"),
             Self::Function {
                 parameters,
-                return_type: None,
+                ..
+                // return_type: None,
             } => {
-                f.write_str("(")?;
+                f.write_str("Function")
+                // f.write_str("(")?;
 
-                let err: fmt::Result = parameters
-                    .iter_items()
-                    .map(|f| format!("{} {}", f.ty.as_ref().unwrap().format(), f.name()))
-                    .intersperse(", ".to_string())
-                    .map(|st| f.write_str(st.as_str()))
-                    .collect();
-                err?;
+                // let err: fmt::Result = parameters
+                //     .iter_items()
+                //     .map(|f| format!("{} {}", f.ty.as_ref().unwrap().format(), f.name()))
+                //     .intersperse(", ".to_string())
+                //     .map(|st| f.write_str(st.as_str()))
+                //     .collect();
+                // err?;
 
-                f.write_str(")")
+                // f.write_str(")")
             }
-            Self::Function {
-                parameters,
-                return_type: Some((_, ret)),
-            } => {
-                f.write_str("(")?;
+            // Self::Function {
+            //     parameters,
+            //     return_type: Some((_, ret)),
+            // } => {
+            //     f.write_str("(")?;
 
-                let err: fmt::Result = parameters
-                    .iter_items()
-                    .map(|f| format!("{} {}", f.ty.as_ref().unwrap().format(), f.name()))
-                    .intersperse(", ".to_string())
-                    .map(|st| f.write_str(st.as_str()))
-                    .collect();
-                err?;
+            //     let err: fmt::Result = parameters
+            //         .iter_items()
+            //         .map(|f| format!("{} {}", f.ty.as_ref().unwrap().format(), f.name()))
+            //         .intersperse(", ".to_string())
+            //         .map(|st| f.write_str(st.as_str()))
+            //         .collect();
+            //     err?;
 
-                f.write_str(") =>");
+            //     f.write_str(") =>");
 
-                ret.fmt(f)
-            }
+            //     ret.fmt(f)
+            // }
             Self::Option { ty, question } => {
-                ty.fmt(f)?;
-                question.fmt(f)
+                if let Some(ty) = &ty {
+                    ty.fmt(f)?;
+                }
+                f.write_str(question.as_op_str())
             }
             Self::Result { ty, error } => {
-                ty.fmt(f)?;
-                error.fmt(f)
+                if let Some(ty) = &ty {
+                    ty.fmt(f)?;
+                }
+                f.write_str(error.as_op_str())
             }
             Self::Ref {
                 ref_token,
                 base_type,
             } => {
-                ref_token.fmt(f)?;
-                base_type.fmt(f)
+                if let Some(base_type) = &base_type {
+                    base_type.fmt(f)?;
+                }
+                f.write_str(ref_token.as_op_str())
             }
         }
     }
@@ -623,11 +664,36 @@ impl fmt::Debug for Type {
 
 impl TreeDisplay for Type {
     fn num_children(&self) -> usize {
-        0
+        match self {
+            Type::Array(a) => a.items.num_children(),
+            Type::Union(a) => a.num_children(),
+            Type::Tuple(a) => a.items.num_children(),
+            Type::Generic {
+                base_type: Some(_), ..
+            } => 2,
+            Type::Generic { .. } => 1,
+            Type::Expression(e) => 1,
+            _ => 0,
+        }
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
-        None
+    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        match self {
+            Type::Array(a) => a.items.child_at(index),
+            Type::Union(a) => a.child_at(index),
+            Type::Tuple(a) => a.items.child_at(index),
+            Type::Generic {
+                base_type: Some(base_type),
+                list,
+            } => match index {
+                0 => Some(&**base_type),
+                1 => Some(list),
+                _ => None,
+            },
+            Type::Generic { list, .. } => Some(list),
+            Type::Expression(e) => Some(&**e),
+            _ => None,
+        }
     }
 }
 
@@ -638,21 +704,27 @@ pub enum ParsedTemplate {
 }
 
 impl NodeDisplay for ParsedTemplate {
-    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // match self {
-        //     // ParsedTemplate::String(s) => f.write_str(s.as_str()),
-        // }
-        Ok(())
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ParsedTemplate::String(l) => write!(f, "Literal: `{}`", l.as_str()),
+            ParsedTemplate::Template(t, _, _) => write!(f, "Value"),
+        }
     }
 }
 
 impl TreeDisplay for ParsedTemplate {
     fn num_children(&self) -> usize {
-        0
+        match self {
+            ParsedTemplate::Template(_, _, _) => 1,
+            _ => 0
+        } 
     }
 
     fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
-        None
+        match self {
+            ParsedTemplate::Template(e, _, _) => Some(&**e),
+            _ => None
+        } 
     }
 }
 
@@ -671,7 +743,7 @@ impl TreeDisplay for ParsedTemplateString {
     }
 
     fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
-        todo!()
+        self.0.get(_index).map::<&dyn TreeDisplay<()>, _>(|t| t)
     }
 }
 
@@ -784,7 +856,7 @@ impl NodeDisplay for Expression {
             Self::Integer(i, None, _) => write!(f, "{i}"),
             Self::Float(i, None, _) => write!(f, "{i}"),
             Self::Ident(SpannedToken(_, Token::Ident(i))) => write!(f, "{i}"),
-            Self::String(_pts, _) => write!(f, "\"{:?}\"", "kkjflsd"),
+            Self::String(_, _) => f.write_str("TemplateString"),
             Self::FunctionCall { .. } => write!(f, "FunctionCall"),
             Self::Array { .. } => f.write_str("Array"),
             _ => panic!(),
@@ -813,6 +885,7 @@ impl TreeDisplay for Expression {
             } => 2,
             Self::BinaryExpression { left: Some(_), .. } => 1,
             Self::BinaryExpression { right: Some(_), .. } => 1,
+            Self::String(p, _) => p.num_children(),
             _ => 0,
         }
     }
@@ -858,6 +931,7 @@ impl TreeDisplay for Expression {
             },
             Self::BinaryExpression { left: Some(l), .. } => Some(&**l),
             Self::BinaryExpression { right: Some(r), .. } => Some(&**r),
+            Self::String(t, _) => t.child_at(index),
             _ => None,
         }
     }

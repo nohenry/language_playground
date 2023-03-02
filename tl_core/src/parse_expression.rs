@@ -3,6 +3,7 @@ use crate::{
     error::{ParseError, ParseErrorKind},
     lexer::Template,
     parser::Parser,
+    restore,
     token::{Operator, Range, SpannedToken, Token},
 };
 
@@ -187,39 +188,57 @@ impl Parser {
         }
     }
 
-    pub fn parse_type(&self, last_prec: u32) -> Option<Type> {
-        let left = self.parse_type_lit();
+    pub fn parse_type(&self) -> Option<Type> {
+        let ty = self.parse_type_primary();
 
-        while let Some(t) = self.tokens.peek() {
-            left = match t {
-                Token::Operator(o) => {
-                    let prec = self.precedence_of_operator_for_ty(o);
-                    if prec <= last_prec || prec == 0 {
-                        break;
-                    }
+        if let Some(Token::Operator(Operator::Pipe)) = self.tokens.peek() {
+            let p = self.parse_punctutation_list(ty, Operator::Pipe, || {
+                restore!(self, self.parse_type_primary().map(|ty| (ty, true)))
+            });
 
-                    let op_token = self.tokens.next().cloned();
-
-                    let right = self.parse_type(prec);
-
-                    Some(Expression::BinaryExpression {
-                        left: left.map(Box::new),
-                        right: right.map(Box::new),
-                        op_token,
-                    })
-                }
-                _ => break,
+            if let Some(p) = p {
+                return Some(Type::Union(p));
+            } else {
+                return None;
             }
         }
 
-        // match self.tokens.peek() {
-        //     Some(Token::Operator(Operator::Ampersand)) => 
-        //     _ => left
-        // }
+        ty
+    }
+
+    pub fn parse_type_primary(&self) -> Option<Type> {
+        if let Some(Token::Operator(Operator::OpenParen)) = self.tokens.peek() {
+            let _open = self.tokens.next().unwrap();
+            let expr = self.parse_type();
+            let _close = self.tokens.next().unwrap(); // TODO: error
+
+            expr
+        } else {
+            self.parse_type_lit()
+        }
     }
 
     pub fn parse_type_lit(&self) -> Option<Type> {
         let ty_first = match self.tokens.peek() {
+            Some(Token::Operator(Operator::OpenSquare)) => {
+                let enclosed_list = self.parse_enclosed_list(
+                    Operator::OpenSquare,
+                    Operator::Comma,
+                    Operator::CloseSquare,
+                    || self.parse_type().map(|ty| (ty, true)),
+                );
+                enclosed_list.map(|el| Type::Array(el))
+            }
+            Some(Token::Operator(Operator::OpenBrace)) => {
+                let enclosed_list = self.parse_enclosed_list(
+                    Operator::OpenBrace,
+                    Operator::Comma,
+                    Operator::CloseBrace,
+                    || self.parse_type().map(|ty| (ty, true)),
+                );
+                enclosed_list.map(|el| Type::Tuple(el))
+            }
+
             Some(Token::Ident(id)) => match id.as_str() {
                 "i8" => Some(Type::Integer {
                     width: 8,
@@ -273,16 +292,36 @@ impl Parser {
                 "char" => Some(Type::Char(self.tokens.next().unwrap().clone())),
                 _ => Some(Type::Ident(self.tokens.next().unwrap().clone())),
             },
+            Some(_) => {
+                let expr = restore!(self, self.parse_literal());
+                expr.map(|expr| Type::Expression(Box::new(expr)))
+            }
             _ => None,
         };
 
-        match self.tokens.peek() {
-            Some(Token::Operator(Operator::Ampersand)) => Type::Ref {
+        let ty_first = match self.tokens.peek() {
+            Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
                 ref_token: self.tokens.next().unwrap().clone(),
-                base_type: Box::new(ty_first),
-            },
+                base_type: ty_first.map(|ty| Box::new(ty)),
+            }),
+            Some(Token::Operator(Operator::Question)) => Some(Type::Option {
+                question: self.tokens.next().unwrap().clone(),
+                ty: ty_first.map(|ty| Box::new(ty)),
+            }),
+            Some(Token::Operator(Operator::OpenAngle)) => {
+                let enclosed_list = self.parse_enclosed_list(
+                    Operator::OpenAngle,
+                    Operator::Comma,
+                    Operator::CloseAngle,
+                    || self.parse_type().map(|ty| (ty, true)),
+                );
+                enclosed_list.map(|el| Type::Generic {
+                    base_type: ty_first.map(|ty| Box::new(ty)),
+                    list: el,
+                })
+            }
             _ => ty_first,
-        }
+        };
 
         ty_first
     }
@@ -303,7 +342,7 @@ impl Parser {
 
     pub fn precedence_of_operator_for_ty(&self, operator: &Operator) -> u32 {
         match operator {
-            Operator::Ampersand => 20, 
+            Operator::Ampersand => 20,
             _ => 0, // TODO: error
         }
     }

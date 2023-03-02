@@ -1,7 +1,7 @@
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    ast::{ArgList, Param, ParamaterList, PunctuationList, Statement},
+    ast::{ArgList, AstNode, EnclosedList, Param, ParamaterList, PunctuationList, Statement},
     error::{ParseError, ParseErrorKind},
     token::{Operator, Range, SpannedToken, Token, TokenIndex, TokenStream},
 };
@@ -11,21 +11,25 @@ pub struct Parser {
     pub(crate) errors: RwLock<Vec<ParseError>>,
 }
 
+#[macro_export]
 macro_rules! restore {
     ($self:expr, $e:expr) => {{
         let index = $self.tokens.get_index();
         let res = $e;
-        index.restore(&$self.tokens);
+        if res.is_none() {
+            index.restore(&$self.tokens);
+        }
         res
     }};
 }
 
+#[macro_export]
 macro_rules! fallback {
     ($self:expr, $e:expr) => {{
         let index = $self.tokens.get_index();
         let res = $e;
-        index.restore(&$self.tokens);
         if res.is_none() {
+            index.restore(&$self.tokens);
             return None;
         }
         res
@@ -80,7 +84,7 @@ impl Parser {
                 let symb = self.expect(Token::Ident(String::new())).unwrap();
                 let eq = self.expect_operator(Operator::Equals).unwrap();
 
-                if let Some(us) = self.parse_type_lit() {
+                if let Some(us) = self.parse_type() {
                     return Some(Statement::TypeAlias {
                         ty_tok: ty_tok.clone(),
                         ident: symb.clone(),
@@ -210,7 +214,7 @@ impl Parser {
     }
 
     fn parse_parameter(&self) -> Option<Param> {
-        let ty = self.parse_type_lit();
+        let ty = self.parse_type();
         let ident = self.expect(Token::Ident("".into()));
 
         match (ident, ty) {
@@ -282,6 +286,117 @@ impl Parser {
                 items: args,
                 range: Range::default(),
             })
+        }
+    }
+
+    pub fn parse_punctutation_list<T: AstNode>(
+        &self,
+        first: Option<T>,
+        punc: Operator,
+        mut cb: impl FnMut() -> Option<(T, bool)>,
+    ) -> Option<PunctuationList<T>> {
+        let mut args = PunctuationList::default();
+
+        if let Some(first) = first {
+            match self.tokens.peek() {
+                Some(Token::Operator(op)) if op == &punc => {
+                    args.push(first, self.tokens.next().cloned())
+                }
+                _ => return None,
+            }
+        }
+
+        while let Some((arg, valid)) = cb() {
+            if !valid {
+                return None;
+            }
+            let punctuation = if let Some(Token::Operator(op)) = self.tokens.peek() {
+                if op == &punc {
+                    self.tokens.next().cloned()
+                } else if args.len() == 0 {
+                    return None;
+                } else {
+                    args.push_term(arg);
+                    break;
+                }
+            } else if args.len() == 0 {
+                return None;
+            } else {
+                args.push_term(arg);
+                break;
+            };
+
+            args.push(arg, punctuation);
+        }
+        Some(args)
+    }
+
+    pub fn parse_enclosed_list<T: AstNode>(
+        &self,
+        open: Operator,
+        punc: Operator,
+        close: Operator,
+        mut cb: impl FnMut() -> Option<(T, bool)>,
+    ) -> Option<EnclosedList<T>> {
+        let open = self.expect_operator(open);
+
+        let args = match self.tokens.peek() {
+            Some(Token::Operator(op)) if op == &close => PunctuationList::default(),
+            _ => {
+                let mut args = PunctuationList::default();
+
+                while let Some((arg, valid)) = cb() {
+                    if !valid {
+                        return None;
+                    }
+                    let comma = if let Some(Token::Operator(op)) = self.tokens.peek() {
+                        if op == &punc {
+                            self.tokens.next().cloned()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    if let Some(Token::Operator(cl)) = self.tokens.peek() {
+                        if cl == &close {
+                            args.push(arg, comma);
+                            break;
+                        }
+                    }
+                    if comma.is_none() {
+                        self.add_error(ParseError {
+                            kind: ParseErrorKind::InvalidSyntax(
+                                "Expected comma in arguments!".to_string(),
+                            ),
+                            range: Range::default(),
+                        });
+                    }
+                    args.push(arg, comma);
+                }
+                args
+            }
+        };
+
+        let close = self.expect_operator(close);
+
+        if let (Some(open), Some(close)) = (open, close) {
+            Some(EnclosedList {
+                open: open.clone(),
+                items: args,
+                close: close.clone(),
+            })
+        } else {
+            None
+            // self.add_error(ParseError {
+            //     kind: ParseErrorKind::InvalidSyntax("Unable to parse enclosed list!".to_string()),
+            //     range: Range::default(),
+            // });
+            // panic!()
+            // Some(Enclo{
+            //     items: args,
+            //     range: Range::default(),
+            // })
         }
     }
 

@@ -113,6 +113,8 @@ impl Lexer {
                 Some(')') => return Some(Token::Operator(Operator::CloseParen)),
                 Some('{') => return Some(Token::Operator(Operator::OpenBrace)),
                 Some('}') => return Some(Token::Operator(Operator::CloseBrace)),
+                Some('<') => return Some(Token::Operator(Operator::OpenAngle)),
+                Some('>') => return Some(Token::Operator(Operator::CloseAngle)),
 
                 Some(':') => return Some(Token::Operator(Operator::Colon)),
                 Some('.') => return Some(Token::Operator(Operator::Dot)),
@@ -142,6 +144,7 @@ impl Lexer {
                 Some('`') => return Some(Token::Operator(Operator::BackTick)),
                 Some('\'') => return Some(Token::Operator(Operator::SingleQuote)),
                 Some('"') => return Some(Token::Operator(Operator::Quote)),
+                Some('?') => return Some(Token::Operator(Operator::Question)),
 
                 Some('=') => return Some(Token::Operator(Operator::Equals)),
 

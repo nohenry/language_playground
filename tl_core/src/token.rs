@@ -12,6 +12,8 @@ pub enum Operator {
     CloseParen,
     OpenBrace,
     CloseBrace,
+    OpenAngle,
+    CloseAngle,
 
     Dot,
     Colon,
@@ -37,6 +39,7 @@ pub enum Operator {
     BackTick,
     Quote,
     SingleQuote,
+    Question,
 
     Equals,
 }
@@ -50,6 +53,8 @@ impl Operator {
             Self::CloseParen => ")",
             Self::OpenBrace => "{",
             Self::CloseBrace => "}",
+            Self::OpenAngle => "<",
+            Self::CloseAngle => ">",
 
             Self::Dot => ".",
             Self::Colon => ":",
@@ -75,6 +80,7 @@ impl Operator {
             Self::BackTick => "`",
             Self::SingleQuote => "'",
             Self::Quote => "\"",
+            Self::Question => "?",
 
             Self::Equals => "=",
         }
@@ -188,10 +194,12 @@ impl SpannedToken {
         Self(span, token)
     }
 
+    #[inline]
     pub fn tok(&self) -> &Token {
         &self.1
     }
 
+    #[inline]
     pub fn span(&self) -> &Span {
         &self.0
     }
@@ -203,6 +211,15 @@ impl SpannedToken {
     //     }
     // }
 
+    #[inline]
+    pub fn as_op_str(&self) -> &str {
+        match &self.1 {
+            Token::Operator(op) => op.as_str(),
+            _ => panic!("Expected to be identifier"),
+        }
+    }
+
+    #[inline]
     pub fn as_str(&self) -> &str {
         match &self.1 {
             Token::Ident(id) => id,

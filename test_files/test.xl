@@ -1,2 +1,2 @@
 
-type Potato = i32
+type Potato = 5
