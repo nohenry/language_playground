@@ -1,7 +1,9 @@
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    ast::{ArgList, AstNode, EnclosedPunctuationList, Param, ParamaterList, PunctuationList, Statement},
+    ast::{
+        ArgList, AstNode, EnclosedPunctuationList, Param, ParamaterList, PunctuationList, Statement,
+    },
     error::{ParseError, ParseErrorKind},
     token::{Operator, Range, SpannedToken, Token, TokenIndex, TokenStream},
 };
@@ -83,22 +85,34 @@ impl Parser {
                 let ty_tok = self.tokens.next().unwrap();
                 let symb = self.expect(Token::Ident(String::new())).unwrap();
 
-                let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek() {
+                let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek()
+                {
                     self.parse_generic_parameters()
                 } else {
                     None
                 };
 
-                let eq = self.expect_operator(Operator::Equals).unwrap();
-
-                if let Some(us) = self.parse_type() {
-                    return Some(Statement::TypeAlias {
-                        ty_tok: ty_tok.clone(),
-                        ident: symb.clone(),
-                        generic,
-                        eq: eq.clone(),
-                        ty: Box::new(us),
-                    });
+                if let Some(Token::Operator(Operator::OpenBrace)) = self.tokens.peek() {
+                    if let Some(strct) = self.parse_struct() {
+                        return Some(Statement::TypeAlias {
+                            ty_tok: ty_tok.clone(),
+                            ident: symb.clone(),
+                            generic,
+                            eq: None,
+                            ty: Box::new(strct),
+                        });
+                    }
+                } else {
+                    if let Some(us) = self.parse_type() {
+                        let eq = self.expect_operator(Operator::Equals).unwrap();
+                        return Some(Statement::TypeAlias {
+                            ty_tok: ty_tok.clone(),
+                            ident: symb.clone(),
+                            generic,
+                            eq: Some(eq.clone()),
+                            ty: Box::new(us),
+                        });
+                    }
                 }
             }
             Some(Token::Ident(_)) => {
@@ -222,8 +236,8 @@ impl Parser {
     }
 
     pub fn parse_parameter(&self) -> Option<Param> {
-        let ty = self.parse_type();
-        let ident = self.expect(Token::Ident("".into()));
+        let ty = fallback!(self, self.parse_type());
+        let ident = fallback!(self, self.expect(Token::Ident("".into())));
 
         match (ident, ty) {
             (Some(ident), Some(ty)) => Some(Param {
@@ -297,8 +311,10 @@ impl Parser {
         }
     }
 
-
-    pub fn parse_list<T: AstNode>(&self, mut cb: impl FnMut() -> Option<(T, bool)>) -> Option<Vec<T>> {
+    pub fn parse_list<T: AstNode>(
+        &self,
+        mut cb: impl FnMut() -> Option<(T, bool)>,
+    ) -> Option<Vec<T>> {
         let mut items = Vec::new();
 
         while let Some((arg, valid)) = cb() {
@@ -311,7 +327,7 @@ impl Parser {
 
         Some(items)
     }
-    
+
     pub fn parse_punctutation_list<T: AstNode>(
         &self,
         first: Option<T>,

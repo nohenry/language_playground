@@ -1,3 +1,4 @@
-
-type Potato <T: Poot & Hamud> = ((5<T>)@)?
-
+type Potato {
+    bool b
+    i32 a
+}

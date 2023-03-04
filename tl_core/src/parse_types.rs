@@ -1,5 +1,5 @@
 use crate::{
-    ast::{EnclosedPunctuationList, GenericParameter, Type},
+    ast::{EnclosedPunctuationList, GenericParameter, Type, EnclosedList},
     parser::Parser,
     restore,
     token::{Operator, Token},
@@ -15,7 +15,15 @@ impl Parser {
 
         let close = self.expect_operator(Operator::CloseBrace);
 
-        // if let ()
+        if let (Some(open), Some(list), Some(close)) = (open, list, close) {
+            Some(Type::Struct(EnclosedList {
+                open: open.clone(),
+                items: list,
+                close: close.clone()
+            }))
+        } else {
+            None
+        }
     }
 
     pub fn parse_type(&self) -> Option<Type> {

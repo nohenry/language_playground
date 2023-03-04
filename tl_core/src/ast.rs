@@ -350,7 +350,7 @@ impl<T: AstNode> AstNode for EnclosedList<T> {
 
 impl<T: AstNode> EnclosedList<T> {
     pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
-        self.items.iter_items()
+        self.items.iter()
     }
 }
 
@@ -362,14 +362,15 @@ impl<T: AstNode> NodeDisplay for EnclosedList<T> {
 
 impl<T: AstNode> TreeDisplay for EnclosedList<T> {
     fn num_children(&self) -> usize {
-        1
+        self.items.num_children()
     }
 
     fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
-        match index {
-            0 => Some(&self.items),
-            _ => None,
-        }
+        self.items.child_at(index)
+        // match index {
+        //     0 => Some(&self.items),
+        //     _ => None,
+        // }
     }
 }
 
@@ -705,7 +706,7 @@ impl NodeDisplay for Type {
                 // }
                 // f.write_str(ref_token.as_op_str())
             }
-            Self::Struct(s) => f.write_str("Struct"),
+            Self::Struct(_) => f.write_str("Struct"),
         }
     }
 }
@@ -730,7 +731,7 @@ impl TreeDisplay for Type {
             Type::Option { .. } => 1,
             Type::Result { .. } => 1,
             Type::Ref { .. } => 1,
-            Type::Struct(s) => s.len(),
+            Type::Struct(s) => s.num_children(),
             _ => 0,
         }
     }
@@ -753,7 +754,7 @@ impl TreeDisplay for Type {
             Type::Option { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
             Type::Result { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
             Type::Ref { base_type, .. } => base_type.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
-            Type::Struct(s) => s.get(index).map::<&dyn TreeDisplay, _>(|f| f),
+            Type::Struct(s) => s.child_at(index),
             _ => None,
         }
     }
@@ -1062,7 +1063,7 @@ pub enum Statement {
         ty_tok: SpannedToken,
         ident: SpannedToken,
         generic: Option<EnclosedPunctuationList<GenericParameter>>,
-        eq: SpannedToken,
+        eq: Option<SpannedToken>,
         ty: Box<Type>,
     },
 }
