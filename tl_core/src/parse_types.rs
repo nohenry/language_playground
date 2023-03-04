@@ -1,11 +1,23 @@
 use crate::{
-    ast::{EnclosedList, GenericParameter, Type},
+    ast::{EnclosedPunctuationList, GenericParameter, Type},
     parser::Parser,
     restore,
     token::{Operator, Token},
 };
 
 impl Parser {
+    pub fn parse_struct(&self) -> Option<Type> {
+        let open = self.expect_operator(Operator::OpenBrace);
+
+        let list = self.parse_list(|| {
+            self.parse_parameter().map(|f| (f, true))
+        });
+
+        let close = self.expect_operator(Operator::CloseBrace);
+
+        // if let ()
+    }
+
     pub fn parse_type(&self) -> Option<Type> {
         let mut ty = self.parse_type_primary();
 
@@ -146,7 +158,7 @@ impl Parser {
         ty_first
     }
 
-    pub fn parse_generic_parameters(&self) -> Option<EnclosedList<GenericParameter>> {
+    pub fn parse_generic_parameters(&self) -> Option<EnclosedPunctuationList<GenericParameter>> {
         self.parse_enclosed_list(
             Operator::OpenAngle,
             Operator::Comma,

@@ -1,7 +1,7 @@
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    ast::{ArgList, AstNode, EnclosedList, Param, ParamaterList, PunctuationList, Statement},
+    ast::{ArgList, AstNode, EnclosedPunctuationList, Param, ParamaterList, PunctuationList, Statement},
     error::{ParseError, ParseErrorKind},
     token::{Operator, Range, SpannedToken, Token, TokenIndex, TokenStream},
 };
@@ -83,8 +83,7 @@ impl Parser {
                 let ty_tok = self.tokens.next().unwrap();
                 let symb = self.expect(Token::Ident(String::new())).unwrap();
 
-                let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek()
-                {
+                let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek() {
                     self.parse_generic_parameters()
                 } else {
                     None
@@ -222,7 +221,7 @@ impl Parser {
         }
     }
 
-    fn parse_parameter(&self) -> Option<Param> {
+    pub fn parse_parameter(&self) -> Option<Param> {
         let ty = self.parse_type();
         let ident = self.expect(Token::Ident("".into()));
 
@@ -298,6 +297,21 @@ impl Parser {
         }
     }
 
+
+    pub fn parse_list<T: AstNode>(&self, mut cb: impl FnMut() -> Option<(T, bool)>) -> Option<Vec<T>> {
+        let mut items = Vec::new();
+
+        while let Some((arg, valid)) = cb() {
+            if !valid {
+                return None;
+            }
+
+            items.push(arg);
+        }
+
+        Some(items)
+    }
+    
     pub fn parse_punctutation_list<T: AstNode>(
         &self,
         first: Option<T>,
@@ -346,7 +360,7 @@ impl Parser {
         punc: Operator,
         close: Operator,
         mut cb: impl FnMut() -> Option<(T, bool)>,
-    ) -> Option<EnclosedList<T>> {
+    ) -> Option<EnclosedPunctuationList<T>> {
         let open = self.expect_operator(open);
 
         let args = match self.tokens.peek() {
@@ -390,7 +404,7 @@ impl Parser {
         let close = self.expect_operator(close);
 
         if let (Some(open), Some(close)) = (open, close) {
-            Some(EnclosedList {
+            Some(EnclosedPunctuationList {
                 open: open.clone(),
                 items: args,
                 close: close.clone(),

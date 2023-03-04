@@ -8,6 +8,16 @@ pub trait AstNode: TreeDisplay {
     fn get_range(&self) -> Range;
 }
 
+impl <T: AstNode> AstNode for Vec<T> {
+    fn get_range(&self) -> Range {
+        if let (Some(first), Some(last)) = (self.first(), self.last()) {
+            Range::from((&first.get_range(), &last.get_range()))
+        } else {
+            Range::default()
+        }
+    }
+}
+
 macro_rules! addup {
     ($($e:expr),*) => {{
         $((if let Some(_) = $e { 1 } else { 0 })+)* 0
@@ -276,9 +286,59 @@ impl TreeDisplay for ArgList {
 }
 
 #[derive(Clone)]
-pub struct EnclosedList<T: AstNode> {
+pub struct EnclosedPunctuationList<T: AstNode> {
     pub open: SpannedToken,
     pub items: PunctuationList<T>,
+    pub close: SpannedToken,
+}
+
+impl<T: AstNode> AstNode for EnclosedPunctuationList<T> {
+    fn get_range(&self) -> Range {
+        Range::from((&self.open, &self.close))
+    }
+}
+
+impl<T: AstNode> EnclosedPunctuationList<T> {
+    pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
+        self.items.iter_items()
+    }
+}
+
+impl<T: AstNode> NodeDisplay for EnclosedPunctuationList<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("Enclosed Punctuation List")
+    }
+}
+
+impl<T: AstNode> TreeDisplay for EnclosedPunctuationList<T> {
+    fn num_children(&self) -> usize {
+        1
+    }
+
+    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        match index {
+            0 => Some(&self.items),
+            _ => None,
+        }
+    }
+}
+
+impl<T: PartialEq + AstNode> PartialEq for EnclosedPunctuationList<T> {
+    fn eq(&self, other: &Self) -> bool {
+        for (a, b) in self.iter_items().zip(other.iter_items()) {
+            if a != b {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+
+#[derive(Clone)]
+pub struct EnclosedList<T: AstNode> {
+    pub open: SpannedToken,
+    pub items: Vec<T>,
     pub close: SpannedToken,
 }
 
@@ -313,17 +373,6 @@ impl<T: AstNode> TreeDisplay for EnclosedList<T> {
     }
 }
 
-impl<T: PartialEq + AstNode> PartialEq for EnclosedList<T> {
-    fn eq(&self, other: &Self) -> bool {
-        for (a, b) in self.iter_items().zip(other.iter_items()) {
-            if a != b {
-                return false;
-            }
-        }
-        true
-    }
-}
-
 #[derive(Clone)]
 pub enum Type {
     Integer {
@@ -342,12 +391,12 @@ pub enum Type {
         ref_token: SpannedToken,
         base_type: Option<Box<Type>>,
     },
-    Array(EnclosedList<Type>),
+    Array(EnclosedPunctuationList<Type>),
     Union(PunctuationList<Type>),
-    Tuple(EnclosedList<Type>),
+    Tuple(EnclosedPunctuationList<Type>),
     Generic {
         base_type: Option<Box<Type>>,
-        list: EnclosedList<Type>,
+        list: EnclosedPunctuationList<Type>,
     },
     Expression(Box<Expression>),
     Function {
@@ -362,6 +411,7 @@ pub enum Type {
         error: SpannedToken,
         base_type: Option<Box<Type>>,
     },
+    Struct(EnclosedList<Param>)
 }
 
 impl PartialEq for Type {
@@ -528,6 +578,7 @@ impl AstNode for Type {
                 base_type: Some(base_type),
             } => Range::from((&base_type.get_range(), &ref_token.get_range())),
             Self::Ref { ref_token, .. } => ref_token.get_range(),
+            Self::Struct(s) => s.get_range(),
         }
     }
 }
@@ -595,7 +646,6 @@ impl NodeDisplay for Type {
             }
             Self::Expression(_e) => f.write_str("Expression"),
             Self::Function {
-                
                 ..
                 // return_type: None,
             } => {
@@ -655,6 +705,7 @@ impl NodeDisplay for Type {
                 // }
                 // f.write_str(ref_token.as_op_str())
             }
+            Self::Struct(s) => f.write_str("Struct"),
         }
     }
 }
@@ -679,6 +730,7 @@ impl TreeDisplay for Type {
             Type::Option { .. } => 1,
             Type::Result { .. } => 1,
             Type::Ref { .. } => 1,
+            Type::Struct(s) => s.len(),
             _ => 0,
         }
     }
@@ -701,6 +753,7 @@ impl TreeDisplay for Type {
             Type::Option { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
             Type::Result { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
             Type::Ref { base_type, .. } => base_type.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
+            Type::Struct(s) => s.get(index).map::<&dyn TreeDisplay, _>(|f| f),
             _ => None,
         }
     }
@@ -1008,7 +1061,7 @@ pub enum Statement {
     TypeAlias {
         ty_tok: SpannedToken,
         ident: SpannedToken,
-        generic: Option<EnclosedList<GenericParameter>>,
+        generic: Option<EnclosedPunctuationList<GenericParameter>>,
         eq: SpannedToken,
         ty: Box<Type>,
     },
@@ -1045,7 +1098,9 @@ impl TreeDisplay for Statement {
             Self::UseStatement { token, args } => addup!(token) + args.num_children(),
             Self::Expression(_) => 1,
             Self::List(list) => list.num_children(),
-            Self::TypeAlias { generic: Some(_), .. } => 3,
+            Self::TypeAlias {
+                generic: Some(_), ..
+            } => 3,
             Self::TypeAlias { .. } => 2,
         }
     }
@@ -1069,9 +1124,19 @@ impl TreeDisplay for Statement {
             Self::Expression(e) => Some(e),
             Self::List(list) => list.child_at(index),
 
-            Self::TypeAlias { ident, generic: Some(_), .. } if index == 0 => Some(ident),
-            Self::TypeAlias { generic: Some(gen), .. } if index == 1 => Some(gen),
-            Self::TypeAlias { generic: Some(_), ty, .. } if index == 2 => Some(&**ty),
+            Self::TypeAlias {
+                ident,
+                generic: Some(_),
+                ..
+            } if index == 0 => Some(ident),
+            Self::TypeAlias {
+                generic: Some(gen), ..
+            } if index == 1 => Some(gen),
+            Self::TypeAlias {
+                generic: Some(_),
+                ty,
+                ..
+            } if index == 2 => Some(&**ty),
 
             Self::TypeAlias { ident, .. } if index == 0 => Some(ident),
             Self::TypeAlias { ty, .. } if index == 1 => Some(&**ty),

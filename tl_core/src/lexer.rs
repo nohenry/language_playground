@@ -38,7 +38,9 @@ impl Lexer {
                     Token::Whitespace => position += 1,
                     Token::Newline => {
                         let _ce = end_index - 1;
-                        if end_index + 1 < input.len() && &input[start_index..end_index + 1] == "\r\n" {
+                        if end_index + 1 < input.len()
+                            && &input[start_index..end_index + 1] == "\r\n"
+                        {
                             end_index += 1;
                         }
 
