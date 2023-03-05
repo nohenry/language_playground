@@ -1,9 +1,10 @@
 #![feature(iter_intersperse)]
+#![feature(box_patterns)]
 use std::{fs::File, io::Read, path::Path, sync::Arc};
 
 use evaluator::Evaluator;
 use tl_core::Module;
-use tl_util::Rf;
+use tl_util::{Rf, format::TreeDisplay};
 
 use crate::{
     pass::CodePass,
@@ -71,10 +72,10 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         fill_module(std_mod_scope);
     }
 
-    let code_pass = CodePass::new(symbol_tree, module.clone(), 1);
+    let code_pass = CodePass::new(symbol_tree.clone(), module.clone(), 1);
     let code_pass_state = code_pass.run();
 
-    // println!("{}", symbol_tree.format());
+    println!("{}", symbol_tree.format());
     let evaluator = Evaluator::new(module, code_pass_state.scope);
     let values = evaluator.evaluate();
 
@@ -86,8 +87,8 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         error.print(path.as_ref().as_os_str().to_str().unwrap(), &lines);
     }
 
-    for _value in values {
-        // println!("{value}");
+    for value in values {
+        println!("{value}");
     }
 
     // println!("{}", symbol_tree.format());

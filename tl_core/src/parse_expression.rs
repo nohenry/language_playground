@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Expression, ParsedTemplate, ParsedTemplateString, PunctuationList, Statement},
+    ast::{
+        EnclosedList, Expression, KeyValue, ParsedTemplate, ParsedTemplateString, PunctuationList,
+        Statement,
+    },
     error::{ParseError, ParseErrorKind},
     lexer::Template,
     parser::Parser,
@@ -7,7 +10,16 @@ use crate::{
 };
 
 impl Parser {
-    pub fn parse_expression(&self, last_prec: u32) -> Option<Expression> {
+    pub fn parse_expression(&self) -> Option<Expression> {
+        match self.tokens.peek() {
+            Some(Token::Operator(Operator::OpenBrace)) => {
+                self.parse_struct_initializer()
+            }
+            _ => self.parse_operator_expression(0),
+        }
+    }
+
+    pub fn parse_operator_expression(&self, last_prec: u32) -> Option<Expression> {
         let mut left = self.parse_primary_expression();
 
         while let Some(t) = self.tokens.peek() {
@@ -31,7 +43,7 @@ impl Parser {
 
                     let op_token = self.tokens.next().cloned();
 
-                    let right = self.parse_expression(prec);
+                    let right = self.parse_operator_expression(prec);
 
                     Some(Expression::BinaryExpression {
                         left: left.map(Box::new),
@@ -48,20 +60,54 @@ impl Parser {
 
     pub fn parse_primary_expression(&self) -> Option<Expression> {
         if let Some(Token::Operator(Operator::OpenParen)) = self.tokens.peek() {
-            let state = self.save_state();
-            if let Some(func) = self.parse_function() {
-                return Some(func);
-            }
-            state.restore(&self.tokens);
+            // let state = self.save_state();
+            // if let Some(func) = self.parse_function() {
+            //     return Some(func);
+            // }
+            // state.restore(&self.tokens);
 
             let _open = self.tokens.next().unwrap();
-            let expr = self.parse_expression(0);
+            let expr = self.parse_operator_expression(0);
             let _close = self.tokens.next().unwrap(); // TODO: error
 
             expr
         } else {
             self.parse_literal()
         }
+    }
+
+    pub fn parse_struct_initializer(&self) -> Option<Expression> {
+        let open = self.expect_operator(Operator::OpenBrace)?;
+        let list = self.parse_list(|| {
+            let name = match self.tokens.peek() {
+                Some(Token::Ident(_)) => self.tokens.next(),
+                _ => None,
+            };
+
+            let colon = self.expect_operator(Operator::Colon);
+
+            let expr = self.parse_expression();
+
+            if let (Some(name), Some(colon), Some(expr)) = (name, colon, expr) {
+                return Some((
+                    KeyValue {
+                        name: Some(name.clone()),
+                        colon: Some(colon.clone()),
+                        expr: Box::new(expr),
+                    },
+                    true,
+                ));
+            }
+
+            None
+        })?;
+        let close = self.expect_operator(Operator::CloseBrace)?;
+
+        Some(Expression::Record(EnclosedList {
+            open: open.clone(),
+            items: list,
+            close: close.clone(),
+        }))
     }
 
     pub fn parse_function_call(&self, expression: Expression) -> (Expression, bool) {
@@ -78,7 +124,17 @@ impl Parser {
         )
     }
 
-    pub fn parse_function(&self) -> Option<Expression> {
+    pub fn parse_function(&self) -> Option<Statement> {
+        let fn_tok = match self.tokens.peek() {
+            Some(Token::Ident(i)) if i == "fn" => self.tokens.next(),
+            _ => None
+        }?;
+
+        let ident = match self.tokens.peek() {
+            Some(Token::Ident(_)) => self.tokens.next(),
+            _ => None
+        }?;
+
         let parameters = self.parse_parameters();
 
         let parameters = if let Some(Token::Operator(Operator::Arrow)) = self.tokens.peek() {
@@ -87,20 +143,22 @@ impl Parser {
 
             match (parameters, return_parameters) {
                 (Some(parameters), Some(return_parameters)) => {
-                    if let Some((comma, body)) = self.parse_function_body() {
-                        return Some(Expression::Function {
+                    if let Some(body) = self.parse_statement() {
+                        return Some(Statement::Function {
+                            fn_tok: fn_tok.clone(),
+                            ident: ident.clone(),
                             parameters,
                             arrow,
                             return_parameters,
-                            comma,
-                            body: Some(Box::new(Statement::List(body))),
+                            body: Some(Box::new(body)),
                         });
                     } else {
-                        return Some(Expression::Function {
+                        return Some(Statement::Function {
+                            fn_tok: fn_tok.clone(),
+                            ident: ident.clone(),
                             parameters,
                             arrow,
                             return_parameters,
-                            comma: None,
                             body: None,
                         });
                     }
@@ -111,7 +169,10 @@ impl Parser {
             parameters
         };
 
-        parameters.map(|parameters| Expression::Record { parameters })
+
+
+        None
+        // parameters.map(|parameters| Expression::Record { parameters })
     }
 
     pub fn parse_function_body(
@@ -159,6 +220,8 @@ impl Parser {
                 None,
                 self.tokens.next().unwrap().clone(),
             )),
+            Some(Token::Ident(i)) if i == "true" => Some(Expression::Boolean(true, self.tokens.next().unwrap().clone())),
+            Some(Token::Ident(i)) if i == "false" => Some(Expression::Boolean(false, self.tokens.next().unwrap().clone())),
             Some(Token::Ident(_)) => Some(Expression::Ident(self.tokens.next().unwrap().clone())),
             Some(Token::TemplateString(ts)) => {
                 let tok = self.tokens.next().unwrap();
@@ -169,7 +232,7 @@ impl Parser {
                         Template::Template(t, o, c) => Some(ParsedTemplate::Template(
                             Box::new({
                                 let parser = Parser::new(t.clone());
-                                let expr = parser.parse_expression(0)?;
+                                let expr = parser.parse_operator_expression(0)?;
 
                                 let mut errors = self.errors.write().unwrap();
                                 errors.append(&mut parser.get_errors_mut());

@@ -1,7 +1,8 @@
 #![feature(trait_upcasting)]
 #![feature(iter_intersperse)]
+#![feature(box_patterns)]
 
-use ast::{Expression, ParamaterList, Statement, Type};
+use ast::{EnclosedList, Expression, Param, ParamaterList, Statement, Type};
 use lexer::Lexer;
 use linked_hash_map::LinkedHashMap;
 use log::{Log, SetLoggerError};
@@ -339,6 +340,8 @@ pub struct ModuleDescender<U: Clone> {
     on_statement: Option<Box<dyn FnMut(&Statement, U) -> (U, U)>>,
     on_expression: Option<Box<dyn FnMut(&Expression, U) -> U>>,
     on_parameters: Option<Box<dyn FnMut(&ParamaterList, U) -> U>>,
+    // on_stru: Option<Box<dyn F>>.
+    on_struct_members: Option<Box<dyn FnMut(&EnclosedList<Param>, U) -> U>>,
     on_return_parameters: Option<Box<dyn FnMut(&ParamaterList, U) -> U>>,
 }
 
@@ -349,6 +352,7 @@ impl<U: Clone> ModuleDescender<U> {
             on_statement: None,
             on_expression: None,
             on_parameters: None,
+            on_struct_members: None,
             on_return_parameters: None,
         }
     }
@@ -377,6 +381,14 @@ impl<U: Clone> ModuleDescender<U> {
         self
     }
 
+    pub fn with_on_struct_members(
+        mut self,
+        on_struct_memebers: impl FnMut(&EnclosedList<Param>, U) -> U + 'static,
+    ) -> ModuleDescender<U> {
+        self.on_struct_members = Some(Box::new(on_struct_memebers));
+        self
+    }
+
     pub fn with_on_return_parameters(
         mut self,
         on_return_parameters: impl FnMut(&ParamaterList, U) -> U + 'static,
@@ -394,23 +406,10 @@ impl<U: Clone> ModuleDescender<U> {
 
     pub fn descend_expression(&mut self, node: &Expression) {
         match node {
-            Expression::Function {
-                parameters,
-                return_parameters,
-                ..
-            } => {
-                if let Some(on_prm) = &mut self.on_parameters {
-                    on_prm(parameters, self.user_data.clone());
-                }
-
-                if let Some(on_prm) = &mut self.on_return_parameters {
-                    on_prm(return_parameters, self.user_data.clone());
-                }
-            }
-            Expression::Record { parameters } => {
-                if let Some(on_prm) = &mut self.on_parameters {
-                    on_prm(parameters, self.user_data.clone());
-                }
+            Expression::Record(parameters) => {
+                // if let Some(on_prm) = &mut self.on_parameters {
+                //     on_prm(parameters, self.user_data.clone());
+                // }
             }
             _ => (),
         }
@@ -436,6 +435,19 @@ impl<U: Clone> ModuleDescender<U> {
                 expr: Some(expr), ..
             } => self.descend_expression(expr),
             Statement::Expression(e) => self.descend_expression(e),
+            Statement::Function {
+                parameters,
+                return_parameters,
+                ..
+            } => {
+                if let Some(on_prm) = &mut self.on_parameters {
+                    on_prm(parameters, self.user_data.clone());
+                }
+
+                if let Some(on_prm) = &mut self.on_return_parameters {
+                    on_prm(return_parameters, self.user_data.clone());
+                }
+            }
             _ => (),
         }
         if let Some(sets) = sets {

@@ -16,9 +16,13 @@ use crate::const_value::{ConstValue, ConstValueKind, Type};
 #[derive(Clone)]
 pub enum ScopeValue {
     ConstValue(ConstValue),
-    Record {
+    Struct {
         ident: String,
         members: LinkedHashMap<String, Type>,
+    },
+    TypeAlias {
+        ident: String,
+        ty: Box<Type>,
     },
     Use(Vec<String>),
     Module(Arc<Module>),
@@ -33,7 +37,8 @@ impl NodeDisplay for ScopeValue {
                 ..
             }) => f.write_str("Function"),
             ScopeValue::ConstValue(_) => f.write_str("Constant Value"),
-            ScopeValue::Record { .. } => f.write_str("Record"),
+            ScopeValue::Struct { .. } => f.write_str("Record"),
+            ScopeValue::TypeAlias { .. } => f.write_str("Type Alias"),
             ScopeValue::Use(_) => f.write_str("Use"),
             ScopeValue::Module(_) => f.write_str("Module"),
             ScopeValue::Root => f.write_str("Root"),
@@ -45,7 +50,8 @@ impl TreeDisplay for ScopeValue {
     fn num_children(&self) -> usize {
         match self {
             ScopeValue::ConstValue(c) => c.num_children(),
-            ScopeValue::Record { .. } => 1,
+            ScopeValue::Struct { .. } => 1,
+            ScopeValue::TypeAlias { .. } => 2,
             ScopeValue::Use(s) => s.len(),
             ScopeValue::Module(_) => 0,
             ScopeValue::Root => 0,
@@ -55,7 +61,12 @@ impl TreeDisplay for ScopeValue {
     fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
         match self {
             ScopeValue::ConstValue(c) => c.child_at(index),
-            ScopeValue::Record { members, .. } => Some(members),
+            ScopeValue::Struct { members, .. } => Some(members),
+            ScopeValue::TypeAlias { ident, ty } => match index {
+                0 => Some(ident),
+                1 => Some(&**ty),
+                _ => None,
+            },
             ScopeValue::Use(s) => s.child_at(index),
             ScopeValue::Module(_) => None,
             ScopeValue::Root => None,
@@ -105,14 +116,14 @@ impl NodeDisplay for Scope {
 
 impl TreeDisplay for Scope {
     fn num_children(&self) -> usize {
-        2 + (if !self.children.is_empty() { 1 } else { 0 })
+        1 + (if !self.children.is_empty() { 1 } else { 0 })
             + (if !self.uses.is_empty() { 1 } else { 0 })
     }
 
     fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
         match _index {
             0 => Some(&self.value),
-            1 => Some(&self.index),
+            // 1 => Some(&self.index),
             _ => None,
         }
     }
@@ -222,8 +233,8 @@ impl<'a> ScopeManager {
                 let mut sym = sym.borrow_mut();
                 let ScopeValue::ConstValue(
                         ConstValue {
-                            ty: Type::RecordInstance { .. },
-                            kind: ConstValueKind::RecordInstance { members, .. }
+                            ty: Type::StructInstance { .. },
+                            kind: ConstValueKind::StructInstance { members, .. }
                         }
                     ) = &mut sym.value else {
                         return false
@@ -254,8 +265,8 @@ impl<'a> ScopeManager {
                 let mut sym = sym.borrow_mut();
                 let ScopeValue::ConstValue(
                         ConstValue {
-                            ty: Type::RecordInstance { .. },
-                            kind: ConstValueKind::RecordInstance { members, .. }
+                            ty: Type::StructInstance { .. },
+                            kind: ConstValueKind::StructInstance { members, .. }
                         }
                     ) = &mut sym.value else {
                         return false
@@ -276,8 +287,8 @@ impl<'a> ScopeManager {
             ) => {
                 return self.follow_member_access_leaf(left, right, |cv| {
                     let ConstValue {
-                        ty: Type::RecordInstance { .. },
-                        kind: ConstValueKind::RecordInstance { members, .. }
+                        ty: Type::StructInstance { .. },
+                        kind: ConstValueKind::StructInstance { members, .. }
                     } = cv else {
                         return;
                     };

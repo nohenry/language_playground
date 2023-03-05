@@ -1,5 +1,5 @@
 use crate::{
-    ast::{EnclosedPunctuationList, GenericParameter, Type, EnclosedList},
+    ast::{EnclosedList, EnclosedPunctuationList, GenericParameter, Type},
     parser::Parser,
     restore,
     token::{Operator, Token},
@@ -9,9 +9,7 @@ impl Parser {
     pub fn parse_struct(&self) -> Option<Type> {
         let open = self.expect_operator(Operator::OpenBrace);
 
-        let list = self.parse_list(|| {
-            self.parse_parameter().map(|f| (f, true))
-        });
+        let list = self.parse_list(|| self.parse_parameter().map(|f| (f, true)));
 
         let close = self.expect_operator(Operator::CloseBrace);
 
@@ -19,7 +17,7 @@ impl Parser {
             Some(Type::Struct(EnclosedList {
                 open: open.clone(),
                 items: list,
-                close: close.clone()
+                close: close.clone(),
             }))
         } else {
             None
@@ -52,7 +50,7 @@ impl Parser {
                     base_type: ty.map(Box::new),
                 }),
                 Some(Token::Operator(Operator::OpenAngle)) => {
-                    let enclosed_list = self.parse_enclosed_list(
+                    let enclosed_list = self.parse_enclosed_punctuation_list(
                         Operator::OpenAngle,
                         Operator::Comma,
                         Operator::CloseAngle,
@@ -85,7 +83,7 @@ impl Parser {
     pub fn parse_type_lit(&self) -> Option<Type> {
         let ty_first = match self.tokens.peek() {
             Some(Token::Operator(Operator::OpenSquare)) => {
-                let enclosed_list = self.parse_enclosed_list(
+                let enclosed_list = self.parse_enclosed_punctuation_list(
                     Operator::OpenSquare,
                     Operator::Comma,
                     Operator::CloseSquare,
@@ -94,7 +92,7 @@ impl Parser {
                 enclosed_list.map(Type::Array)
             }
             Some(Token::Operator(Operator::OpenBrace)) => {
-                let enclosed_list = self.parse_enclosed_list(
+                let enclosed_list = self.parse_enclosed_punctuation_list(
                     Operator::OpenBrace,
                     Operator::Comma,
                     Operator::CloseBrace,
@@ -167,7 +165,7 @@ impl Parser {
     }
 
     pub fn parse_generic_parameters(&self) -> Option<EnclosedPunctuationList<GenericParameter>> {
-        self.parse_enclosed_list(
+        self.parse_enclosed_punctuation_list(
             Operator::OpenAngle,
             Operator::Comma,
             Operator::CloseAngle,

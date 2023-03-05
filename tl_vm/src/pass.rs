@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
-    ast::{Expression, ParamaterList, Statement},
+    ast::{EnclosedList, Expression, Param, ParamaterList, Statement},
     token::{SpannedToken, Token},
     Module,
 };
@@ -16,6 +16,7 @@ use crate::{
 
 pub enum PassType {
     TypeOnly,
+    SecondType,
     Members,
     // Variables,
 }
@@ -69,51 +70,72 @@ impl CodePass {
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
-            Statement::Decleration {
-                ident: SpannedToken(_, Token::Ident(id)),
-                expr: Some(Expression::Record { parameters }),
+            Statement::TypeAlias {
+                ident,
+                generic,
+                ty: box tl_core::ast::Type::Struct(members),
                 ..
             } => {
                 match self.pass {
                     PassType::TypeOnly => {
                         self.wstate().scope.insert_value(
-                            id,
-                            ScopeValue::Record {
-                                ident: id.to_string(),
+                            ident.as_str(),
+                            ScopeValue::Struct {
+                                ident: ident.as_str().to_string(),
                                 members: LinkedHashMap::default(),
                             },
                             index,
                         );
                     }
                     PassType::Members => {
-                        let emembers = self.evaluate_params(parameters);
-                        if let Some(sym) = self.wstate().scope.find_symbol(id) {
+                        let emembers = self.evaluate_struct_members(members);
+                        if let Some(sym) = self.wstate().scope.find_symbol(ident.as_str()) {
                             let mut sym = sym.borrow_mut();
-                            if let ScopeValue::Record { members, .. } = &mut sym.value {
+                            if let ScopeValue::Struct { members, .. } = &mut sym.value {
                                 *members = emembers
                             }
                         }
                     }
+                    _ => (),
                 };
-                // self.wstate()
-                //     .scope
-                //     .update_value(id, ScopeValue::Record { members });
             }
-
-            Statement::Decleration {
-                ident: SpannedToken(_, Token::Ident(id)),
-                expr:
-                    Some(Expression::Function {
-                        parameters,
-                        return_parameters,
-                        body: Some(body),
-                        ..
-                    }),
+            Statement::TypeAlias {
+                ident,
+                generic: None,
+                ty,
+                ..
+            } => match self.pass {
+                PassType::TypeOnly => {
+                    self.wstate().scope.insert_value(
+                        ident.as_str(),
+                        ScopeValue::TypeAlias {
+                            ident: ident.as_str().to_string(),
+                            ty: Box::new(Type::Empty),
+                        },
+                        index,
+                    );
+                }
+                PassType::Members => {
+                    let expr_ty = self.evaluate_type(ty);
+                    if let Some(sym) = self.wstate().scope.find_symbol(ident.as_str()) {
+                        let mut sym = sym.borrow_mut();
+                        if let ScopeValue::TypeAlias { ty, .. } = &mut sym.value {
+                            *ty.as_mut() = expr_ty
+                        }
+                    }
+                }
+                _ => (),
+            },
+            Statement::Function {
+                ident,
+                parameters,
+                return_parameters,
+                body: Some(body),
                 ..
             } => match self.pass {
                 PassType::TypeOnly => {
                     let sym = self.wstate().scope.insert_value(
-                        id,
+                        ident.as_str(),
                         ScopeValue::ConstValue(ConstValue::empty()),
                         index,
                     );
@@ -122,7 +144,7 @@ impl CodePass {
                     let ereturn_parameters = self.evaluate_params(return_parameters);
 
                     self.wstate().scope.insert_value(
-                        id,
+                        ident.as_str(),
                         ScopeValue::ConstValue(ConstValue::func(
                             Statement::clone(body),
                             eparameters,
@@ -133,7 +155,7 @@ impl CodePass {
                     );
                 }
                 PassType::Members => {
-                    let Some(rf) = self.rstate().scope.find_symbol(id.as_str()) else {
+                    let Some(rf) = self.rstate().scope.find_symbol(ident.as_str()) else {
                         return;
                     };
                     let (pvals, rvals) = {
@@ -178,6 +200,7 @@ impl CodePass {
 
                     self.wstate().scope.pop_scope();
                 }
+                _ => (),
             },
             Statement::Decleration { ident, .. } => match self.pass {
                 PassType::TypeOnly => {
@@ -214,6 +237,20 @@ impl CodePass {
         LinkedHashMap::from_iter(iter)
     }
 
+    pub fn evaluate_struct_members(
+        &self,
+        members: &EnclosedList<Param>,
+    ) -> LinkedHashMap<String, Type> {
+        let iter = members.iter_items().filter_map(|f| {
+            if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
+                Some((ident.as_str().to_string(), self.evaluate_type(ty)))
+            } else {
+                None
+            }
+        });
+        LinkedHashMap::from_iter(iter)
+    }
+
     fn evaluate_type(&self, ty: &tl_core::ast::Type) -> Type {
         match ty {
             tl_core::ast::Type::Integer { width, signed, .. } => Type::Integer {
@@ -231,6 +268,7 @@ impl CodePass {
                 // });
                 Type::Empty
             }
+            tl_core::ast::Type::Boolean(_) => Type::Boolean,
             _ => Type::Empty,
         }
     }

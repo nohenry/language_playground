@@ -55,7 +55,12 @@ impl EvaluationError {
             lines[self.range.start.line_num as usize]
         );
         let start = 1 + self.range.start.position as usize;
-        let len = (self.range.end.position - self.range.start.position + 1) as usize;
+        let len = if self.range.end == self.range.start {
+            self.range.start.length as usize
+        } else {
+            (self.range.end.position - self.range.start.position + 1) as usize
+        };
+        // let len = (self.range.end.position - self.range.start.position + 1) as usize;
         let notes = self.kind.get_notes();
         if let Some(s) = notes.first() {
             println!(

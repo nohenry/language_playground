@@ -1,20 +1,23 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
     ast::{
-        ArgList, AstNode, Expression, ParamaterList, ParsedTemplate, ParsedTemplateString,
-        Statement,
+        ArgList, AstNode, EnclosedList, Expression, Param, ParamaterList, ParsedTemplate,
+        ParsedTemplateString, Statement,
     },
     token::{Operator, Range, SpannedToken, Token},
     Module,
 };
-use tl_util::format::TreeDisplay;
+use tl_util::{format::TreeDisplay, Rf};
 
 use crate::{
     const_value::{ConstValue, ConstValueKind, Type},
     error::{EvaluationError, EvaluationErrorKind, TypeHint},
-    scope::{ScopeManager, ScopeValue},
+    scope::{Scope, ScopeManager, ScopeValue},
 };
 
 pub struct EvaluatorState {
@@ -62,30 +65,42 @@ impl Evaluator {
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) -> ConstValue {
         match statement {
-            Statement::Decleration {
-                ident: SpannedToken(_, Token::Ident(id)),
-                expr: Some(Expression::Record { parameters }),
+            Statement::TypeAlias {
+                ident,
+                generic,
+                ty: box tl_core::ast::Type::Struct(members),
                 ..
             } => {
-                let members = self.evaluate_params(parameters);
+                let members = self.evaluate_struct_members(members);
                 self.wstate().scope.update_value(
-                    id,
-                    ScopeValue::Record {
+                    ident.as_str(),
+                    ScopeValue::Struct {
                         members,
-                        ident: id.to_string(),
+                        ident: ident.as_str().to_string(),
                     },
                     index,
                 );
             }
-            Statement::Decleration {
-                ident: SpannedToken(_, Token::Ident(id)),
-                expr:
-                    Some(Expression::Function {
-                        parameters,
-                        return_parameters,
-                        body: Some(body),
-                        ..
-                    }),
+            // Statement::Decleration {
+            //     ident: SpannedToken(_, Token::Ident(id)),
+            //     expr: Some(Expression::Record(parameters)),
+            //     ..
+            // } => {
+            //     let members = self.evaluate_struct_members(parameters);
+            //     self.wstate().scope.update_value(
+            //         id,
+            //         ScopeValue::Struct {
+            //             members,
+            //             ident: id.to_string(),
+            //         },
+            //         index,
+            //     );
+            // }
+            Statement::Function {
+                ident,
+                parameters,
+                return_parameters,
+                body: Some(body),
                 ..
             } => {
                 let parameters = self.evaluate_params(parameters);
@@ -94,9 +109,9 @@ impl Evaluator {
                 // self.wstate()
                 //     .scope
                 //     .update_value(id, ScopeValue::ConstValue(ConstValue::empty()), index);
-                let sym = self.wstate().scope.find_symbol(id).unwrap();
+                let sym = self.wstate().scope.find_symbol(ident.as_str()).unwrap();
                 self.wstate().scope.update_value(
-                    id,
+                    ident.as_str(),
                     ScopeValue::ConstValue(ConstValue::func(
                         Statement::clone(body),
                         parameters,
@@ -107,11 +122,43 @@ impl Evaluator {
                 );
             }
             Statement::Decleration {
+                ty,
                 ident,
-                expr: Some(expr),
+                expr: Some(raw_expr),
                 ..
             } => {
-                let expr = self.evaluate_expression(expr, index);
+                let ty = self.evaluate_type(ty);
+                let expr = self.evaluate_expression(raw_expr, index);
+
+                match (ty, expr) {
+                    (
+                        Type::Symbol(sym),
+                        ConstValue {
+                            kind: ConstValueKind::StructInitializer { members: args },
+                            ..
+                        },
+                    ) => {
+                        if let ScopeValue::Struct { members, .. } = &sym.borrow().value {
+                            return self.evaluate_struct_init(
+                                &sym,
+                                members,
+                                &args,
+                                |i| {
+                                    if let Expression::Record(r) = raw_expr {
+                                        if let Some(item) = r.iter_items().nth(i) {
+                                            return Some(item.expr.get_range());
+                                        }
+                                    }
+                                    None
+                                },
+                                raw_expr.get_range(),
+                            );
+                        }
+                    }
+                    _ => (),
+                }
+
+                let expr = self.evaluate_expression(raw_expr, index);
                 self.wstate().scope.update_value(
                     ident.as_str(),
                     ScopeValue::ConstValue(expr),
@@ -159,10 +206,25 @@ impl Evaluator {
         LinkedHashMap::from_iter(iter)
     }
 
+    pub fn evaluate_struct_members(
+        &self,
+        members: &EnclosedList<Param>,
+    ) -> LinkedHashMap<String, Type> {
+        let iter = members.iter_items().filter_map(|f| {
+            if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
+                Some((ident.as_str().to_string(), self.evaluate_type(ty)))
+            } else {
+                None
+            }
+        });
+        LinkedHashMap::from_iter(iter)
+    }
+
     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> ConstValue {
         match expression {
             Expression::Integer(val, _, _) => ConstValue::cinteger(*val),
             Expression::Float(val, _, _) => ConstValue::cfloat(*val),
+            Expression::Boolean(b, _) => ConstValue::bool(*b),
             Expression::String(ParsedTemplateString(vs), _) => {
                 let str = vs
                     .iter()
@@ -183,7 +245,7 @@ impl Evaluator {
                     let symv = sym.borrow();
                     match &symv.value {
                         ScopeValue::ConstValue(cv) => cv.clone(),
-                        ScopeValue::Record { .. } => ConstValue {
+                        ScopeValue::Struct { .. } => ConstValue {
                             ty: Type::Symbol(sym.clone()),
                             kind: ConstValueKind::Empty,
                         },
@@ -202,6 +264,14 @@ impl Evaluator {
                 right: Some(right),
                 op_token: Some(SpannedToken(_, Token::Operator(o))),
             } => self.evaluate_binary_expression(left, o, right, index),
+            Expression::Record(r) => {
+                let hmp = LinkedHashMap::from_iter(
+                    r.iter_items()
+                        .map(|f| (f.name().clone(), self.evaluate_expression(&f.expr, index))),
+                );
+
+                ConstValue::record_initializer(hmp)
+            }
             Expression::FunctionCall {
                 expr,
                 args: raw_args,
@@ -348,59 +418,60 @@ impl Evaluator {
 
                         ConstValue::record_instance(rf, return_vals)
                     }
-                    // Record is instantiated
-                    (Type::Symbol(sym), _) => {
-                        if let ScopeValue::Record { members, .. } = &sym.borrow().value {
-                            let len_off = members.len() != args.len();
-                            let args_vals: LinkedHashMap<_, _> = members
-                                .iter()
-                                .zip(args.into_iter())
-                                .enumerate()
-                                .filter_map(|(i, ((name, ty), arg))| {
-                                    let arg = arg.try_implicit_cast(ty).unwrap_or(arg);
-                                    if &arg.ty == ty {
-                                        Some((name.clone(), arg))
-                                    } else {
-                                        self.add_error(EvaluationError {
-                                            kind: EvaluationErrorKind::TypeMismatch(
-                                                arg.ty,
-                                                ty.clone(),
-                                                TypeHint::Parameter,
-                                            ),
-                                            range: raw_args
-                                                .items
-                                                .iter_items()
-                                                .nth(i)
-                                                .unwrap()
-                                                .get_range(),
-                                        });
-                                        None
-                                    }
-                                })
-                                .collect();
-
-                            if len_off {
-                                // If the number of arguments doesn't match the record
-                                self.add_error(EvaluationError {
-                                    kind: EvaluationErrorKind::ArgCountMismatch(
-                                        raw_args.len() as _,
-                                        members.len() as _,
-                                    ),
-                                    range: raw_args.get_range(),
-                                });
-                            } else if args_vals.len() == members.len() {
-                                // Everything good!
-                                return ConstValue::record_instance(sym.clone(), args_vals);
-                            }
-                        }
-                        ConstValue::empty()
-                    }
                     // TODO: throw error
                     _ => ConstValue::empty(),
                 }
             }
             _ => ConstValue::empty(),
         }
+    }
+
+    pub fn evaluate_struct_init(
+        &self,
+        symbol: &Rf<Scope>,
+        members: &LinkedHashMap<String, Type>,
+        args: &LinkedHashMap<String, ConstValue>,
+        member_range_provider: impl Fn(usize) -> Option<Range>,
+        full_range: Range,
+    ) -> ConstValue {
+        let arg_len = args.len();
+        let len_off = members.len() != args.len();
+
+        let arg_vals: LinkedHashMap<_, _> = members
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (name, ty))| {
+                if let Some(arg) = args.get(name) {
+                    let arg = arg.try_implicit_cast(ty).unwrap_or_else(|| arg.clone());
+                    if &arg.ty == ty {
+                        return Some((name.clone(), arg));
+                    } else {
+                        self.add_error(EvaluationError {
+                            kind: EvaluationErrorKind::TypeMismatch(
+                                arg.ty,
+                                ty.clone(),
+                                TypeHint::Parameter,
+                            ),
+                            range: member_range_provider(i).unwrap_or(full_range),
+                        });
+                        return None;
+                    }
+                }
+                None
+            })
+            .collect();
+
+        if len_off {
+            // If the number of arguments doesn't match the record
+            self.add_error(EvaluationError {
+                kind: EvaluationErrorKind::ArgCountMismatch(arg_len as _, members.len() as _),
+                range: full_range,
+            });
+        } else if arg_vals.len() == members.len() {
+            // Everything good!
+            return ConstValue::record_instance(symbol.clone(), arg_vals);
+        }
+        ConstValue::empty()
     }
 
     pub fn evaluate_binary_expression(
@@ -442,7 +513,7 @@ impl Evaluator {
                 let left = self.evaluate_expression(raw_left, index);
                 match (left.kind, raw_right) {
                     (
-                        ConstValueKind::RecordInstance { members, .. },
+                        ConstValueKind::StructInstance { members, .. },
                         Expression::Ident(SpannedToken(_, Token::Ident(member))),
                     ) => {
                         if let Some(val) = members.get(member) {
@@ -627,6 +698,7 @@ impl Evaluator {
                 });
                 Type::Empty
             }
+            tl_core::ast::Type::Boolean(_) => Type::Boolean,
             _ => Type::Empty,
         }
     }

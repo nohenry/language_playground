@@ -176,7 +176,7 @@ impl Backend {
                                 0,
                             );
                         }
-                        ScopeValue::Record { .. } => {
+                        ScopeValue::Struct { .. } => {
                             builder.push(
                                 tok.span().line_num,
                                 tok.span().position,
@@ -186,7 +186,7 @@ impl Backend {
                             );
                         }
                         ScopeValue::ConstValue(ConstValue {
-                            kind: ConstValueKind::RecordInstance { .. },
+                            kind: ConstValueKind::StructInstance { .. },
                             ..
                         }) => {
                             builder.push(

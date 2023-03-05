@@ -24,6 +24,7 @@ pub enum Type {
     Float {
         width: u8,
     },
+    Boolean,
     Function {
         parameters: LinkedHashMap<String, Type>,
         return_parameters: LinkedHashMap<String, Type>,
@@ -32,7 +33,10 @@ pub enum Type {
     Symbol(Rf<Scope>),
     Ident(String),
     Tuple(Vec<Type>),
-    RecordInstance {
+    StructInitializer {
+        members: LinkedHashMap<String, Type>,
+    },
+    StructInstance {
         rf: Option<Rf<Scope>>,
         members: LinkedHashMap<String, Type>,
     },
@@ -66,17 +70,17 @@ impl PartialEq for Type {
             (Self::Ident(l0), Self::Ident(r0)) => l0 == r0,
             (Self::Tuple(l0), Self::Tuple(r0)) => l0 == r0,
             (
-                Self::RecordInstance {
+                Self::StructInstance {
                     rf: l_rf,
                     members: l_members,
                 },
-                Self::RecordInstance {
+                Self::StructInstance {
                     rf: r_rf,
                     members: r_members,
                 },
             ) => l_rf == r_rf && l_members == r_members,
-            (Self::RecordInstance { rf: Some(l_rf), .. }, Self::Symbol(sym)) => l_rf == sym,
-            (Self::Symbol(sym), Self::RecordInstance { rf: Some(l_rf), .. }) => sym == l_rf,
+            (Self::StructInstance { rf: Some(l_rf), .. }, Self::Symbol(sym)) => l_rf == sym,
+            (Self::Symbol(sym), Self::StructInstance { rf: Some(l_rf), .. }) => sym == l_rf,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -101,6 +105,7 @@ impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::String => f.write_str("string"),
+            Self::Boolean => f.write_str("bool"),
             Self::Float { width, .. } => write!(f, "f{width}"),
             Self::Integer {
                 width,
@@ -141,7 +146,7 @@ impl Display for Type {
             }
             Self::Symbol(rs) => {
                 let rs = rs.borrow();
-                if let ScopeValue::Record { ident, members } = &rs.value {
+                if let ScopeValue::Struct { ident, members } = &rs.value {
                     write!(f, "{ident}: (")?;
                     let mut iter = members.iter();
 
@@ -155,7 +160,7 @@ impl Display for Type {
                 }
                 Ok(())
             }
-            Self::RecordInstance { members, .. } => {
+            Self::StructInstance { members, .. } | Self::StructInitializer { members } => {
                 write!(f, "(")?;
                 let mut iter = members.iter();
 
@@ -187,9 +192,11 @@ impl Display for Type {
 impl NodeDisplay for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Self::Boolean => f.write_str("bool"),
             Self::String => f.write_str("string"),
             Self::Symbol { .. } => write!(f, "Symbol"),
-            Self::RecordInstance { .. } => write!(f, "Record Instance"),
+            Self::StructInitializer { .. } => write!(f, "Struct Initializer"),
+            Self::StructInstance { .. } => write!(f, "Struct Instance"),
             Self::Tuple(_) => write!(f, "Tuple"),
             Self::Empty => write!(f, "Empty"),
             Self::CoercibleInteger => write!(f, "Coercible Integer"),
@@ -220,7 +227,7 @@ impl TreeDisplay for Type {
         match self {
             Type::Function { .. } => 2,
             Type::Tuple(tu) => tu.len(),
-            Type::RecordInstance { members, .. } => members.len(),
+            Type::StructInstance { members, .. } => members.len(),
             _ => 0,
         }
     }
@@ -242,14 +249,14 @@ impl TreeDisplay for Type {
                     None
                 }
             }
-            Type::RecordInstance { .. } => None,
+            Type::StructInstance { .. } => None,
             _ => None,
         }
     }
 
     fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
-            Type::RecordInstance { members, .. } => members.child_at_bx(_index),
+            Type::StructInstance { members, .. } => members.child_at_bx(_index),
             _ => panic!(),
         }
     }
@@ -267,6 +274,9 @@ pub enum ConstValueKind {
     String {
         string: String,
     },
+    Bool {
+        value: bool,
+    },
     Function {
         rf: Rf<Scope>,
         body: Statement,
@@ -280,7 +290,10 @@ pub enum ConstValueKind {
         >,
     },
     Tuple(Vec<ConstValue>),
-    RecordInstance {
+    StructInitializer {
+        members: LinkedHashMap<String, ConstValue>,
+    },
+    StructInstance {
         rf: Rf<Scope>,
         members: LinkedHashMap<String, ConstValue>,
     },
@@ -290,6 +303,7 @@ impl Display for ConstValueKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ConstValueKind::Empty => f.write_str("()"),
+            ConstValueKind::Bool { value } => write!(f, "{value}"),
             ConstValueKind::Integer { value } => write!(f, "{value}"),
             ConstValueKind::Float { value } => write!(f, "{value}"),
             ConstValueKind::String { string } => write!(f, "{string}"),
@@ -306,7 +320,8 @@ impl Display for ConstValueKind {
                 }
                 Ok(())
             }
-            ConstValueKind::RecordInstance { members, .. } => {
+            ConstValueKind::StructInstance { members, .. }
+            | ConstValueKind::StructInitializer { members } => {
                 let mut iter = members.iter();
                 write!(f, "{{ ")?;
                 let Some(item) = iter.next() else {
@@ -340,7 +355,7 @@ impl ConstValueKind {
 
     pub fn as_record_instance(&self) -> (&Rf<Scope>, &LinkedHashMap<String, ConstValue>) {
         match self {
-            ConstValueKind::RecordInstance { rf, members } => (rf, members),
+            ConstValueKind::StructInstance { rf, members } => (rf, members),
             _ => panic!(),
         }
     }
@@ -355,12 +370,14 @@ impl NodeDisplay for ConstValueKind {
         match self {
             ConstValueKind::Empty => write!(f, "Empty"),
             ConstValueKind::Integer { value } => write!(f, "Integer: {value}"),
+            ConstValueKind::Bool { value } => write!(f, "Boolean: {value}"),
             ConstValueKind::Float { value } => write!(f, "Float: {value}"),
             ConstValueKind::String { string } => write!(f, "String: {string}"),
             ConstValueKind::Function { .. } => write!(f, "Function"),
             ConstValueKind::NativeFunction { .. } => write!(f, "Native Function"),
             ConstValueKind::Tuple(_) => write!(f, "Tuple"),
-            ConstValueKind::RecordInstance { .. } => write!(f, "Record Instance"),
+            ConstValueKind::StructInitializer { .. } => write!(f, "Struct Initializer"),
+            ConstValueKind::StructInstance { .. } => write!(f, "Record Instance"),
         }
     }
 }
@@ -370,7 +387,8 @@ impl TreeDisplay for ConstValueKind {
         match self {
             ConstValueKind::Function { .. } => 1,
             ConstValueKind::Tuple(list) => list.len(),
-            ConstValueKind::RecordInstance { members, .. } => members.len(),
+            // ConstValueKind::StructInitializer { members, .. } => members.len(),
+            // ConstValueKind::StructInstance { members, .. } => members.len(),
             _ => 0,
         }
     }
@@ -388,14 +406,14 @@ impl TreeDisplay for ConstValueKind {
                     None
                 }
             }
-            ConstValueKind::RecordInstance { .. } => None,
+            ConstValueKind::StructInstance { .. } => None,
             _ => None,
         }
     }
 
     fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
-            ConstValueKind::RecordInstance { members, .. } => members.child_at_bx(index),
+            ConstValueKind::StructInstance { members, .. } => members.child_at_bx(index),
             _ => panic!(),
         }
     }
@@ -464,6 +482,13 @@ impl ConstValue {
         }
     }
 
+    pub fn bool(value: bool) -> ConstValue {
+        ConstValue {
+            kind: ConstValueKind::Bool { value },
+            ty: Type::Boolean,
+        }
+    }
+
     pub fn func(
         body: Statement,
         parameters: LinkedHashMap<String, Type>,
@@ -487,6 +512,16 @@ impl ConstValue {
         }
     }
 
+    pub fn record_initializer(values: LinkedHashMap<String, ConstValue>) -> ConstValue {
+        let types = values.values().map(|val| val.ty.clone());
+        let ty = LinkedHashMap::from_iter(values.keys().cloned().zip(types));
+
+        ConstValue {
+            ty: Type::StructInitializer { members: ty },
+            kind: ConstValueKind::StructInitializer { members: values },
+        }
+    }
+
     pub fn record_instance(
         sym: Rf<Scope>,
         values: LinkedHashMap<String, ConstValue>,
@@ -495,11 +530,11 @@ impl ConstValue {
         let ty = LinkedHashMap::from_iter(values.keys().cloned().zip(types));
 
         ConstValue {
-            ty: Type::RecordInstance {
+            ty: Type::StructInstance {
                 rf: Some(sym.clone()),
                 members: ty,
             },
-            kind: ConstValueKind::RecordInstance {
+            kind: ConstValueKind::StructInstance {
                 rf: sym,
                 members: values,
             },

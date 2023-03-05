@@ -2,7 +2,8 @@ use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     ast::{
-        ArgList, AstNode, EnclosedPunctuationList, Param, ParamaterList, PunctuationList, Statement,
+        ArgList, AstNode, EnclosedList, EnclosedPunctuationList, Param, ParamaterList,
+        PunctuationList, Statement,
     },
     error::{ParseError, ParseErrorKind},
     token::{Operator, Range, SpannedToken, Token, TokenIndex, TokenStream},
@@ -115,15 +116,28 @@ impl Parser {
                     }
                 }
             }
+            Some(Token::Ident(id)) if id.as_str() == "fn" => {
+                return self.parse_function();
+            }
             Some(Token::Ident(_)) => {
-                if let Some(decl) = self.parse_decleration() {
+                if let Some(decl) = self.parse_variable_decleration() {
                     return Some(decl);
+                }
+            }
+            Some(Token::Operator(Operator::OpenBrace)) => {
+                if let Some(stmt) = self
+                    .parse_enclosed_list(Operator::OpenBrace, Operator::CloseBrace, || {
+                        self.parse_statement().map(|stmt| (stmt, true))
+                    })
+                    .map(|list| Statement::Block(list))
+                {
+                    return Some(stmt);
                 }
             }
             _ => (),
         };
 
-        let expression = self.parse_expression(0);
+        let expression = self.parse_operator_expression(0);
         if expression.is_some() {
             return expression.map(Statement::Expression);
         }
@@ -131,22 +145,47 @@ impl Parser {
         None
     }
 
-    pub fn parse_decleration(&self) -> Option<Statement> {
-        let ident = match self.tokens.next() {
-            Some(tok @ SpannedToken(_, Token::Ident(_))) => tok.clone(),
-            _ => {
+    pub fn parse_variable_decleration(&self) -> Option<Statement> {
+        let ty = self.parse_type();
+        let ident = match self.tokens.peek() {
+            Some(Token::Ident(_)) => self.tokens.next(),
+            _ => None,
+        };
+
+        if let (Some(ty), Some(ident)) = (ty, ident) {
+            let Some(eq) = self.expect_operator(Operator::Equals).cloned() else {
                 self.tokens.back();
                 return None;
-            }
-        };
-        let Some(colon) = self.expect_operator(Operator::Colon).cloned() else {
-            self.tokens.back();
-            return None;
-        };
-        let expr = self.parse_expression(0);
+            };
 
-        Some(Statement::Decleration { ident, colon, expr })
+            let expr = self.parse_expression();
+
+            return Some(Statement::Decleration {
+                ty,
+                ident: ident.clone(),
+                eq,
+                expr,
+            });
+        }
+        None
     }
+
+    // pub fn parse_decleration(&self) -> Option<Statement> {
+    //     let ident = match self.tokens.next() {
+    //         Some(tok @ SpannedToken(_, Token::Ident(_))) => tok.clone(),
+    //         _ => {
+    //             self.tokens.back();
+    //             return None;
+    //         }
+    //     };
+    //     let Some(colon) = self.expect_operator(Operator::Colon).cloned() else {
+    //         self.tokens.back();
+    //         return None;
+    //     };
+    //     let expr = self.parse_expression(0);
+
+    //     Some(Statement::Decleration { ident, colon, expr })
+    // }
 
     pub fn parse_use(&self) -> Option<Statement> {
         let token = self.tokens.next();
@@ -265,7 +304,7 @@ impl Parser {
             _ => {
                 let mut args = PunctuationList::default();
 
-                while let Some(arg) = self.parse_expression(0) {
+                while let Some(arg) = self.parse_operator_expression(0) {
                     let comma = if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
                         self.tokens.next().cloned()
                     } else {
@@ -371,6 +410,29 @@ impl Parser {
     }
 
     pub fn parse_enclosed_list<T: AstNode>(
+        &self,
+        open: Operator,
+        close: Operator,
+        cb: impl FnMut() -> Option<(T, bool)>,
+    ) -> Option<EnclosedList<T>> {
+        let open = self.expect_operator(open);
+
+        let list = self.parse_list(cb);
+
+        let close = self.expect_operator(close);
+
+        if let (Some(open), Some(items), Some(close)) = (open, list, close) {
+            Some(EnclosedList {
+                open: open.clone(),
+                items,
+                close: close.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn parse_enclosed_punctuation_list<T: AstNode>(
         &self,
         open: Operator,
         punc: Operator,
