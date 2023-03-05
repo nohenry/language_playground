@@ -10,9 +10,10 @@ Potato p = {
     a: 8
 }
 
-fn myfunc(Potato p) -> () {
-    i32 i = p.b
-    print("{i}")
+fn myfunc(Potato@ p) -> () {
+    i32 d = p.a
+    print("{d}")
 }
 
+i32 i = 0
 myfunc(p)

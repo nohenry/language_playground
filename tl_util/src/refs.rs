@@ -1,6 +1,6 @@
 use std::{
     ops::Deref,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, atomic::{AtomicBool, Ordering}},
 };
 
 pub struct Rf<T: ?Sized>(pub Arc<RwLock<T>>);
@@ -39,12 +39,23 @@ impl<T> Rf<T> {
     }
 }
 
+static mut BACKTRACE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_backtrace(enabled: bool) {
+    unsafe {
+        BACKTRACE.store(enabled, Ordering::Relaxed)
+    }
+}
+
 impl<T: ?Sized> Rf<T> {
     pub fn borrow_mut(&self) -> RwLockWriteGuard<'_, T> {
         self.0.write().unwrap()
     }
 
     pub fn borrow(&self) -> RwLockReadGuard<'_, T> {
+        if unsafe { BACKTRACE.load(Ordering::Relaxed) } {
+            println!("d {}", std::backtrace::Backtrace::force_capture());
+        }
         self.0.read().unwrap()
         // self.().unwrap()
     }

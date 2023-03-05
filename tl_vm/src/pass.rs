@@ -134,6 +134,7 @@ impl CodePass {
                 ..
             } => match self.pass {
                 PassType::TypeOnly => {
+                    // return;
                     let sym = self.wstate().scope.insert_value(
                         ident.as_str(),
                         ScopeValue::ConstValue(ConstValue::empty()),
@@ -143,7 +144,7 @@ impl CodePass {
                     let eparameters = self.evaluate_params(parameters);
                     let ereturn_parameters = self.evaluate_params(return_parameters);
 
-                    self.wstate().scope.insert_value(
+                    self.wstate().scope.update_value(
                         ident.as_str(),
                         ScopeValue::ConstValue(ConstValue::func(
                             Statement::clone(body),
@@ -155,6 +156,7 @@ impl CodePass {
                     );
                 }
                 PassType::Members => {
+                    // return;
                     let Some(rf) = self.rstate().scope.find_symbol(ident.as_str()) else {
                         return;
                     };
@@ -269,6 +271,12 @@ impl CodePass {
                 Type::Empty
             }
             tl_core::ast::Type::Boolean(_) => Type::Boolean,
+            tl_core::ast::Type::Ref {
+                base_type: Some(ty),
+                ..
+            } => Type::Ref {
+                base_type: Box::new(self.evaluate_type(ty)),
+            },
             _ => Type::Empty,
         }
     }

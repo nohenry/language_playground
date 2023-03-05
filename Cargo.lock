@@ -697,6 +697,7 @@ name = "tl_compiler"
 version = "0.1.0"
 dependencies = [
  "tl_core",
+ "tl_util",
  "tl_vm",
 ]
 

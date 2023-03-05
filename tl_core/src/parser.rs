@@ -264,7 +264,7 @@ impl Parser {
             })
         } else {
             self.add_error(ParseError {
-                kind: ParseErrorKind::InvalidSyntax("Unable to parse arg brackets!".to_string()),
+                kind: ParseErrorKind::InvalidSyntax("Unable to parse parameters brackets!".to_string()),
                 range: Range::default(),
             });
             Some(ParamaterList {

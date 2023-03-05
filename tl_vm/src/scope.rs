@@ -110,7 +110,7 @@ impl Scope {
 
 impl NodeDisplay for Scope {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Scope - {}", self.index)
+        write!(f, "Scope - {} {}", self.index, self.children.len())
     }
 }
 
@@ -130,7 +130,7 @@ impl TreeDisplay for Scope {
 
     fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
         match _index {
-            2 if !self.uses.is_empty() => Box::new(GrouperIter(
+            1 if !self.uses.is_empty() => Box::new(GrouperIter(
                 "Use".to_string(),
                 self.uses.len(),
                 self.uses.iter().map(|f| f as &'a dyn TreeDisplay),
@@ -507,9 +507,15 @@ impl<'a> ScopeManager {
         value: ScopeValue,
         index: usize,
     ) -> Option<ScopeValue> {
-        if let Some(sym) = self.find_symbol(name) {
+        println!("Update value");
+        // tl_util::set_backtrace(false);
+        // std::env::set_var("RUST_LIB_BACKTRACE", "0");
+        {
+
+        if let Some(sym) = { self.find_symbol(name) } {
             let old_value = std::mem::replace(&mut sym.borrow_mut().value, value);
             return Some(old_value);
+        }
         }
 
         if let Some(scp) = self.current_scope.last() {
@@ -517,6 +523,8 @@ impl<'a> ScopeManager {
                 .children
                 .insert(name.to_string(), Rf::new(Scope::new(value, index)));
         }
+        // tl_util::set_backtrace(true);
+        // std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
         None
     }

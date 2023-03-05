@@ -100,23 +100,43 @@ impl Evaluator {
                 body: Some(body),
                 ..
             } => {
-                let parameters = self.evaluate_params(parameters);
-                let return_parameters = self.evaluate_params(return_parameters);
+                let params = self.evaluate_params(parameters);
+                let return_params = self.evaluate_params(return_parameters);
 
-                // self.wstate()
-                //     .scope
-                //     .update_value(id, ScopeValue::ConstValue(ConstValue::empty()), index);
                 let sym = self.wstate().scope.find_symbol(ident.as_str()).unwrap();
-                self.wstate().scope.update_value(
-                    ident.as_str(),
-                    ScopeValue::ConstValue(ConstValue::func(
-                        Statement::clone(body),
-                        parameters,
-                        return_parameters,
-                        sym,
-                    )),
-                    index,
-                );
+
+                let mut mut_sym = sym.borrow_mut();
+                if let ScopeValue::ConstValue(ConstValue {
+                    ty:
+                        Type::Function {
+                            parameters,
+                            return_parameters,
+                        },
+                    ..
+                }) = &mut mut_sym.value
+                {
+                    *parameters = params;
+                    *return_parameters = return_params
+                }
+                // sym.borrow_mut().update(
+                //     ident.as_str(),
+                //     ScopeValue::ConstValue(ConstValue::func(
+                //         Statement::clone(body),
+                //         params,
+                //         return_params,
+                //         sym.clone(),
+                //     )),
+                // );
+                // self.wstate().scope.update_value(
+                //     ident.as_str(),
+                //     ScopeValue::ConstValue(ConstValue::func(
+                //         Statement::clone(body),
+                //         parameters,
+                //         return_parameters,
+                //         sym,
+                //     )),
+                //     index,
+                // );
             }
             Statement::Decleration {
                 ty,
@@ -159,6 +179,7 @@ impl Evaluator {
                         }
                     }
                     (ty, expr) => {
+                        let expr = expr.try_implicit_cast(&ty).unwrap_or(expr);
                         if expr.ty != ty {
                             self.add_error(EvaluationError {
                                 kind: EvaluationErrorKind::TypeMismatch(
@@ -170,7 +191,7 @@ impl Evaluator {
                             });
                             return ConstValue::empty();
                         }
-                        self.wstate().scope.update_value(
+                        self.wstate().scope.insert_value(
                             ident.as_str(),
                             ScopeValue::ConstValue(expr),
                             index,
@@ -261,6 +282,13 @@ impl Evaluator {
                         ParsedTemplate::String(s) => s.as_str().to_string(),
                         ParsedTemplate::Template(t, _, _) => {
                             let expr = self.evaluate_expression(t, index);
+
+                            if let Some(data) = expr.resolve_ref() {
+                                if let ScopeValue::ConstValue(cv) = &data.borrow().value {
+                                    return format!("{}", cv);
+                                }
+                            }
+
                             format!("{expr}")
                         }
                     })
@@ -272,8 +300,9 @@ impl Evaluator {
                 let sym = self.rstate().scope.find_symbol(id);
                 if let Some(sym) = sym {
                     let symv = sym.borrow();
+                    // println!("{}", self.rstate().scope.module.format());
                     match &symv.value {
-                        ScopeValue::ConstValue(cv) => cv.clone(),
+                        ScopeValue::ConstValue(cv) => ConstValue::reference(&sym, cv.ty.clone()),
                         ScopeValue::Struct { .. } => ConstValue {
                             ty: Type::Symbol(sym.clone()),
                             kind: ConstValueKind::Empty,
@@ -308,7 +337,18 @@ impl Evaluator {
                 let expr = self.evaluate_expression(expr, index);
                 let args = self.evaluate_args(raw_args, index);
 
-                match (expr.ty, expr.kind) {
+                let expr = {
+                    let expr = expr.resolve_ref().unwrap();
+                    let expr = expr.borrow();
+                    let expr = if let ScopeValue::ConstValue(cv) = &expr.value {
+                        cv.clone()
+                    } else {
+                        return ConstValue::empty();
+                    };
+                    expr
+                };
+
+                match (&expr.ty, &expr.kind) {
                     // Function is called
                     (
                         Type::Function {
@@ -326,11 +366,11 @@ impl Evaluator {
                             .map(|(i, (arg, (name, ty)))| {
                                 let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
 
-                                if arg.ty != ty {
+                                if &arg.ty != ty {
                                     self.add_error(EvaluationError {
                                         kind: EvaluationErrorKind::TypeMismatch(
                                             arg.ty,
-                                            ty,
+                                            ty.clone(),
                                             TypeHint::Parameter,
                                         ),
                                         range: raw_args
@@ -342,7 +382,7 @@ impl Evaluator {
                                     });
                                     return None;
                                 }
-                                self.wstate().scope.update_value(
+                                self.wstate().scope.insert_value(
                                     &name,
                                     ScopeValue::ConstValue(arg),
                                     index,
@@ -367,7 +407,7 @@ impl Evaluator {
                                 let vl = if let Some(sym) = sym {
                                     let sym = sym.borrow();
                                     if let ScopeValue::ConstValue(cv) = &sym.value {
-                                        if cv.ty == ty {
+                                        if &cv.ty == ty {
                                             cv.clone()
                                         } else {
                                             // TODO: error handling
@@ -384,13 +424,13 @@ impl Evaluator {
                                         },
                                         range: expression.get_range(),
                                     });
-                                    ConstValue::default_for(&ty)
+                                    ConstValue::default_for(ty)
                                 };
-                                (name, vl)
+                                (name.clone(), vl)
                             })
                             .collect();
 
-                        let value = ConstValue::record_instance(rf, return_values);
+                        let value = ConstValue::record_instance(rf.clone(), return_values);
 
                         self.wstate().scope.pop_scope();
 
@@ -412,11 +452,11 @@ impl Evaluator {
                             .map(|(i, (arg, (name, ty)))| {
                                 let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
 
-                                if arg.ty != ty {
+                                if &arg.ty != ty {
                                     self.add_error(EvaluationError {
                                         kind: EvaluationErrorKind::TypeMismatch(
                                             arg.ty,
-                                            ty,
+                                            ty.clone(),
                                             TypeHint::Parameter,
                                         ),
                                         range: raw_args
@@ -429,7 +469,7 @@ impl Evaluator {
                                     return None;
                                 }
 
-                                Some((name, arg))
+                                Some((name.clone(), arg))
                             })
                             .collect();
 
@@ -445,7 +485,7 @@ impl Evaluator {
 
                         let return_vals = callback(has_args.as_ref().unwrap());
 
-                        ConstValue::record_instance(rf, return_vals)
+                        ConstValue::record_instance(rf.clone(), return_vals)
                     }
                     // TODO: throw error
                     _ => ConstValue::empty(),
@@ -541,13 +581,34 @@ impl Evaluator {
             }
             (Operator::Dot, _) => {
                 let left = self.evaluate_expression(raw_left, index);
-                match (left.kind, raw_right) {
+                // println!("potato: s{}", left.format());
+                let left = left.resolve_ref();
+                let left = left.as_ref().unwrap().borrow();
+                let left = if let ScopeValue::ConstValue(cv) = &left.value {
+                    cv
+                } else {
+                    return ConstValue::empty();
+                };
+
+                match (&left.kind, raw_right) {
                     (
                         ConstValueKind::StructInstance { members, .. },
                         Expression::Ident(SpannedToken(_, Token::Ident(member))),
                     ) => {
                         if let Some(val) = members.get(member) {
                             return val.clone();
+                        }
+                    }
+                    (
+                        ConstValueKind::Ref { symbol, offset },
+                        Expression::Ident(SpannedToken(_, Token::Ident(member))),
+                    ) => {
+                        if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
+                            if let ConstValueKind::StructInstance { rf, members } = &cv.kind {
+                                if let Some(val) = members.get(member) {
+                                    return val.clone();
+                                }
+                            }
                         }
                     }
                     _ => (),
@@ -729,6 +790,12 @@ impl Evaluator {
                 Type::Empty
             }
             tl_core::ast::Type::Boolean(_) => Type::Boolean,
+            tl_core::ast::Type::Ref {
+                base_type: Some(ty),
+                ..
+            } => Type::Ref {
+                base_type: Box::new(self.evaluate_type(ty)),
+            },
             _ => Type::Empty,
         }
     }

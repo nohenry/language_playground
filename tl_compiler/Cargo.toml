@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 tl_core = { path = "../tl_core" }
 tl_vm = { path = "../tl_vm" }
+tl_util = { path = "../tl_util" }

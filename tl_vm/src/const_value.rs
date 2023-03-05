@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     fmt::{Debug, Display},
     sync::Arc,
 };
@@ -31,6 +32,9 @@ pub enum Type {
     },
     String,
     Symbol(Rf<Scope>),
+    Ref {
+        base_type: Box<Type>,
+    },
     Ident(String),
     Tuple(Vec<Type>),
     StructInitializer {
@@ -120,6 +124,19 @@ impl Display for Type {
             Self::Empty => f.write_str("()"),
             Self::CoercibleInteger => f.write_str("{integer}"),
             Self::CoercibleFloat => f.write_str("{float}"),
+            Self::Ref { base_type } => {
+                write!(f, "{}@", base_type)
+            }
+            // Self::Ref { symbol, offset }=>{
+            //     if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
+            //         if let Some(offset) = offset {
+            //             return write!(f, "{}.{}@", offset, cv.ty)
+            //         } else {
+            //             return write!(f, "{}@", cv.ty)
+            //         }
+            //     }
+            //     write!(f, "unknown@")
+            // },
             Self::Function {
                 parameters,
                 return_parameters,
@@ -201,6 +218,7 @@ impl NodeDisplay for Type {
             Self::Empty => write!(f, "Empty"),
             Self::CoercibleInteger => write!(f, "Coercible Integer"),
             Self::CoercibleFloat => write!(f, "Coercible Float"),
+            Self::Ref { .. } => write!(f, "Reference"),
             Self::Float { width, .. } => write!(f, "f{width}"),
             Self::Integer {
                 width,
@@ -229,6 +247,7 @@ impl TreeDisplay for Type {
             Type::Tuple(tu) => tu.len(),
             Type::StructInstance { members, .. } => members.len(),
             Type::StructInitializer { members } => members.len(),
+            Type::Ref { .. } => 1,
             _ => 0,
         }
     }
@@ -251,6 +270,7 @@ impl TreeDisplay for Type {
                 }
             }
             Type::StructInstance { .. } => None,
+            Type::Ref { base_type } => Some(&**base_type),
             _ => None,
         }
     }
@@ -278,6 +298,10 @@ pub enum ConstValueKind {
     },
     Bool {
         value: bool,
+    },
+    Ref {
+        symbol: Rf<Scope>,
+        offset: Option<usize>,
     },
     Function {
         rf: Rf<Scope>,
@@ -309,6 +333,16 @@ impl Display for ConstValueKind {
             ConstValueKind::Integer { value } => write!(f, "{value}"),
             ConstValueKind::Float { value } => write!(f, "{value}"),
             ConstValueKind::String { string } => write!(f, "{string}"),
+            ConstValueKind::Ref { symbol, offset } => {
+                if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
+                    if let Some(offset) = offset {
+                        return write!(f, "{}.{}@", offset, cv.ty);
+                    } else {
+                        return write!(f, "{}@", cv.ty);
+                    }
+                }
+                write!(f, "unknown@")
+            }
             ConstValueKind::Function { body, .. } => write!(f, "{}", body.format()),
             ConstValueKind::NativeFunction { .. } => write!(f, "Native Function"),
             ConstValueKind::Tuple(list) => {
@@ -374,6 +408,7 @@ impl NodeDisplay for ConstValueKind {
             ConstValueKind::Integer { value } => write!(f, "Integer: {value}"),
             ConstValueKind::Bool { value } => write!(f, "Boolean: {value}"),
             ConstValueKind::Float { value } => write!(f, "Float: {value}"),
+            ConstValueKind::Ref { .. } => write!(f, "Reference"),
             ConstValueKind::String { string } => write!(f, "String: {string}"),
             ConstValueKind::Function { .. } => write!(f, "Function"),
             ConstValueKind::NativeFunction { .. } => write!(f, "Native Function"),
@@ -391,6 +426,7 @@ impl TreeDisplay for ConstValueKind {
             ConstValueKind::Tuple(list) => list.len(),
             ConstValueKind::StructInitializer { members, .. } => members.len(),
             ConstValueKind::StructInstance { members, .. } => members.len(),
+            // ConstValueKind::Ref { symbol, offset } => symbol.borrow().num_children(),
             _ => 0,
         }
     }
@@ -409,6 +445,7 @@ impl TreeDisplay for ConstValueKind {
                 }
             }
             ConstValueKind::StructInstance { .. } => None,
+            ConstValueKind::Ref { symbol, offset } => None,
             _ => None,
         }
     }
@@ -417,6 +454,9 @@ impl TreeDisplay for ConstValueKind {
         match self {
             ConstValueKind::StructInstance { members, .. } => members.child_at_bx(index),
             ConstValueKind::StructInitializer { members } => members.child_at_bx(index),
+            ConstValueKind::Ref { symbol, offset } => {
+                Box::new(symbol.borrow().value.clone())
+            },
             _ => panic!(),
         }
     }
@@ -447,6 +487,22 @@ impl ConstValue {
         ConstValue {
             ty: ty.clone(),
             kind,
+        }
+    }
+
+    pub fn resolve_ref(&self) -> Option<Rf<Scope>> {
+        match (&self.ty, &self.kind) {
+            (Type::Ref { base_type }, ConstValueKind::Ref { symbol, offset }) => {
+                let sym = symbol.borrow();
+                if let ScopeValue::ConstValue(f) = &sym.value {
+                    return f.resolve_ref().or_else(|| Some(symbol.clone()));
+                }
+                None
+            },
+            (_, ConstValueKind::Ref { symbol, offset }) => {
+                Some(symbol.clone())
+            }
+            _ => None
         }
     }
 
@@ -544,8 +600,49 @@ impl ConstValue {
         }
     }
 
-    pub fn try_implicit_cast(&self, ty: &Type) -> Option<ConstValue> {
+    pub fn reference(sym: &Rf<Scope>, ty: Type) -> ConstValue {
+        // println!("Ref {} ", sym.borrow().format());
+        ConstValue {
+            ty: Type::Ref {
+                base_type: Box::new(ty),
+            },
+            kind: ConstValueKind::Ref {
+                symbol: sym.clone(),
+                offset: None,
+            },
+        }
+    }
+
+    pub fn try_implicit_cast(
+        &self,
+        ty: &Type,
+        // var_location: Option<&Rf<Scope>>,
+    ) -> Option<ConstValue> {
+        // println!("Cast: {} {}", self.format(), ty.format());
         match (self, ty) {
+            // (
+            //     ConstValue {
+            //         ty: ty @ Type::Ref { base_type },
+
+            //     }
+            //     ConstValue {
+            //         ty: ty @ Type::StructInstance { .. },
+            //         kind: ConstValueKind::StructInstance { rf, members },
+            //     },
+            //     Type::Ref {
+            //         base_type: box Type::Symbol(rf_type),
+            //     },
+            // ) => {
+            //     if let Some(vl) = var_location {
+            //         if rf == rf_type {
+            //             Some(ConstValue::reference(vl, ty.clone()))
+            //         } else {
+            //             None
+            //         }
+            //     } else {
+            //         None
+            //     }
+            // }
             (
                 ConstValue {
                     kind: ConstValueKind::Integer { value },

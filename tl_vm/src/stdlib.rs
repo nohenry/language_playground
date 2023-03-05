@@ -43,7 +43,16 @@ pub fn fill_io(module: &Rf<Scope>) {
         [("data".to_string(), Type::String)].into_iter(),
         [].into_iter(),
         Arc::new(|params| {
-            println!("{}", params.get("data").unwrap());
+            if let Some(data) = params.get("data") {
+                if let Some(data) = data.resolve_ref() {
+                    let ScopeValue::ConstValue(cv) = &data.borrow().value else {
+                        return LinkedHashMap::new()
+                    };
+                    println!("{}", cv)
+                } else {
+                    println!("{}", data)
+                }
+            }
             LinkedHashMap::new()
         }),
     );
