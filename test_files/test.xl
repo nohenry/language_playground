@@ -1,3 +1,5 @@
+use std.io 
+
 type Potato {
     bool b
     i32 a
@@ -5,11 +7,12 @@ type Potato {
 
 Potato p = {
     b: true
-    a: 0
+    a: 8
 }
 
 fn myfunc(Potato p) -> () {
-    i32 i = 0
+    i32 i = p.b
+    print("{i}")
 }
 
 myfunc(p)

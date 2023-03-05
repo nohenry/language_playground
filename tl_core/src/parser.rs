@@ -120,7 +120,7 @@ impl Parser {
                 return self.parse_function();
             }
             Some(Token::Ident(_)) => {
-                if let Some(decl) = self.parse_variable_decleration() {
+                if let Some(decl) = restore!(self, self.parse_variable_decleration()) {
                     return Some(decl);
                 }
             }
@@ -149,7 +149,7 @@ impl Parser {
         let ty = self.parse_type();
         let ident = match self.tokens.peek() {
             Some(Token::Ident(_)) => self.tokens.next(),
-            _ => None,
+            _ => return None,
         };
 
         if let (Some(ty), Some(ident)) = (ty, ident) {

@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
@@ -139,7 +136,7 @@ impl Evaluator {
                         },
                     ) => {
                         if let ScopeValue::Struct { members, .. } = &sym.borrow().value {
-                            return self.evaluate_struct_init(
+                            let value = self.evaluate_struct_init(
                                 &sym,
                                 members,
                                 &args,
@@ -153,20 +150,52 @@ impl Evaluator {
                                 },
                                 raw_expr.get_range(),
                             );
+
+                            self.wstate().scope.update_value(
+                                ident.as_str(),
+                                ScopeValue::ConstValue(value),
+                                index,
+                            );
                         }
                     }
-                    _ => (),
+                    (ty, expr) => {
+                        if expr.ty != ty {
+                            self.add_error(EvaluationError {
+                                kind: EvaluationErrorKind::TypeMismatch(
+                                    expr.ty,
+                                    ty,
+                                    TypeHint::Variable,
+                                ),
+                                range: raw_expr.get_range(),
+                            });
+                            return ConstValue::empty();
+                        }
+                        self.wstate().scope.update_value(
+                            ident.as_str(),
+                            ScopeValue::ConstValue(expr),
+                            index,
+                        );
+                    }
                 }
-
-                let expr = self.evaluate_expression(raw_expr, index);
-                self.wstate().scope.update_value(
-                    ident.as_str(),
-                    ScopeValue::ConstValue(expr),
-                    index,
-                );
             }
             Statement::Expression(expr) => return self.evaluate_expression(expr, index),
             Statement::List(list) => {
+                if list.num_children() == 1 {
+                    let item = list
+                        .iter_items()
+                        .next()
+                        .expect("Value should have been present. This is probably a rustc bug");
+                    return self.evaluate_statement(item, 0);
+                } else {
+                    let values: Vec<_> = list
+                        .iter_items()
+                        .enumerate()
+                        .map(|(index, stmt)| self.evaluate_statement(stmt, index))
+                        .collect();
+                    return ConstValue::tuple(values);
+                }
+            }
+            Statement::Block(list) => {
                 if list.num_children() == 1 {
                     let item = list
                         .iter_items()
@@ -443,6 +472,7 @@ impl Evaluator {
             .filter_map(|(i, (name, ty))| {
                 if let Some(arg) = args.get(name) {
                     let arg = arg.try_implicit_cast(ty).unwrap_or_else(|| arg.clone());
+
                     if &arg.ty == ty {
                         return Some((name.clone(), arg));
                     } else {

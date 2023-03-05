@@ -228,6 +228,7 @@ impl TreeDisplay for Type {
             Type::Function { .. } => 2,
             Type::Tuple(tu) => tu.len(),
             Type::StructInstance { members, .. } => members.len(),
+            Type::StructInitializer { members } => members.len(),
             _ => 0,
         }
     }
@@ -257,6 +258,7 @@ impl TreeDisplay for Type {
     fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
             Type::StructInstance { members, .. } => members.child_at_bx(_index),
+            Type::StructInitializer { members, .. } => members.child_at_bx(_index),
             _ => panic!(),
         }
     }
@@ -387,8 +389,8 @@ impl TreeDisplay for ConstValueKind {
         match self {
             ConstValueKind::Function { .. } => 1,
             ConstValueKind::Tuple(list) => list.len(),
-            // ConstValueKind::StructInitializer { members, .. } => members.len(),
-            // ConstValueKind::StructInstance { members, .. } => members.len(),
+            ConstValueKind::StructInitializer { members, .. } => members.len(),
+            ConstValueKind::StructInstance { members, .. } => members.len(),
             _ => 0,
         }
     }
@@ -414,6 +416,7 @@ impl TreeDisplay for ConstValueKind {
     fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
             ConstValueKind::StructInstance { members, .. } => members.child_at_bx(index),
+            ConstValueKind::StructInitializer { members } => members.child_at_bx(index),
             _ => panic!(),
         }
     }

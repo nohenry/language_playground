@@ -78,6 +78,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     println!("{}", symbol_tree.format());
     let evaluator = Evaluator::new(module, code_pass_state.scope);
     let values = evaluator.evaluate();
+    // println!("{}", symbol_tree.format());
 
     for error in &code_pass_state.errors {
         error.print(path.as_ref().as_os_str().to_str().unwrap(), &lines);
@@ -88,7 +89,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     }
 
     for value in values {
-        println!("{value}");
+        // println!("{value}");
     }
 
     // println!("{}", symbol_tree.format());
