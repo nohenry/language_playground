@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
-    ast::{EnclosedList, Expression, Param, ParamaterList, Statement},
+    ast::{EnclosedList, Expression, GenericParameter, Param, ParamaterList, Statement},
     token::{SpannedToken, Token},
     Module,
 };
@@ -78,7 +78,7 @@ impl CodePass {
             } => {
                 match self.pass {
                     PassType::TypeOnly => {
-                        self.wstate().scope.insert_value(
+                        let scope = self.wstate().scope.insert_value(
                             ident.as_str(),
                             ScopeValue::Struct {
                                 ident: ident.as_str().to_string(),
@@ -86,15 +86,45 @@ impl CodePass {
                             },
                             index,
                         );
+
+                        if let Some(generic) = generic {
+                            self.wstate().scope.push_scope(scope);
+
+                            for param in generic.iter_items() {
+                                match param {
+                                    GenericParameter::Unbounded(b) => {
+                                        self.wstate().scope.insert_value(
+                                            b.as_str(),
+                                            ScopeValue::TypeAlias {
+                                                ident: b.as_str().to_string(),
+                                                ty: Box::new(Type::Integer { width: 8, signed: false }),
+                                            },
+                                            index,
+                                        );
+                                        // self.wstate().scope.insert_value(b.as_str(), ScopeValue::ConstValue(ConstValue::empty()), index);
+                                    }
+                                    _ => todo!(),
+                                }
+                            }
+
+                            self.wstate().scope.pop_scope();
+                        }
                     }
                     PassType::Members => {
+                        let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
+                            return;
+                        };
+                        self.wstate().scope.push_scope(sym.clone());
+
                         let emembers = self.evaluate_struct_members(members);
-                        if let Some(sym) = self.wstate().scope.find_symbol(ident.as_str()) {
-                            let mut sym = sym.borrow_mut();
-                            if let ScopeValue::Struct { members, .. } = &mut sym.value {
-                                *members = emembers
-                            }
+
+                        let mut sym = sym.borrow_mut();
+                        if let ScopeValue::Struct { members, .. } = &mut sym.value {
+                            *members = emembers
                         }
+
+                        self.wstate().scope.pop_scope();
+                        // }
                     }
                     _ => (),
                 };

@@ -511,11 +511,10 @@ impl<'a> ScopeManager {
         // tl_util::set_backtrace(false);
         // std::env::set_var("RUST_LIB_BACKTRACE", "0");
         {
-
-        if let Some(sym) = { self.find_symbol(name) } {
-            let old_value = std::mem::replace(&mut sym.borrow_mut().value, value);
-            return Some(old_value);
-        }
+            if let Some(sym) = { self.find_symbol(name) } {
+                let old_value = std::mem::replace(&mut sym.borrow_mut().value, value);
+                return Some(old_value);
+            }
         }
 
         if let Some(scp) = self.current_scope.last() {

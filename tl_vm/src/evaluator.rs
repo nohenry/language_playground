@@ -68,6 +68,11 @@ impl Evaluator {
                 ty: box tl_core::ast::Type::Struct(members),
                 ..
             } => {
+                let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
+                    return ConstValue::empty();
+                };
+                self.wstate().scope.push_scope(sym.clone());
+
                 let members = self.evaluate_struct_members(members);
                 self.wstate().scope.update_value(
                     ident.as_str(),
@@ -77,6 +82,8 @@ impl Evaluator {
                     },
                     index,
                 );
+
+                self.wstate().scope.pop_scope();
             }
             // Statement::Decleration {
             //     ident: SpannedToken(_, Token::Ident(id)),
@@ -512,6 +519,7 @@ impl Evaluator {
             .filter_map(|(i, (name, ty))| {
                 if let Some(arg) = args.get(name) {
                     let arg = arg.try_implicit_cast(ty).unwrap_or_else(|| arg.clone());
+                    println!("Param: {} {ty}", arg.ty);
 
                     if &arg.ty == ty {
                         return Some((name.clone(), arg));

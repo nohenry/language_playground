@@ -37,8 +37,9 @@ impl Display for EvaluationError {
 
 impl EvaluationError {
     pub fn print(&self, file_path: &str, lines: &[&str]) {
-        let padding = self.range.start.line_num.to_string().len() + 2;
+        let padding = (self.range.start.line_num + 1).to_string().len() + 2;
         println!("{}: {}", self.kind.get_level(), self.kind);
+        // file path
         println!(
             "{:>padding$}{} {}:{}:{}",
             "--".bold().blue(),
@@ -47,7 +48,10 @@ impl EvaluationError {
             self.range.start.line_num + 1,
             self.range.start.position + 1
         );
+
+        // Initial pipe
         println!("{:>padding$}", "|".bold().blue());
+        // Line contents
         println!(
             "{} {} {}",
             (self.range.start.line_num + 1).to_string().bold().blue(),

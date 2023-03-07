@@ -12,9 +12,7 @@ use crate::{
 impl Parser {
     pub fn parse_expression(&self) -> Option<Expression> {
         match self.tokens.peek() {
-            Some(Token::Operator(Operator::OpenBrace)) => {
-                self.parse_struct_initializer()
-            }
+            Some(Token::Operator(Operator::OpenBrace)) => self.parse_struct_initializer(),
             _ => self.parse_operator_expression(0),
         }
     }
@@ -127,12 +125,12 @@ impl Parser {
     pub fn parse_function(&self) -> Option<Statement> {
         let fn_tok = match self.tokens.peek() {
             Some(Token::Ident(i)) if i == "fn" => self.tokens.next(),
-            _ => None
+            _ => None,
         }?;
 
         let ident = match self.tokens.peek() {
             Some(Token::Ident(_)) => self.tokens.next(),
-            _ => None
+            _ => None,
         }?;
 
         let parameters = self.parse_parameters();
@@ -168,8 +166,6 @@ impl Parser {
         } else {
             parameters
         };
-
-
 
         None
         // parameters.map(|parameters| Expression::Record { parameters })
@@ -220,8 +216,14 @@ impl Parser {
                 None,
                 self.tokens.next().unwrap().clone(),
             )),
-            Some(Token::Ident(i)) if i == "true" => Some(Expression::Boolean(true, self.tokens.next().unwrap().clone())),
-            Some(Token::Ident(i)) if i == "false" => Some(Expression::Boolean(false, self.tokens.next().unwrap().clone())),
+            Some(Token::Ident(i)) if i == "true" => Some(Expression::Boolean(
+                true,
+                self.tokens.next().unwrap().clone(),
+            )),
+            Some(Token::Ident(i)) if i == "false" => Some(Expression::Boolean(
+                false,
+                self.tokens.next().unwrap().clone(),
+            )),
             Some(Token::Ident(_)) => Some(Expression::Ident(self.tokens.next().unwrap().clone())),
             Some(Token::TemplateString(ts)) => {
                 let tok = self.tokens.next().unwrap();

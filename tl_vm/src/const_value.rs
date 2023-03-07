@@ -48,6 +48,7 @@ pub enum Type {
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
+        println!("EQQQQQQQ: {} {}", self, other);
         match (self, other) {
             (
                 Self::Integer {
@@ -85,6 +86,13 @@ impl PartialEq for Type {
             ) => l_rf == r_rf && l_members == r_members,
             (Self::StructInstance { rf: Some(l_rf), .. }, Self::Symbol(sym)) => l_rf == sym,
             (Self::Symbol(sym), Self::StructInstance { rf: Some(l_rf), .. }) => sym == l_rf,
+            (Self::Symbol(sym), right) | (right, Self::Symbol(sym)) => {
+                let sym = sym.borrow();
+                if let ScopeValue::TypeAlias { ident, ty } = &sym.value {
+                    return &**ty == right
+                }
+                false
+            }
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -163,18 +171,25 @@ impl Display for Type {
             }
             Self::Symbol(rs) => {
                 let rs = rs.borrow();
-                if let ScopeValue::Struct { ident, members } = &rs.value {
-                    write!(f, "{ident}: (")?;
-                    let mut iter = members.iter();
+                match &rs.value {
+                    ScopeValue::Struct { ident, members } => {
+                        write!(f, "{ident}: (")?;
+                        let mut iter = members.iter();
 
-                    if let Some(val) = iter.next() {
-                        write!(f, "{} {}", val.1, val.0)?;
+                        if let Some(val) = iter.next() {
+                            write!(f, "{} {}", val.1, val.0)?;
+                        }
+                        for val in iter {
+                            write!(f, " ,{} {}", val.1, val.0)?;
+                        }
+                        write!(f, ")")?;
                     }
-                    for val in iter {
-                        write!(f, " ,{} {}", val.1, val.0)?;
+                    ScopeValue::TypeAlias { ident, ty } => {
+                        write!(f, "{ident} = {ty}")?;
                     }
-                    write!(f, ")")?;
+                    _ => (),
                 }
+
                 Ok(())
             }
             Self::StructInstance { members, .. } | Self::StructInitializer { members } => {
@@ -454,9 +469,7 @@ impl TreeDisplay for ConstValueKind {
         match self {
             ConstValueKind::StructInstance { members, .. } => members.child_at_bx(index),
             ConstValueKind::StructInitializer { members } => members.child_at_bx(index),
-            ConstValueKind::Ref { symbol, offset } => {
-                Box::new(symbol.borrow().value.clone())
-            },
+            ConstValueKind::Ref { symbol, offset } => Box::new(symbol.borrow().value.clone()),
             _ => panic!(),
         }
     }
@@ -498,11 +511,9 @@ impl ConstValue {
                     return f.resolve_ref().or_else(|| Some(symbol.clone()));
                 }
                 None
-            },
-            (_, ConstValueKind::Ref { symbol, offset }) => {
-                Some(symbol.clone())
             }
-            _ => None
+            (_, ConstValueKind::Ref { symbol, offset }) => Some(symbol.clone()),
+            _ => None,
         }
     }
 
@@ -618,7 +629,7 @@ impl ConstValue {
         ty: &Type,
         // var_location: Option<&Rf<Scope>>,
     ) -> Option<ConstValue> {
-        // println!("Cast: {} {}", self.format(), ty.format());
+        println!("Cast: {} {}", self.format(), ty.format());
         match (self, ty) {
             // (
             //     ConstValue {
@@ -657,6 +668,13 @@ impl ConstValue {
                 },
                 Type::Float { width },
             ) => Some(ConstValue::float(*value, *width)),
+            (_, Type::Symbol(sym)) => {
+                let sym = sym.borrow();
+                if let ScopeValue::TypeAlias { ident, ty } = &sym.value {
+                    return self.try_implicit_cast(ty);
+                }
+                None
+            }
             _ => None,
         }
     }

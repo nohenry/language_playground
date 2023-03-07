@@ -1,8 +1,8 @@
 use std.io 
 
-type Potato {
+type Potato <T> {
     bool b
-    i32 a
+    T a
 }
 
 Potato p = {
@@ -10,10 +10,9 @@ Potato p = {
     a: 8
 }
 
-fn myfunc(Potato@ p) -> () {
-    i32 d = p.a
-    print("{d}")
+fn myfunc(i32@ i) -> () {
+    print("{i}")
 }
 
-i32 i = 0
-myfunc(p)
+i32 i = 8
+myfunc(i)
