@@ -48,7 +48,6 @@ pub enum Type {
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
-        println!("EQQQQQQQ: {} {}", self, other);
         match (self, other) {
             (
                 Self::Integer {
@@ -627,33 +626,8 @@ impl ConstValue {
     pub fn try_implicit_cast(
         &self,
         ty: &Type,
-        // var_location: Option<&Rf<Scope>>,
     ) -> Option<ConstValue> {
-        println!("Cast: {} {}", self.format(), ty.format());
         match (self, ty) {
-            // (
-            //     ConstValue {
-            //         ty: ty @ Type::Ref { base_type },
-
-            //     }
-            //     ConstValue {
-            //         ty: ty @ Type::StructInstance { .. },
-            //         kind: ConstValueKind::StructInstance { rf, members },
-            //     },
-            //     Type::Ref {
-            //         base_type: box Type::Symbol(rf_type),
-            //     },
-            // ) => {
-            //     if let Some(vl) = var_location {
-            //         if rf == rf_type {
-            //             Some(ConstValue::reference(vl, ty.clone()))
-            //         } else {
-            //             None
-            //         }
-            //     } else {
-            //         None
-            //     }
-            // }
             (
                 ConstValue {
                     kind: ConstValueKind::Integer { value },

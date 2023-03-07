@@ -519,7 +519,6 @@ impl Evaluator {
             .filter_map(|(i, (name, ty))| {
                 if let Some(arg) = args.get(name) {
                     let arg = arg.try_implicit_cast(ty).unwrap_or_else(|| arg.clone());
-                    println!("Param: {} {ty}", arg.ty);
 
                     if &arg.ty == ty {
                         return Some((name.clone(), arg));
