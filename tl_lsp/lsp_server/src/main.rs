@@ -3,7 +3,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
-use tl_core::ast::{ArgList, AstNode, Expression, ParamaterList, ParsedTemplate, Statement, Type};
+use tl_core::ast::{
+    ArgList, AstNode, EnclosedPunctuationList, Expression, GenericParameter, ParamaterList,
+    ParsedTemplate, Statement, Type,
+};
 use tl_core::token::{Operator, Span, SpannedToken, Token};
 use tl_core::Module;
 use tl_util::Rf;
@@ -86,6 +89,16 @@ impl SemanticTokenBuilder {
         }
     }
 
+    pub fn push_token(&mut self, token: &SpannedToken, index: u32, modifier: u32) {
+        self.push(
+            token.span().line_num,
+            token.span().position,
+            token.span().length,
+            index,
+            modifier,
+        )
+    }
+
     pub fn build(self) -> Vec<SemanticToken> {
         self.tokens
     }
@@ -122,6 +135,9 @@ impl Backend {
         builder: &mut SemanticTokenBuilder,
     ) {
         match value {
+            Expression::Boolean(_, tok) => {
+                builder.push_token(tok, get_stype_index_from_str("keyword"), 0)
+            }
             Expression::String(template_string, _tok) => {
                 // builder.push(
                 //     tok.span().line_num,
@@ -227,19 +243,7 @@ impl Backend {
                     0,
                 );
             }
-            Expression::Function {
-                parameters,
-                return_parameters,
-                body,
-                ..
-            } => {
-                self.recurse_params(module, parameters, scope_index, builder);
-                self.recurse_params(module, return_parameters, scope_index, builder);
 
-                if let Some(body) = body {
-                    self.recurse(module, scope, body, scope_index, builder);
-                }
-            }
             Expression::FunctionCall { expr, args } => {
                 self.recurse_expression(expr, module, scope, scope_index, builder);
                 self.recurse_args(module, scope, args, scope_index, builder);
@@ -256,8 +260,14 @@ impl Backend {
                     self.recurse_expression(right, module, scope, scope_index, builder);
                 }
             }
-            Expression::Record { parameters } => {
-                self.recurse_params(module, parameters, scope_index, builder);
+            Expression::Record(parameters) => {
+                for kv in parameters.items.iter() {
+                    if let Some(name) = &kv.name {
+                        builder.push_token(name, get_stype_index_from_str("property"), 0)
+                    }
+
+                    self.recurse_expression(&kv.expr, module, scope, scope_index, builder);
+                }
             }
         }
     }
@@ -279,12 +289,13 @@ impl Backend {
         &self,
         module: &Module,
         args: &ParamaterList,
+        scope: &ScopeManager,
         scope_index: &mut Vec<usize>,
         builder: &mut SemanticTokenBuilder,
     ) {
         for item in args.iter_items() {
             if let Some(ty) = &item.ty {
-                self.recurse_type(module, ty, scope_index, builder);
+                self.recurse_type(module, ty, scope, scope_index, builder);
             }
 
             if let Some(name) = &item.name {
@@ -301,9 +312,10 @@ impl Backend {
 
     fn recurse_type(
         &self,
-        _module: &Module,
+        module: &Module,
         ty: &Type,
-        _scope_index: &mut Vec<usize>,
+        scope: &ScopeManager,
+        scope_index: &mut Vec<usize>,
         builder: &mut SemanticTokenBuilder,
     ) {
         match ty {
@@ -325,6 +337,20 @@ impl Backend {
                     0,
                 );
             }
+            Type::Boolean(tok) => builder.push_token(tok, get_stype_index_from_str("type"), 0),
+            Type::Expression(e) => self.recurse_expression(e, module, scope, scope_index, builder),
+            Type::Ref {
+                base_type: Some(base_type),
+                ..
+            } => self.recurse_type(module, base_type, scope, scope_index, builder),
+            Type::Option {
+                base_type: Some(base_type),
+                ..
+            } => self.recurse_type(module, base_type, scope, scope_index, builder),
+            Type::Result {
+                base_type: Some(base_type),
+                ..
+            } => self.recurse_type(module, base_type, scope, scope_index, builder),
             Type::Ident(ident) => {
                 builder.push(
                     ident.span().line_num,
@@ -334,7 +360,48 @@ impl Backend {
                     0,
                 );
             }
+            Type::Struct(values) => {
+                for item in values.iter_items() {
+                    // value.
+                    if let Some(ty) = &item.ty {
+                        self.recurse_type(module, ty, scope, scope_index, builder);
+                    }
+
+                    if let Some(name) = &item.name {
+                        builder.push(
+                            name.span().line_num,
+                            name.span().position,
+                            name.span().length,
+                            get_stype_index(SemanticTokenType::VARIABLE),
+                            0,
+                        );
+                    }
+                }
+                // self.recurse_params(module, values.items, scope, scope_index, builder)
+            }
             _ => (),
+        }
+    }
+
+    fn recurse_generic(
+        &self,
+        module: &Module,
+        scope: &ScopeManager,
+        stmt: &EnclosedPunctuationList<GenericParameter>,
+        scope_index: &mut Vec<usize>,
+        builder: &mut SemanticTokenBuilder,
+    ) {
+        for stmt in stmt.iter_items() {
+            match stmt {
+                GenericParameter::Unbounded(ident) => {
+                    builder.push_token(ident, get_stype_index_from_str("typeParameter"), 0)
+                }
+                GenericParameter::Bounded {
+                    bounds,
+                    colon,
+                    ident,
+                } => builder.push_token(ident, get_stype_index_from_str("typeParameter"), 0),
+            }
         }
     }
 
@@ -352,19 +419,18 @@ impl Backend {
                     self.recurse(module, scope, l, scope_index, builder);
                 }
             }
-            Statement::Decleration { ident, expr, .. } => {
+            Statement::Decleration {
+                ty, ident, expr, ..
+            } => {
+                self.recurse_type(module, ty, scope, scope_index, builder);
                 let func = match expr {
-                    Some(Expression::Function { .. }) => get_stype_index_from_str("function"),
+                    // Some(Expression::Function { .. }) => get_stype_index_from_str("function"),
                     Some(Expression::Record { .. }) => get_stype_index_from_str("struct"),
                     _ => get_stype_index_from_str("variable"),
                 };
-                builder.push(
-                    ident.span().line_num,
-                    ident.span().position,
-                    ident.span().length,
-                    func,
-                    0,
-                );
+
+                builder.push_token(ident, func, 0);
+
                 if let Some(expr) = expr {
                     self.recurse_expression(expr, module, scope, scope_index, builder);
                 }
@@ -392,6 +458,45 @@ impl Backend {
                         0,
                     );
                 });
+            }
+            Statement::Function {
+                fn_tok,
+                ident,
+                parameters,
+                return_parameters,
+                body,
+                ..
+            } => {
+                builder.push_token(fn_tok, get_stype_index_from_str("keyword"), 0);
+                builder.push_token(ident, get_stype_index_from_str("function"), 0);
+
+                self.recurse_params(module, parameters, scope, scope_index, builder);
+                self.recurse_params(module, return_parameters, scope, scope_index, builder);
+
+                if let Some(body) = body {
+                    self.recurse(module, scope, body, scope_index, builder);
+                }
+            }
+            Statement::TypeAlias {
+                ty_tok,
+                ident,
+                generic,
+                eq,
+                ty,
+            } => {
+                builder.push_token(ty_tok, get_stype_index_from_str("keyword"), 0);
+                builder.push_token(ident, get_stype_index_from_str("type"), 0);
+
+                if let Some(generic) = generic {
+                    self.recurse_generic(module, scope, generic, scope_index, builder)
+                }
+
+                self.recurse_type(module, ty, scope, scope_index, builder);
+            }
+            Statement::Block(b) => {
+                for statement in b.items.iter() {
+                    self.recurse(module, scope, statement, scope_index, builder);
+                }
             }
             _ => (),
         }
