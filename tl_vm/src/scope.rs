@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
@@ -20,6 +20,11 @@ pub enum ScopeValue {
         ident: String,
         members: LinkedHashMap<String, Type>,
     },
+    StructTemplate {
+        ident: String,
+        members: LinkedHashMap<String, Type>,
+        constructions: HashMap<Vec<Type>, String>,
+    },
     TypeAlias {
         ident: String,
         ty: Box<Type>,
@@ -38,6 +43,7 @@ impl NodeDisplay for ScopeValue {
             }) => f.write_str("Function"),
             ScopeValue::ConstValue(_) => f.write_str("Constant Value"),
             ScopeValue::Struct { .. } => f.write_str("Record"),
+            ScopeValue::StructTemplate { .. } => f.write_str("Struct Template"),
             ScopeValue::TypeAlias { .. } => f.write_str("Type Alias"),
             ScopeValue::Use(_) => f.write_str("Use"),
             ScopeValue::Module(_) => f.write_str("Module"),
@@ -51,6 +57,7 @@ impl TreeDisplay for ScopeValue {
         match self {
             ScopeValue::ConstValue(c) => c.num_children(),
             ScopeValue::Struct { .. } => 1,
+            ScopeValue::StructTemplate { .. } => 2,
             ScopeValue::TypeAlias { .. } => 2,
             ScopeValue::Use(s) => s.len(),
             ScopeValue::Module(_) => 0,
@@ -62,6 +69,15 @@ impl TreeDisplay for ScopeValue {
         match self {
             ScopeValue::ConstValue(c) => c.child_at(index),
             ScopeValue::Struct { members, .. } => Some(members),
+            ScopeValue::StructTemplate {
+                members,
+                constructions,
+                ..
+            } => match index {
+                0 => Some(members),
+                1 => Some(constructions),
+                _ => None,
+            },
             ScopeValue::TypeAlias { ident, ty } => match index {
                 0 => Some(ident),
                 1 => Some(&**ty),

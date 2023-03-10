@@ -351,26 +351,52 @@ impl<'a, T: TreeDisplay + 'a> TreeDisplay for Vec<T> {
     }
 }
 
-impl<'a, T: NodeDisplay + 'a> NodeDisplay for HashMap<String, T> {
+impl<'a, K: NodeDisplay + 'a, V: NodeDisplay + 'a> NodeDisplay for HashMap<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str("HashMap")
     }
 }
 
-impl<'b, T: TreeDisplay + 'b> TreeDisplay for HashMap<String, T> {
+impl<'b, K: TreeDisplay + 'b, V: TreeDisplay + 'b> TreeDisplay for HashMap<K, V> {
     fn num_children(&self) -> usize {
         self.len()
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        // if let Some((key, value))
         None
     }
 
     fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay + 'a> {
         let (name, item) = self.iter().nth(index).unwrap();
-        Box::new(Grouper(name.clone(), item))
+        Box::new(GrouperIter(
+            "Entry".to_string(),
+            2,
+            [name as &dyn TreeDisplay, item as &dyn TreeDisplay].into_iter(),
+        ))
     }
 }
+
+// impl<'a, T: NodeDisplay + 'a> NodeDisplay for HashMap<String, T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         f.write_str("HashMap")
+//     }
+// }
+
+// impl<'b, T: TreeDisplay + 'b> TreeDisplay for HashMap<String, T> {
+//     fn num_children(&self) -> usize {
+//         self.len()
+//     }
+
+//     fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+//         None
+//     }
+
+//     fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay + 'a> {
+//         let (name, item) = self.iter().nth(index).unwrap();
+//         Box::new(Grouper(name.clone(), item))
+//     }
+// }
 
 impl<'a, T: NodeDisplay + 'a> NodeDisplay for LinkedHashMap<String, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -392,6 +418,27 @@ impl<'b, T: TreeDisplay + 'b> TreeDisplay for LinkedHashMap<String, T> {
         Box::new(Grouper(name.clone(), item))
     }
 }
+
+// impl<'a, T: NodeDisplay + 'a> NodeDisplay for HashMap<String, T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         f.write_str("HashMap")
+//     }
+// }
+
+// impl<'b, T: TreeDisplay + 'b> TreeDisplay for HashMap<String, T> {
+//     fn num_children(&self) -> usize {
+//         self.len()
+//     }
+
+//     fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+//         None
+//     }
+
+//     fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay + 'a> {
+//         let (name, item) = self.iter().nth(index).unwrap();
+//         Box::new(Grouper(name.clone(), item))
+//     }
+// }
 
 impl NodeDisplay for String {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

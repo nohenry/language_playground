@@ -88,7 +88,7 @@ impl PartialEq for Type {
             (Self::Symbol(sym), right) | (right, Self::Symbol(sym)) => {
                 let sym = sym.borrow();
                 if let ScopeValue::TypeAlias { ident, ty } = &sym.value {
-                    return &**ty == right
+                    return &**ty == right;
                 }
                 false
             }
@@ -623,10 +623,7 @@ impl ConstValue {
         }
     }
 
-    pub fn try_implicit_cast(
-        &self,
-        ty: &Type,
-    ) -> Option<ConstValue> {
+    pub fn try_implicit_cast(&self, ty: &Type) -> Option<ConstValue> {
         match (self, ty) {
             (
                 ConstValue {

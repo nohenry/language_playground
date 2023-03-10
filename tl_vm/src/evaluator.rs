@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
@@ -64,7 +67,7 @@ impl Evaluator {
         match statement {
             Statement::TypeAlias {
                 ident,
-                generic,
+                generic: None,
                 ty: box tl_core::ast::Type::Struct(members),
                 ..
             } => {
@@ -79,6 +82,30 @@ impl Evaluator {
                     ScopeValue::Struct {
                         members,
                         ident: ident.as_str().to_string(),
+                    },
+                    index,
+                );
+
+                self.wstate().scope.pop_scope();
+            }
+            Statement::TypeAlias {
+                ident,
+                generic: Some(_),
+                ty: box tl_core::ast::Type::Struct(members),
+                ..
+            } => {
+                let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
+                    return ConstValue::empty();
+                };
+                self.wstate().scope.push_scope(sym.clone());
+
+                let members = self.evaluate_struct_members(members);
+                self.wstate().scope.update_value(
+                    ident.as_str(),
+                    ScopeValue::StructTemplate {
+                        members,
+                        ident: ident.as_str().to_string(),
+                        constructions: HashMap::new(),
                     },
                     index,
                 );

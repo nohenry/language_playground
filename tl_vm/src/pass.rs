@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
@@ -78,14 +81,26 @@ impl CodePass {
             } => {
                 match self.pass {
                     PassType::TypeOnly => {
-                        let scope = self.wstate().scope.insert_value(
-                            ident.as_str(),
-                            ScopeValue::Struct {
-                                ident: ident.as_str().to_string(),
-                                members: LinkedHashMap::default(),
-                            },
-                            index,
-                        );
+                        let scope = if let Some(generic) = generic {
+                            self.wstate().scope.insert_value(
+                                ident.as_str(),
+                                ScopeValue::StructTemplate {
+                                    ident: ident.as_str().to_string(),
+                                    members: LinkedHashMap::default(),
+                                    constructions: HashMap::new(),
+                                },
+                                index,
+                            )
+                        } else {
+                            self.wstate().scope.insert_value(
+                                ident.as_str(),
+                                ScopeValue::Struct {
+                                    ident: ident.as_str().to_string(),
+                                    members: LinkedHashMap::default(),
+                                },
+                                index,
+                            )
+                        };
 
                         if let Some(generic) = generic {
                             self.wstate().scope.push_scope(scope);
@@ -97,7 +112,10 @@ impl CodePass {
                                             b.as_str(),
                                             ScopeValue::TypeAlias {
                                                 ident: b.as_str().to_string(),
-                                                ty: Box::new(Type::Integer { width: 8, signed: false }),
+                                                ty: Box::new(Type::Integer {
+                                                    width: 8,
+                                                    signed: false,
+                                                }),
                                             },
                                             index,
                                         );
@@ -119,7 +137,9 @@ impl CodePass {
                         let emembers = self.evaluate_struct_members(members);
 
                         let mut sym = sym.borrow_mut();
-                        if let ScopeValue::Struct { members, .. } = &mut sym.value {
+                        if let ScopeValue::Struct { members, .. }
+                        | ScopeValue::StructTemplate { members, .. } = &mut sym.value
+                        {
                             *members = emembers
                         }
 
