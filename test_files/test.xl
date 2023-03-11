@@ -1,13 +1,13 @@
 use std.io 
 
-type Potato <T> {
-    bool b
+type Potato <T, U> {
     T a
+    U b
 }
 
 Potato<u32> p = {
-    b: true
-    a: 8
+    b: 0
+    a: 0
 }
 
 fn myfunc(i32@ i) -> () {

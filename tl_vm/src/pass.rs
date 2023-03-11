@@ -87,13 +87,14 @@ impl CodePass {
             } => {
                 match self.pass {
                     PassType::TypeOnly => {
-                        let scope = if let Some(_) = generic {
+                        let scope = if let Some(generics) = generic {
                             self.wstate().scope.insert_value(
                                 ident.as_str(),
                                 ScopeValue::StructTemplate {
                                     ident: ident.as_str().to_string(),
                                     raw_members: members.clone(),
                                     members: LinkedHashMap::default(),
+                                    generics: generics.iter_items().cloned().collect(),
                                     constructions: HashMap::new(),
                                     construction_start_index: 0
                                 },
@@ -111,6 +112,10 @@ impl CodePass {
                         };
 
                         if let Some(generic) = generic {
+                            {
+
+                            }
+
                             self.wstate().scope.push_scope(scope);
 
                             for param in generic.iter_items() {
@@ -132,6 +137,8 @@ impl CodePass {
                                     _ => todo!(),
                                 }
                             }
+
+
 
                             self.wstate().scope.pop_scope();
                         }

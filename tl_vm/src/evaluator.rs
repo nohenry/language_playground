@@ -8,7 +8,7 @@ use linked_hash_map::LinkedHashMap;
 use tl_core::{
     ast::{
         ArgList, AstNode, EnclosedList, Expression, Param, ParamaterList, ParsedTemplate,
-        ParsedTemplateString, Statement,
+        ParsedTemplateString, Statement, GenericParameter,
     },
     token::{Operator, Range, SpannedToken, Token},
     Module,
@@ -107,6 +107,7 @@ impl Evaluator {
                         raw_members: raw_members.clone(),
                         members,
                         ident: ident.as_str().to_string(),
+                        generics: gen.iter_items().cloned().collect(),
                         constructions: HashMap::new(),
                         construction_start_index: gen.items.len(),
                     },
@@ -558,7 +559,7 @@ impl Evaluator {
                             kind: EvaluationErrorKind::TypeMismatch(
                                 arg.ty,
                                 ty.clone(),
-                                TypeHint::Parameter,
+                                TypeHint::StructMember,
                             ),
                             range: member_range_provider(i).unwrap_or(full_range),
                         });
@@ -851,20 +852,24 @@ impl Evaluator {
 
                 let csi = {
                     let sym = symrf.borrow();
-                    let ScopeValue::StructTemplate { constructions, members, construction_start_index, .. } = &sym.value else {
+                    let ScopeValue::StructTemplate { constructions, construction_start_index, generics, .. } = &sym.value else {
                         self.add_error(EvaluationError {
-                            kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
+                            kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Struct),
                             range: tok.get_range(),
                         });
                         return Type::Empty
                     };
 
+                    if !self.verify_generics_match(generics, &types, list.get_range()) {
+                        return Type::Empty;
+                    }
+
+                    // If we have already constructed this struct with the same type arguments, reuse this construction
                     if let Some(child_construction_name) = constructions.get(&types) {
-                        // let sym = symrf.borrow();
                         let Some(construction) = sym.children.get(child_construction_name) else {
-                            panic!("Comiler bug!")
+                            panic!("Compiler bug!");
                         };
-                        todo!()
+                        return Type::Symbol(construction.clone());
                     }
 
                     *construction_start_index
@@ -878,10 +883,10 @@ impl Evaluator {
 
                 let raw_members = {
                     let ScopeValue::StructTemplate { constructions, raw_members, .. } = &mut sym.value else {
-                    // self.add_error(EvaluationError {
-                    //     kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
-                    //     range: tok.get_range(),
-                    // });
+                        // self.add_error(EvaluationError {
+                        //     kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
+                        //     range: tok.get_range(),
+                        // });
                         return Type::Empty
                     };
 
@@ -889,6 +894,7 @@ impl Evaluator {
                     raw_members.clone()
                 };
 
+                // Build generic parameter symbols
                 let children: Vec<_> = {
                     sym.children
                         .iter()
@@ -918,6 +924,7 @@ impl Evaluator {
                     0,
                 );
 
+                // insert generic parameter symbols
                 {
                     let mut child = child.borrow_mut();
                     for c in children {
@@ -927,7 +934,6 @@ impl Evaluator {
 
                 {
                     self.wstate().scope.push_scope(child.clone());
-
 
                     // We need to regenerate types using generic parameters
                     let emembers = self.evaluate_struct_members(&raw_members);
@@ -942,12 +948,24 @@ impl Evaluator {
                     self.wstate().scope.pop_scope();
                 }
 
-                
                 Type::Symbol(child)
-                // return Type::Symbol(sym);
             }
             _ => Type::Empty,
         }
+    }
+
+    fn verify_generics_match(&self, params: &Vec<GenericParameter>, args: &Vec<Type>, errored_range: Range) -> bool {
+        if args.len() != params.len() {
+            self.add_error(EvaluationError {
+                kind: EvaluationErrorKind::ArgCountMismatch(args.len() as _, params.len() as _),
+                range: errored_range,
+            });
+            return false
+        }
+
+        // TODO: Verify bindings match
+
+        true
     }
 
     fn add_error(&self, error: EvaluationError) {

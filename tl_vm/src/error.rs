@@ -98,7 +98,8 @@ pub enum TypeHint {
     Parameter,
     ReturnParameter,
     Function,
-    Record,
+    Struct,
+    StructMember
 }
 
 #[derive(Debug, Clone)]
@@ -133,7 +134,7 @@ impl EvaluationErrorKind {
             }
             Self::ArgCountMismatch(found, expected) => {
                 vec![format!(
-                    "expected: `{}` found: `{}`",
+                    "expected {} arguments but received {}",
                     expected.to_string().bold(),
                     found.to_string().bold()
                 )]
@@ -183,6 +184,12 @@ impl Display for EvaluationErrorKind {
             }
             Self::TypeMismatch(_, _, TypeHint::Function) => {
                 f.write_str(&"function type mismatch".bold().bright_white())
+            }
+            Self::TypeMismatch(_, _, TypeHint::Struct) => {
+                f.write_str(&"struct type mismatch".bold().bright_white())
+            }
+            Self::TypeMismatch(_, _, TypeHint::StructMember) => {
+                f.write_str(&"struct member type mismatch".bold().bright_white())
             }
             Self::TypeMismatch(_, _, _) => f.write_str(&"type mismatch".bold().bright_white()),
             Self::ArgCountMismatch(_, _) => f.write_str(&"type mismatch".bold().bright_white()),

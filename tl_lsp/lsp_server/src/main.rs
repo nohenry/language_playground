@@ -3,14 +3,11 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
-use tl_core::ast::{
-    ArgList, AstNode, EnclosedPunctuationList, Expression, GenericParameter, ParamaterList,
-    ParsedTemplate, Statement, Type,
-};
-use tl_core::token::{Operator, Span, SpannedToken, Token};
+use semantic_tokens::{SemanticTokenGenerator, STOKEN_TYPES};
+use tl_core::ast::AstNode;
+use tl_core::token::Span;
 use tl_core::Module;
 use tl_util::Rf;
-use tl_vm::const_value::{ConstValue, ConstValueKind};
 use tl_vm::error::ErrorLevel;
 use tl_vm::pass::CodePass;
 use tl_vm::scope::{Scope, ScopeManager, ScopeValue};
@@ -20,6 +17,9 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::request::Request;
 use tower_lsp::{lsp_types::*, LanguageServer};
 use tower_lsp::{Client, LspService, Server};
+
+mod completion;
+mod semantic_tokens;
 
 struct ReadDirectoryRequest {}
 
@@ -31,80 +31,7 @@ impl Request for ReadDirectoryRequest {
     const METHOD: &'static str = "lsif/readDirectory";
 }
 
-const STOKEN_TYPES: &[SemanticTokenType] = &[
-    SemanticTokenType::KEYWORD,
-    SemanticTokenType::TYPE,
-    SemanticTokenType::VARIABLE,
-    SemanticTokenType::NAMESPACE,
-    SemanticTokenType::CLASS,
-    SemanticTokenType::ENUM,
-    SemanticTokenType::INTERFACE,
-    SemanticTokenType::STRUCT,
-    SemanticTokenType::TYPE_PARAMETER,
-    SemanticTokenType::PARAMETER,
-    SemanticTokenType::PROPERTY,
-    SemanticTokenType::ENUM_MEMBER,
-    SemanticTokenType::EVENT,
-    SemanticTokenType::FUNCTION,
-    SemanticTokenType::METHOD,
-    SemanticTokenType::MACRO,
-    SemanticTokenType::MODIFIER,
-    SemanticTokenType::COMMENT,
-    SemanticTokenType::STRING,
-    SemanticTokenType::NUMBER,
-    SemanticTokenType::REGEXP,
-    SemanticTokenType::OPERATOR,
-];
-
-#[derive(Default)]
-pub struct SemanticTokenBuilder {
-    tokens: Vec<SemanticToken>,
-    last_line: u32,
-    last_pos: u32,
-}
-
-impl SemanticTokenBuilder {
-    pub fn push(&mut self, line: u32, position: u32, length: u32, token: u32, modifier: u32) {
-        if self.last_line == line {
-            let delta_pos = position - self.last_pos;
-            self.last_pos = position;
-            self.tokens.push(SemanticToken {
-                delta_line: 0,
-                delta_start: delta_pos,
-                length,
-                token_type: token,
-                token_modifiers_bitset: modifier,
-            })
-        } else {
-            let delta_line = line - self.last_line;
-            self.last_line = line;
-            self.last_pos = position;
-            self.tokens.push(SemanticToken {
-                delta_line,
-                delta_start: position,
-                length,
-                token_type: token,
-                token_modifiers_bitset: modifier,
-            })
-        }
-    }
-
-    pub fn push_token(&mut self, token: &SpannedToken, index: u32, modifier: u32) {
-        self.push(
-            token.span().line_num,
-            token.span().position,
-            token.span().length,
-            index,
-            modifier,
-        )
-    }
-
-    pub fn build(self) -> Vec<SemanticToken> {
-        self.tokens
-    }
-}
-
-struct Backend {
+pub struct Backend {
     element_names: HashSet<String>,
     style_enum: HashMap<String, CompletionType>,
 
@@ -112,427 +39,6 @@ struct Backend {
     client: Arc<Client>,
 
     symbol_tree: Rf<Scope>,
-}
-
-fn get_stype_index(ty: SemanticTokenType) -> u32 {
-    STOKEN_TYPES.iter().position(|f| *f == ty).unwrap_or(0) as u32
-}
-
-fn get_stype_index_from_str(ty: &str) -> u32 {
-    STOKEN_TYPES
-        .iter()
-        .position(|f| f.as_str() == ty)
-        .unwrap_or(0) as u32
-}
-
-impl Backend {
-    fn recurse_expression(
-        &self,
-        value: &Expression,
-        module: &Module,
-        scope: &ScopeManager,
-        scope_index: &mut Vec<usize>,
-        builder: &mut SemanticTokenBuilder,
-    ) {
-        match value {
-            Expression::Boolean(_, tok) => {
-                builder.push_token(tok, get_stype_index_from_str("keyword"), 0)
-            }
-            Expression::String(template_string, _tok) => {
-                // builder.push(
-                //     tok.span().line_num,
-                //     tok.span().position,
-                //     1,
-                //     get_stype_index(SemanticTokenType::STRING),
-                //     0,
-                // );
-
-                for templ in &template_string.0 {
-                    match templ {
-                        ParsedTemplate::String(s) => {
-                            builder.push(
-                                s.span().line_num,
-                                s.span().position,
-                                s.span().length,
-                                get_stype_index(SemanticTokenType::STRING),
-                                0,
-                            );
-                        }
-                        ParsedTemplate::Template(st, _o, _c) => {
-                            self.recurse_expression(st, module, scope, scope_index, builder);
-                        }
-                    }
-                }
-
-                // builder.push(
-                //     tok.span().line_num,
-                //     tok.span().position + tok.span().length - 1,
-                //     1,
-                //     get_stype_index(SemanticTokenType::STRING),
-                //     0,
-                // );
-            }
-            Expression::Ident(tok) => {
-                let mut current_scope = Vec::new();
-                scope.push_scope_chain(&mut current_scope, scope_index.iter());
-
-                if let Some(sym) = scope.find_symbol_in_scope(tok.as_str(), &current_scope) {
-                    let sym = sym.borrow();
-                    match &sym.value {
-                        ScopeValue::ConstValue(ConstValue {
-                            kind:
-                                ConstValueKind::Function { .. } | ConstValueKind::NativeFunction { .. },
-                            ..
-                        }) => {
-                            builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
-                                get_stype_index(SemanticTokenType::FUNCTION),
-                                0,
-                            );
-                        }
-                        ScopeValue::Struct { .. } => {
-                            builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
-                                get_stype_index(SemanticTokenType::TYPE),
-                                0,
-                            );
-                        }
-                        ScopeValue::ConstValue(ConstValue {
-                            kind: ConstValueKind::StructInstance { .. },
-                            ..
-                        }) => {
-                            builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
-                                get_stype_index(SemanticTokenType::TYPE),
-                                0,
-                            );
-                        }
-                        _ => {
-                            builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
-                                get_stype_index(SemanticTokenType::VARIABLE),
-                                0,
-                            );
-                        }
-                    }
-                }
-            }
-            Expression::Float(_, _, tok) => {
-                builder.push(
-                    tok.span().line_num,
-                    tok.span().position,
-                    tok.span().length,
-                    get_stype_index(SemanticTokenType::NUMBER),
-                    0,
-                );
-            }
-            Expression::Integer(_, _, tok) => {
-                builder.push(
-                    tok.span().line_num,
-                    tok.span().position,
-                    tok.span().length,
-                    get_stype_index(SemanticTokenType::NUMBER),
-                    0,
-                );
-            }
-
-            Expression::FunctionCall { expr, args } => {
-                self.recurse_expression(expr, module, scope, scope_index, builder);
-                self.recurse_args(module, scope, args, scope_index, builder);
-            }
-            Expression::Tuple(_) => (),
-            Expression::Array { values, .. } => values.iter_items().for_each(|item| {
-                self.recurse_expression(item, module, scope, scope_index, builder)
-            }),
-            Expression::BinaryExpression { left, right, .. } => {
-                if let Some(left) = left {
-                    self.recurse_expression(left, module, scope, scope_index, builder);
-                }
-                if let Some(right) = right {
-                    self.recurse_expression(right, module, scope, scope_index, builder);
-                }
-            }
-            Expression::Record(parameters) => {
-                for kv in parameters.items.iter() {
-                    if let Some(name) = &kv.name {
-                        builder.push_token(name, get_stype_index_from_str("property"), 0)
-                    }
-
-                    self.recurse_expression(&kv.expr, module, scope, scope_index, builder);
-                }
-            }
-        }
-    }
-
-    fn recurse_args(
-        &self,
-        module: &Module,
-        scope: &ScopeManager,
-        args: &ArgList,
-        scope_index: &mut Vec<usize>,
-        builder: &mut SemanticTokenBuilder,
-    ) {
-        for item in args.iter_items() {
-            self.recurse_expression(item, module, scope, scope_index, builder)
-        }
-    }
-
-    fn recurse_params(
-        &self,
-        module: &Module,
-        args: &ParamaterList,
-        scope: &ScopeManager,
-        scope_index: &mut Vec<usize>,
-        builder: &mut SemanticTokenBuilder,
-    ) {
-        for item in args.iter_items() {
-            if let Some(ty) = &item.ty {
-                self.recurse_type(module, ty, scope, scope_index, builder);
-            }
-
-            if let Some(name) = &item.name {
-                builder.push(
-                    name.span().line_num,
-                    name.span().position,
-                    name.span().length,
-                    get_stype_index(SemanticTokenType::VARIABLE),
-                    0,
-                );
-            }
-        }
-    }
-
-    fn recurse_type(
-        &self,
-        module: &Module,
-        ty: &Type,
-        scope: &ScopeManager,
-        scope_index: &mut Vec<usize>,
-        builder: &mut SemanticTokenBuilder,
-    ) {
-        match ty {
-            Type::Integer { token, .. } => {
-                builder.push(
-                    token.span().line_num,
-                    token.span().position,
-                    token.span().length,
-                    get_stype_index_from_str("type"),
-                    0,
-                );
-            }
-            Type::Float { token, .. } => {
-                builder.push(
-                    token.span().line_num,
-                    token.span().position,
-                    token.span().length,
-                    get_stype_index_from_str("type"),
-                    0,
-                );
-            }
-            Type::Boolean(tok) => builder.push_token(tok, get_stype_index_from_str("type"), 0),
-            Type::Expression(e) => self.recurse_expression(e, module, scope, scope_index, builder),
-            Type::Ref {
-                base_type: Some(base_type),
-                ..
-            } => self.recurse_type(module, base_type, scope, scope_index, builder),
-            Type::Option {
-                base_type: Some(base_type),
-                ..
-            } => self.recurse_type(module, base_type, scope, scope_index, builder),
-            Type::Result {
-                base_type: Some(base_type),
-                ..
-            } => self.recurse_type(module, base_type, scope, scope_index, builder),
-            Type::Ident(ident) => {
-                builder.push(
-                    ident.span().line_num,
-                    ident.span().position,
-                    ident.span().length,
-                    get_stype_index_from_str("type"),
-                    0,
-                );
-            }
-            Type::Struct(values) => {
-                for item in values.iter_items() {
-                    // value.
-                    if let Some(ty) = &item.ty {
-                        self.recurse_type(module, ty, scope, scope_index, builder);
-                    }
-
-                    if let Some(name) = &item.name {
-                        builder.push(
-                            name.span().line_num,
-                            name.span().position,
-                            name.span().length,
-                            get_stype_index(SemanticTokenType::VARIABLE),
-                            0,
-                        );
-                    }
-                }
-                // self.recurse_params(module, values.items, scope, scope_index, builder)
-            }
-            _ => (),
-        }
-    }
-
-    fn recurse_generic(
-        &self,
-        module: &Module,
-        scope: &ScopeManager,
-        stmt: &EnclosedPunctuationList<GenericParameter>,
-        scope_index: &mut Vec<usize>,
-        builder: &mut SemanticTokenBuilder,
-    ) {
-        for stmt in stmt.iter_items() {
-            match stmt {
-                GenericParameter::Unbounded(ident) => {
-                    builder.push_token(ident, get_stype_index_from_str("typeParameter"), 0)
-                }
-                GenericParameter::Bounded {
-                    bounds,
-                    colon,
-                    ident,
-                } => builder.push_token(ident, get_stype_index_from_str("typeParameter"), 0),
-            }
-        }
-    }
-
-    fn recurse(
-        &self,
-        module: &Module,
-        scope: &ScopeManager,
-        stmt: &Statement,
-        scope_index: &mut Vec<usize>,
-        builder: &mut SemanticTokenBuilder,
-    ) {
-        match stmt {
-            Statement::List(list) => {
-                for l in list.iter_items() {
-                    self.recurse(module, scope, l, scope_index, builder);
-                }
-            }
-            Statement::Decleration {
-                ty, ident, expr, ..
-            } => {
-                self.recurse_type(module, ty, scope, scope_index, builder);
-                let func = match expr {
-                    // Some(Expression::Function { .. }) => get_stype_index_from_str("function"),
-                    Some(Expression::Record { .. }) => get_stype_index_from_str("struct"),
-                    _ => get_stype_index_from_str("variable"),
-                };
-
-                builder.push_token(ident, func, 0);
-
-                if let Some(expr) = expr {
-                    self.recurse_expression(expr, module, scope, scope_index, builder);
-                }
-            }
-            Statement::Expression(e) => {
-                self.recurse_expression(e, module, scope, scope_index, builder)
-            }
-            Statement::UseStatement { token, args } => {
-                if let Some(token) = token {
-                    builder.push(
-                        token.span().line_num,
-                        token.span().position,
-                        token.span().length,
-                        get_stype_index_from_str("keyword"),
-                        0,
-                    )
-                }
-
-                scope.iter_use(args.iter_items().map(|f| (f.as_str(), f)), |_sym, ud| {
-                    builder.push(
-                        ud.span().line_num,
-                        ud.span().position,
-                        ud.span().length,
-                        get_stype_index_from_str("namespace"),
-                        0,
-                    );
-                });
-            }
-            Statement::Function {
-                fn_tok,
-                ident,
-                parameters,
-                return_parameters,
-                body,
-                ..
-            } => {
-                builder.push_token(fn_tok, get_stype_index_from_str("keyword"), 0);
-                builder.push_token(ident, get_stype_index_from_str("function"), 0);
-
-                self.recurse_params(module, parameters, scope, scope_index, builder);
-                self.recurse_params(module, return_parameters, scope, scope_index, builder);
-
-                if let Some(body) = body {
-                    self.recurse(module, scope, body, scope_index, builder);
-                }
-            }
-            Statement::TypeAlias {
-                ty_tok,
-                ident,
-                generic,
-                eq,
-                ty,
-            } => {
-                builder.push_token(ty_tok, get_stype_index_from_str("keyword"), 0);
-                builder.push_token(ident, get_stype_index_from_str("type"), 0);
-
-                if let Some(generic) = generic {
-                    self.recurse_generic(module, scope, generic, scope_index, builder)
-                }
-
-                self.recurse_type(module, ty, scope, scope_index, builder);
-            }
-            Statement::Block(b) => {
-                for statement in b.items.iter() {
-                    self.recurse(module, scope, statement, scope_index, builder);
-                }
-            }
-            _ => (),
-        }
-    }
-
-    fn bsearch_value_with_key(
-        &self,
-        _key: &SpannedToken,
-        _span: &Span,
-    ) -> Option<Vec<CompletionItem>> {
-        None
-    }
-
-    fn bsearch_statement(
-        &self,
-        _module: &Module,
-        item: &Statement,
-        _span: &Span,
-    ) -> Option<Vec<CompletionItem>> {
-        match item {
-            Statement::UseStatement { args, .. } => {
-                if let Some((_, Some(SpannedToken(_, Token::Operator(Operator::Dot))))) =
-                    args.iter().last()
-                {
-                    // if let Some(sym) = module.resolve_symbol_chain(args.iter_items()) {
-                    //     println!("Use {}", sym.borrow().name);
-                    //     let comp = Vec::new();
-
-                    //     return Some(comp);
-                    // }
-                }
-            }
-            _ => (),
-        }
-        None
-    }
 }
 
 #[tower_lsp::async_trait]
@@ -587,18 +93,23 @@ impl LanguageServer for Backend {
                 return Ok(None)
             };
 
-            let mut scope = Vec::with_capacity(50);
-            if let Some(id) = mods.1.index_of_mod(&mods.0.name) {
-                scope.push(id);
+            let index = if let Some(id) = mods.1.index_of_mod(&mods.0.name) {
+                id
+            } else {
+                0
+            };
+
+            let mut generator = SemanticTokenGenerator::new(&mods.1);
+            generator.scope_index.push(index);
+            generator.scope_index.push(0);
+
+            for (i, stmt) in mods.0.stmts.iter().enumerate() {
+                generator.scope_index[1] = i;
+
+                generator.recurse(stmt);
             }
 
-            let mut builder = SemanticTokenBuilder::default();
-            scope.push(0);
-            for (i, tok) in mods.0.stmts.iter().enumerate() {
-                scope[1] = i;
-                self.recurse(&mods.0, &mods.1, tok, &mut scope, &mut builder);
-            }
-            builder.build()
+            generator.build()
         };
 
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
@@ -778,9 +289,14 @@ async fn main() {
     let (service, socket) = LspService::new(|client| {
         let client = Arc::new(client);
 
-        let symbol_tree = Rf::new(Scope::new(ScopeValue::Root, 0));
+        let symbol_tree = Rf::new(Scope::root());
         {
-            let std_mod_scope = symbol_tree.borrow_mut().insert("std", ScopeValue::Root, 0);
+            let std_mod_scope = symbol_tree.borrow_mut().insert(
+                symbol_tree.clone(),
+                "std".to_string(),
+                ScopeValue::Root,
+                0,
+            );
 
             fill_module(std_mod_scope);
         }

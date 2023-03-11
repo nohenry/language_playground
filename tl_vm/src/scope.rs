@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hasher, io::Read, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
-    ast::{Expression, EnclosedPunctuationList, Param, EnclosedList},
+    ast::{Expression, EnclosedPunctuationList, Param, EnclosedList, GenericParameter},
     token::{Operator, SpannedToken, Token},
     Module,
 };
@@ -24,6 +24,7 @@ pub enum ScopeValue {
         ident: String,
         raw_members: EnclosedList<Param>,
         members: LinkedHashMap<String, Type>,
+        generics: Vec<GenericParameter>,
         constructions: HashMap<Vec<Type>, String>,
         construction_start_index: usize,
     },
