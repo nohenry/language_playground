@@ -1,19 +1,20 @@
 use std::{
     borrow::Borrow,
     fmt::{Debug, Display},
+    hash::Hasher,
     sync::Arc,
 };
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::ast::Statement;
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay},
+    format::{Grouper, NodeDisplay, TreeDisplay},
     Rf,
 };
 
 use crate::scope::{Scope, ScopeValue};
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub enum Type {
     Empty,
     CoercibleInteger,
@@ -44,6 +45,54 @@ pub enum Type {
         rf: Option<Rf<Scope>>,
         members: LinkedHashMap<String, Type>,
     },
+}
+
+impl std::hash::Hash for Type {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            Self::Integer { width, signed } => {
+                state.write_u8(*width);
+                state.write_u8(if *signed { 1 } else { 0 });
+            }
+            Self::Float { width } => {
+                state.write_u8(*width);
+            }
+            Self::Function {
+                parameters,
+                return_parameters,
+            } => {
+                parameters.hash(state);
+                return_parameters.hash(state);
+            }
+            Self::Ref { base_type } => {
+                base_type.hash(state);
+            }
+            Self::Ident(s) => {
+                s.hash(state);
+            }
+            Self::Tuple(tys) => {
+                tys.hash(state);
+            }
+            Self::StructInitializer { members } => {
+                members.hash(state);
+            }
+            Self::StructInstance {
+                rf: Some(rf),
+                members,
+            } => {
+                Scope::hash(rf, state);
+                members.hash(state);
+            }
+            Self::StructInstance { rf: None, members } => {
+                members.hash(state);
+            }
+            Self::Symbol(sym) => {
+                Scope::hash(sym, state);
+            }
+            _ => (),
+        }
+    }
 }
 
 impl PartialEq for Type {
@@ -225,7 +274,10 @@ impl NodeDisplay for Type {
         match self {
             Self::Boolean => f.write_str("bool"),
             Self::String => f.write_str("string"),
-            Self::Symbol { .. } => write!(f, "Symbol"),
+            Self::Symbol(ty) => {
+                let ty = ty.borrow();
+                write!(f, "Symbol {}", ty.name)
+            }
             Self::StructInitializer { .. } => write!(f, "Struct Initializer"),
             Self::StructInstance { .. } => write!(f, "Struct Instance"),
             Self::Tuple(_) => write!(f, "Tuple"),
@@ -262,6 +314,7 @@ impl TreeDisplay for Type {
             Type::StructInstance { members, .. } => members.len(),
             Type::StructInitializer { members } => members.len(),
             Type::Ref { .. } => 1,
+            Type::Symbol(_) => 1,
             _ => 0,
         }
     }
@@ -285,6 +338,7 @@ impl TreeDisplay for Type {
             }
             Type::StructInstance { .. } => None,
             Type::Ref { base_type } => Some(&**base_type),
+
             _ => None,
         }
     }
@@ -293,6 +347,11 @@ impl TreeDisplay for Type {
         match self {
             Type::StructInstance { members, .. } => members.child_at_bx(_index),
             Type::StructInitializer { members, .. } => members.child_at_bx(_index),
+            Type::Symbol(sym) => {
+                // let sym = sym.borrow();
+                Box::new(sym.borrow())
+                // Box::new(Grouper("".to_string(), sym.child_at(1).unwrap()))
+            }
             _ => panic!(),
         }
     }
