@@ -4,15 +4,12 @@ use tl_core::{
         ParsedTemplate, Statement, Type,
     },
     token::SpannedToken,
-    Module,
 };
 use tl_vm::{
     const_value::{ConstValue, ConstValueKind},
     scope::{ScopeManager, ScopeValue},
 };
 use tower_lsp::lsp_types::{SemanticToken, SemanticTokenType};
-
-use crate::Backend;
 
 pub const STOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::KEYWORD,
@@ -105,9 +102,7 @@ pub struct SemanticTokenGenerator<'a> {
 }
 
 impl<'a> SemanticTokenGenerator<'a> {
-    pub fn new(
-        scope: &'a ScopeManager,
-    ) -> SemanticTokenGenerator<'a> {
+    pub fn new(scope: &'a ScopeManager) -> SemanticTokenGenerator<'a> {
         SemanticTokenGenerator {
             scope,
             scope_index: Vec::with_capacity(50),
@@ -133,7 +128,6 @@ impl<'a> SemanticTokenGenerator<'a> {
             } => {
                 self.recurse_type(ty);
                 let func = match expr {
-                    // Some(Expression::Function { .. }) => get_stype_index_from_str("function"),
                     Some(Expression::Record { .. }) => get_stype_index_from_str("struct"),
                     _ => get_stype_index_from_str("variable"),
                 };
@@ -147,24 +141,14 @@ impl<'a> SemanticTokenGenerator<'a> {
             Statement::Expression(e) => self.recurse_expression(e),
             Statement::UseStatement { token, args } => {
                 if let Some(token) = token {
-                    self.builder.push(
-                        token.span().line_num,
-                        token.span().position,
-                        token.span().length,
-                        get_stype_index_from_str("keyword"),
-                        0,
-                    )
+                    self.builder
+                        .push_token(token, get_stype_index_from_str("keyword"), 0)
                 }
 
                 self.scope
                     .iter_use(args.iter_items().map(|f| (f.as_str(), f)), |_sym, ud| {
-                        self.builder.push(
-                            ud.span().line_num,
-                            ud.span().position,
-                            ud.span().length,
-                            get_stype_index_from_str("namespace"),
-                            0,
-                        );
+                        self.builder
+                            .push_token(ud, get_stype_index_from_str("namespace"), 0);
                     });
             }
             Statement::Function {
@@ -191,8 +175,8 @@ impl<'a> SemanticTokenGenerator<'a> {
                 ty_tok,
                 ident,
                 generic,
-                eq,
                 ty,
+                ..
             } => {
                 self.builder
                     .push_token(ty_tok, get_stype_index_from_str("keyword"), 0);
@@ -210,7 +194,6 @@ impl<'a> SemanticTokenGenerator<'a> {
                     self.recurse(statement);
                 }
             }
-            _ => (),
         }
     }
 
@@ -221,21 +204,11 @@ impl<'a> SemanticTokenGenerator<'a> {
                     .push_token(tok, get_stype_index_from_str("keyword"), 0)
             }
             Expression::String(template_string, _tok) => {
-                // builder.push(
-                //     tok.span().line_num,
-                //     tok.span().position,
-                //     1,
-                //     get_stype_index(SemanticTokenType::STRING),
-                //     0,
-                // );
-
                 for templ in &template_string.0 {
                     match templ {
                         ParsedTemplate::String(s) => {
-                            self.builder.push(
-                                s.span().line_num,
-                                s.span().position,
-                                s.span().length,
+                            self.builder.push_token(
+                                s,
                                 get_stype_index(SemanticTokenType::STRING),
                                 0,
                             );
@@ -245,14 +218,6 @@ impl<'a> SemanticTokenGenerator<'a> {
                         }
                     }
                 }
-
-                // builder.push(
-                //     tok.span().line_num,
-                //     tok.span().position + tok.span().length - 1,
-                //     1,
-                //     get_stype_index(SemanticTokenType::STRING),
-                //     0,
-                // );
             }
             Expression::Ident(tok) => {
                 let mut current_scope = Vec::new();
@@ -270,19 +235,15 @@ impl<'a> SemanticTokenGenerator<'a> {
                                 ConstValueKind::Function { .. } | ConstValueKind::NativeFunction { .. },
                             ..
                         }) => {
-                            self.builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
+                            self.builder.push_token(
+                                tok,
                                 get_stype_index(SemanticTokenType::FUNCTION),
                                 0,
                             );
                         }
                         ScopeValue::Struct { .. } => {
-                            self.builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
+                            self.builder.push_token(
+                                tok,
                                 get_stype_index(SemanticTokenType::TYPE),
                                 0,
                             );
@@ -291,19 +252,15 @@ impl<'a> SemanticTokenGenerator<'a> {
                             kind: ConstValueKind::StructInstance { .. },
                             ..
                         }) => {
-                            self.builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
+                            self.builder.push_token(
+                                tok,
                                 get_stype_index(SemanticTokenType::TYPE),
                                 0,
                             );
                         }
                         _ => {
-                            self.builder.push(
-                                tok.span().line_num,
-                                tok.span().position,
-                                tok.span().length,
+                            self.builder.push_token(
+                                tok,
                                 get_stype_index(SemanticTokenType::VARIABLE),
                                 0,
                             );
@@ -312,22 +269,12 @@ impl<'a> SemanticTokenGenerator<'a> {
                 }
             }
             Expression::Float(_, _, tok) => {
-                self.builder.push(
-                    tok.span().line_num,
-                    tok.span().position,
-                    tok.span().length,
-                    get_stype_index(SemanticTokenType::NUMBER),
-                    0,
-                );
+                self.builder
+                    .push_token(tok, get_stype_index(SemanticTokenType::NUMBER), 0);
             }
             Expression::Integer(_, _, tok) => {
-                self.builder.push(
-                    tok.span().line_num,
-                    tok.span().position,
-                    tok.span().length,
-                    get_stype_index(SemanticTokenType::NUMBER),
-                    0,
-                );
+                self.builder
+                    .push_token(tok, get_stype_index(SemanticTokenType::NUMBER), 0);
             }
 
             Expression::FunctionCall { expr, args } => {
@@ -362,22 +309,12 @@ impl<'a> SemanticTokenGenerator<'a> {
     pub fn recurse_type(&mut self, ty: &Type) {
         match ty {
             Type::Integer { token, .. } => {
-                self.builder.push(
-                    token.span().line_num,
-                    token.span().position,
-                    token.span().length,
-                    get_stype_index_from_str("type"),
-                    0,
-                );
+                self.builder
+                    .push_token(token, get_stype_index_from_str("type"), 0);
             }
             Type::Float { token, .. } => {
-                self.builder.push(
-                    token.span().line_num,
-                    token.span().position,
-                    token.span().length,
-                    get_stype_index_from_str("type"),
-                    0,
-                );
+                self.builder
+                    .push_token(token, get_stype_index_from_str("type"), 0);
             }
             Type::Boolean(tok) => self
                 .builder
@@ -396,13 +333,8 @@ impl<'a> SemanticTokenGenerator<'a> {
                 ..
             } => self.recurse_type(base_type),
             Type::Ident(ident) => {
-                self.builder.push(
-                    ident.span().line_num,
-                    ident.span().position,
-                    ident.span().length,
-                    get_stype_index_from_str("type"),
-                    0,
-                );
+                self.builder
+                    .push_token(ident, get_stype_index_from_str("type"), 0);
             }
             Type::Struct(values) => {
                 for item in values.iter_items() {
@@ -411,14 +343,31 @@ impl<'a> SemanticTokenGenerator<'a> {
                     }
 
                     if let Some(name) = &item.name {
-                        self.builder.push(
-                            name.span().line_num,
-                            name.span().position,
-                            name.span().length,
+                        self.builder.push_token(
+                            name,
                             get_stype_index(SemanticTokenType::VARIABLE),
                             0,
                         );
                     }
+                }
+            }
+            Type::Generic { base_type, list } => {
+                if let Some(base_type) = base_type {
+                    self.recurse_type(base_type);
+                }
+
+                for ty in list.iter_items() {
+                    self.recurse_type(ty)
+                }
+            }
+            Type::Union(list) => {
+                for ty in list.iter_items() {
+                    self.recurse_type(ty)
+                }
+            }
+            Type::Array(list) => {
+                for ty in list.iter_items() {
+                    self.recurse_type(ty)
                 }
             }
             _ => (),
@@ -432,13 +381,15 @@ impl<'a> SemanticTokenGenerator<'a> {
                     self.builder
                         .push_token(ident, get_stype_index_from_str("typeParameter"), 0)
                 }
-                GenericParameter::Bounded {
-                    bounds,
-                    colon,
-                    ident,
-                } => self
-                    .builder
-                    .push_token(ident, get_stype_index_from_str("typeParameter"), 0),
+                GenericParameter::Bounded { bounds, ident, .. } => {
+                    self.builder
+                        .push_token(ident, get_stype_index_from_str("typeParameter"), 0);
+
+                    for bound in bounds.iter_items() {
+                        self.builder
+                            .push_token(bound, get_stype_index_from_str("interface"), 0);
+                    }
+                }
             }
         }
     }
@@ -456,13 +407,8 @@ impl<'a> SemanticTokenGenerator<'a> {
             }
 
             if let Some(name) = &item.name {
-                self.builder.push(
-                    name.span().line_num,
-                    name.span().position,
-                    name.span().length,
-                    get_stype_index(SemanticTokenType::VARIABLE),
-                    0,
-                );
+                self.builder
+                    .push_token(name, get_stype_index(SemanticTokenType::VARIABLE), 0);
             }
         }
     }
