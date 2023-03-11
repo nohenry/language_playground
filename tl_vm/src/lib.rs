@@ -1,5 +1,6 @@
 #![feature(iter_intersperse)]
 #![feature(box_patterns)]
+#![feature(hasher_prefixfree_extras)]
 use std::{fs::File, io::Read, path::Path, sync::Arc};
 
 use evaluator::Evaluator;
@@ -45,7 +46,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
 
     let lines: Vec<&str> = input.split(LINE_ENDING).collect();
 
-    let symbol_tree = Rf::new(Scope::new(ScopeValue::Root, 0));
+    let symbol_tree = Rf::new(Scope::root());
 
     {
         let std_module = std_module();
@@ -74,8 +75,8 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
 
     let code_pass = CodePass::new(symbol_tree.clone(), module.clone(), 1);
     let code_pass_state = code_pass.run();
-
     println!("{}", symbol_tree.format());
+
     let evaluator = Evaluator::new(module, code_pass_state.scope);
     let values = evaluator.evaluate();
     println!("{}", symbol_tree.format());

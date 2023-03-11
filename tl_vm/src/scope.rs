@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hasher, io::Read, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
-    ast::Expression,
+    ast::{Expression, EnclosedPunctuationList, Param, EnclosedList},
     token::{Operator, SpannedToken, Token},
     Module,
 };
@@ -22,8 +22,10 @@ pub enum ScopeValue {
     },
     StructTemplate {
         ident: String,
+        raw_members: EnclosedList<Param>,
         members: LinkedHashMap<String, Type>,
         constructions: HashMap<Vec<Type>, String>,
+        construction_start_index: usize,
     },
     TypeAlias {
         ident: String,
@@ -91,26 +93,77 @@ impl TreeDisplay for ScopeValue {
 }
 
 pub struct Scope {
+    pub name: String,
     pub value: ScopeValue,
+    pub parent: Option<Rf<Scope>>,
     pub children: LinkedHashMap<String, Rf<Scope>>,
     pub uses: Vec<Vec<String>>,
     pub index: usize,
 }
 
 impl Scope {
-    pub fn new(value: ScopeValue, index: usize) -> Scope {
+    pub fn root() -> Scope {
         Scope {
+            name: "".to_string(),
+            value: ScopeValue::Root,
+            parent: None,
+            children: LinkedHashMap::new(),
+            uses: Vec::new(),
+            index: 0,
+        }
+    }
+
+    pub fn new(parent: Rf<Scope>, name: String, value: ScopeValue, index: usize) -> Scope {
+        Scope {
+            name: name.to_string(),
             value,
+            parent: Some(parent),
             children: LinkedHashMap::new(),
             uses: Vec::new(),
             index,
         }
     }
 
-    pub fn insert(&mut self, name: &str, val: ScopeValue, index: usize) -> Rf<Scope> {
-        let rf = Rf::new(Scope::new(val, index));
+    pub fn with_children(mut self, children: LinkedHashMap<String, Rf<Scope>>) -> Self {
+        self.children = children;
+        self
+    }
 
-        self.children.insert(name.to_string(), rf.clone());
+    pub fn hash<H: Hasher>(self_rf: &Rf<Scope>, state: &mut H) {
+        Self::iter(self_rf, &mut |sym| {
+            let item = sym.borrow();
+            state.write_str(&item.name);
+        });
+    }
+
+    pub fn iter(self_rf: &Rf<Scope>, cb: &mut impl FnMut(&Rf<Scope>)) {
+        let slf = self_rf.borrow();
+        if let Some(prnt) = &slf.parent {
+            // let parent = prnt.borrow();
+            Self::iter(self_rf, cb);
+            cb(prnt)
+        }
+    }
+
+    pub fn insert(
+        &mut self,
+        self_rf: Rf<Scope>,
+        name: String,
+        val: ScopeValue,
+        index: usize,
+    ) -> Rf<Scope> {
+        let rf = Rf::new(Scope::new(self_rf, name.to_string(), val, index));
+
+        self.children.insert(name, rf.clone());
+
+        rf
+    }
+
+    pub fn insert_node(&mut self, scope: Scope) -> Rf<Scope> {
+        let name = scope.name.clone();
+        let rf = Rf::new(scope);
+
+        self.children.insert(name, rf.clone());
 
         rf
     }
@@ -534,9 +587,10 @@ impl<'a> ScopeManager {
         }
 
         if let Some(scp) = self.current_scope.last() {
-            scp.borrow_mut()
-                .children
-                .insert(name.to_string(), Rf::new(Scope::new(value, index)));
+            scp.borrow_mut().children.insert(
+                name.to_string(),
+                Rf::new(Scope::new(scp.clone(), name.to_string(), value, index)),
+            );
         }
         // tl_util::set_backtrace(true);
         // std::env::set_var("RUST_LIB_BACKTRACE", "1");
@@ -546,7 +600,7 @@ impl<'a> ScopeManager {
 
     pub fn insert_value(&mut self, name: &str, value: ScopeValue, index: usize) -> Rf<Scope> {
         if let Some(scp) = self.current_scope.last() {
-            let rf = Rf::new(Scope::new(value, index));
+            let rf = Rf::new(Scope::new(scp.clone(), name.to_string(), value, index));
             scp.borrow_mut()
                 .children
                 .insert(name.to_string(), rf.clone());

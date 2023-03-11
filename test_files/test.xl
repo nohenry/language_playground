@@ -5,7 +5,7 @@ type Potato <T> {
     T a
 }
 
-Potato p = {
+Potato<u32> p = {
     b: true
     a: 8
 }

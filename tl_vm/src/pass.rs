@@ -37,7 +37,12 @@ pub struct CodePass {
 
 impl CodePass {
     pub fn new(root: Rf<Scope>, module: Arc<Module>, index: usize) -> CodePass {
-        let scope = Rf::new(Scope::new(ScopeValue::Module(module.clone()), index));
+        let scope = Rf::new(Scope::new(
+            root.clone(),
+            module.name.to_string(),
+            ScopeValue::Module(module.clone()),
+            index,
+        ));
         CodePass {
             module,
             state: RwLock::new(CodePassState {
@@ -73,6 +78,7 @@ impl CodePass {
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
+            // Struct decleration
             Statement::TypeAlias {
                 ident,
                 generic,
@@ -81,13 +87,15 @@ impl CodePass {
             } => {
                 match self.pass {
                     PassType::TypeOnly => {
-                        let scope = if let Some(generic) = generic {
+                        let scope = if let Some(_) = generic {
                             self.wstate().scope.insert_value(
                                 ident.as_str(),
                                 ScopeValue::StructTemplate {
                                     ident: ident.as_str().to_string(),
+                                    raw_members: members.clone(),
                                     members: LinkedHashMap::default(),
                                     constructions: HashMap::new(),
+                                    construction_start_index: 0
                                 },
                                 index,
                             )

@@ -1,5 +1,6 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
@@ -90,8 +91,8 @@ impl Evaluator {
             }
             Statement::TypeAlias {
                 ident,
-                generic: Some(_),
-                ty: box tl_core::ast::Type::Struct(members),
+                generic: Some(gen),
+                ty: box tl_core::ast::Type::Struct(raw_members),
                 ..
             } => {
                 let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
@@ -99,13 +100,15 @@ impl Evaluator {
                 };
                 self.wstate().scope.push_scope(sym.clone());
 
-                let members = self.evaluate_struct_members(members);
+                let members = self.evaluate_struct_members(raw_members);
                 self.wstate().scope.update_value(
                     ident.as_str(),
                     ScopeValue::StructTemplate {
+                        raw_members: raw_members.clone(),
                         members,
                         ident: ident.as_str().to_string(),
                         constructions: HashMap::new(),
+                        construction_start_index: gen.items.len(),
                     },
                     index,
                 );
@@ -539,6 +542,7 @@ impl Evaluator {
     ) -> ConstValue {
         let arg_len = args.len();
         let len_off = members.len() != args.len();
+        dbg!(members);
 
         let arg_vals: LinkedHashMap<_, _> = members
             .iter()
@@ -830,6 +834,118 @@ impl Evaluator {
             } => Type::Ref {
                 base_type: Box::new(self.evaluate_type(ty)),
             },
+            tl_core::ast::Type::Generic {
+                base_type: Some(box tl_core::ast::Type::Ident(tok)),
+                list,
+            } => {
+                let types: Vec<_> = list.iter_items().map(|ty| self.evaluate_type(ty)).collect();
+
+                let Some(symrf) = self.rstate().scope.find_symbol(tok.as_str()) else {
+                    self.add_error(EvaluationError {
+                        kind: EvaluationErrorKind::SymbolNotFound(tok.as_str().to_string()),
+                        range: tok.get_range(),
+                    });
+
+                    return Type::Empty
+                };
+
+                let csi = {
+                    let sym = symrf.borrow();
+                    let ScopeValue::StructTemplate { constructions, members, construction_start_index, .. } = &sym.value else {
+                        self.add_error(EvaluationError {
+                            kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
+                            range: tok.get_range(),
+                        });
+                        return Type::Empty
+                    };
+
+                    if let Some(child_construction_name) = constructions.get(&types) {
+                        // let sym = symrf.borrow();
+                        let Some(construction) = sym.children.get(child_construction_name) else {
+                            panic!("Comiler bug!")
+                        };
+                        todo!()
+                    }
+
+                    *construction_start_index
+                };
+
+                let mut sym = symrf.borrow_mut();
+
+                let mut hash = DefaultHasher::new();
+                types.hash(&mut hash);
+                let hash = hash.finish().to_string();
+
+                let raw_members = {
+                    let ScopeValue::StructTemplate { constructions, raw_members, .. } = &mut sym.value else {
+                    // self.add_error(EvaluationError {
+                    //     kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
+                    //     range: tok.get_range(),
+                    // });
+                        return Type::Empty
+                    };
+
+                    constructions.insert(types.clone(), hash.clone());
+                    raw_members.clone()
+                };
+
+                let children: Vec<_> = {
+                    sym.children
+                        .iter()
+                        .take(csi)
+                        .zip(types.into_iter())
+                        .map(|((k, _), ty)| {
+                            Scope::new(
+                                symrf.clone(),
+                                k.to_string(),
+                                ScopeValue::TypeAlias {
+                                    ident: k.to_string(),
+                                    ty: Box::new(ty),
+                                },
+                                0,
+                            )
+                        })
+                        .collect()
+                };
+
+                let child = sym.insert(
+                    symrf.clone(),
+                    hash.clone(),
+                    ScopeValue::Struct {
+                        ident: hash,
+                        members: LinkedHashMap::new(),
+                    },
+                    0,
+                );
+
+                {
+                    let mut child = child.borrow_mut();
+                    for c in children {
+                        child.insert_node(c);
+                    }
+                }
+
+                {
+                    self.wstate().scope.push_scope(child.clone());
+
+
+                    // We need to regenerate types using generic parameters
+                    let emembers = self.evaluate_struct_members(&raw_members);
+
+                    let mut child_sym = child.borrow_mut();
+                    let ScopeValue::Struct { members, .. } = &mut child_sym.value else {
+                        panic!("Expected struct!")
+                    };
+
+                    *members = emembers;
+
+                    self.wstate().scope.pop_scope();
+                }
+
+                
+                Type::Symbol(child)
+                // return Type::Symbol(sym);
+            }
             _ => Type::Empty,
         }
     }

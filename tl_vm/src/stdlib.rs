@@ -24,21 +24,21 @@ pub fn std_module() -> Arc<Module> {
     Arc::new(module)
 }
 
-pub fn fill_module(module: Rf<Scope>) {
-    let mut module = module.borrow_mut();
+pub fn fill_module(module_rf: Rf<Scope>) {
+    let mut module = module_rf.borrow_mut();
 
     // module.insert("print", ScopeValue::)
 
-    let io = module.insert("io", ScopeValue::Module(Arc::new(Module::empty("io"))), 0);
+    let io = module.insert(module_rf.clone(), "io".to_string(), ScopeValue::Module(Arc::new(Module::empty("io"))), 0);
 
     fill_io(&io);
 }
 
-pub fn fill_io(module: &Rf<Scope>) {
-    let mut module = module.borrow_mut();
+pub fn fill_io(module_rf: &Rf<Scope>) {
+    // let mut module = module_rf.borrow_mut();
 
     create_func(
-        &mut module,
+        &module_rf,
         "print",
         [("data".to_string(), Type::String)].into_iter(),
         [].into_iter(),
@@ -59,7 +59,7 @@ pub fn fill_io(module: &Rf<Scope>) {
 }
 
 fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, Type)>>(
-    module: &mut Scope,
+    module: &Rf<Scope>,
     name: &str,
     p: P,
     r: R,
@@ -69,7 +69,9 @@ fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, T
             + Send,
     >,
 ) -> Rf<Scope> {
-    let sym = module.insert(name, ScopeValue::Root, 0);
+    let mut mo = module.borrow_mut();
+
+    let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
 
     let cv = ScopeValue::ConstValue(ConstValue {
         kind: ConstValueKind::NativeFunction {
@@ -82,5 +84,5 @@ fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, T
         },
     });
 
-    module.update(name, cv).unwrap()
+    mo.update(name, cv).unwrap()
 }
