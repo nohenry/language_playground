@@ -220,12 +220,15 @@ impl Evaluator {
                                 scope.children = args
                                     .into_iter()
                                     .map(|arg| {
-                                        (arg.0.clone(), Rf::new(Scope::new(
-                                            sym.clone(),
+                                        (
                                             arg.0.clone(),
-                                            ScopeValue::ConstValue(arg.1.clone()),
-                                            index,
-                                        )))
+                                            Rf::new(Scope::new(
+                                                sym.clone(),
+                                                arg.0.clone(),
+                                                ScopeValue::ConstValue(arg.1.clone()),
+                                                index,
+                                            )),
+                                        )
                                     })
                                     .collect();
                             }
@@ -339,8 +342,10 @@ impl Evaluator {
                         ParsedTemplate::Template(t, _, _) => {
                             let expr = self.evaluate_expression(t, index);
 
+                            println!("String value: {}", expr.format());
                             if let Some(data) = expr.resolve_ref() {
                                 if let ScopeValue::ConstValue(cv) = &data.borrow().value {
+                                    println!("String value: {}", cv.format());
                                     return format!("{}", cv);
                                 }
                             }
@@ -428,11 +433,19 @@ impl Evaluator {
                             .zip(ptypes.into_iter())
                             .enumerate()
                             .map(|(i, (arg, (name, ty)))| {
-                                // let arg = arg.resolve_ref();
                                 let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
 
                                 println!("Arg Type: {}", ty.format());
                                 println!("Arg Value: {}", arg.format());
+
+                                // let arg = if let Some(value) = arg.resolve_ref_value() {
+                                //     ConstValue {
+                                //         ty: value.ty,
+                                //         kind: arg.kind,
+                                //     }
+                                // } else {
+                                //     arg
+                                // };
 
                                 if &arg.ty != ty {
                                     self.add_error(EvaluationError {
@@ -608,10 +621,7 @@ impl Evaluator {
             });
         } else if arg_vals.len() == members.len() {
             // Everything good!
-            return (
-                ConstValue::record_instance(symbol.clone()),
-                arg_vals,
-            );
+            return (ConstValue::record_instance(symbol.clone()), arg_vals);
         }
         (ConstValue::empty(), LinkedHashMap::new())
     }
@@ -643,7 +653,7 @@ impl Evaluator {
                 };
 
                 let right = right.try_implicit_cast(&cv.ty).unwrap_or_else(|| right);
-                *cv = right.clone(); 
+                *cv = right.clone();
 
                 return right;
             }
@@ -657,10 +667,12 @@ impl Evaluator {
             ) => {
                 let right = self.evaluate_expression(raw_right, index);
                 let right = right.resolve_ref_value().unwrap();
-                // let right = 
+                // let right =
                 let scope = &mut self.wstate().scope;
                 let updated_value = scope.follow_member_access_mut(dleft, dright, |cv| {
-                    *cv = right.try_implicit_cast(&cv.ty).unwrap_or_else(|| right.clone());
+                    *cv = right
+                        .try_implicit_cast(&cv.ty)
+                        .unwrap_or_else(|| right.clone());
                 });
                 if !updated_value {
                     return ConstValue::empty();
@@ -669,61 +681,37 @@ impl Evaluator {
             }
             (Operator::Dot, _) => {
                 let left = self.evaluate_expression(raw_left, index);
-                // println!("potato: s{}", left.format());
-                // let left_sym = left.resolve_ref();
-                // let left = left_sym.as_ref().unwrap().borrow();
-                // let left = if let ScopeValue::ConstValue(cv) = &left.value {
-                //     cv
-                // } else {
-                //     return ConstValue::empty();
-                // };
-                match raw_right {
-                    Expression::Ident(member) => {
-                        return ConstValue::reference(
-                            // ConstValue::record_instance(rf, members),
-                            left,
-                            member.as_str().to_string(),
-                            Type::Empty,
-                        );
-                    }
-                    _ => (),
-                }
 
                 match (left, raw_right) {
                     (
-                        ConstValue {
-                            kind: ConstValueKind::StructInstance { members, rf },
+                        left @ ConstValue {
+                            ty: Type::Ref { .. },
                             ..
                         },
-                        Expression::Ident(SpannedToken(_, Token::Ident(member))),
+                        Expression::Ident(member),
                     ) => {
-                        let rtype = if let Some(val) = members.get(member) {
-                            val.ty.clone()
+
+                        let child = left.resolve_ref().unwrap();
+                        let child_scope = child.borrow();
+
+                        let rtype = if let Some(val) = child_scope.children.get(member.as_str()) {
+                            let value = val.borrow();
+
+                            let ScopeValue::ConstValue(cv) = &value.value else {
+                                return ConstValue::empty()
+                            };
+
+                            cv.ty.clone()
                         } else {
                             return ConstValue::empty();
                         };
 
                         return ConstValue::reference(
-                            ConstValue::record_instance(rf),
-                            member.clone(),
+                            left,
+                            member.as_str().to_string(),
                             rtype,
                         );
                     }
-                    // (left, Expression::Ident(ident)) => {
-
-                    // }
-                    // (
-                    //     ConstValueKind::Ref { symbol, offset },
-                    //     Expression::Ident(SpannedToken(_, Token::Ident(member))),
-                    // ) => {
-                    //     if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
-                    //         if let ConstValueKind::StructInstance { rf, members } = &cv.kind {
-                    //             if let Some(val) = members.get(member) {
-                    //                 return val.clone();
-                    //             }
-                    //         }
-                    //     }
-                    // }
                     _ => (),
                 }
             }
