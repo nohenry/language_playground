@@ -5,14 +5,16 @@ type Potato <T, U> {
     U b
 }
 
-Potato<u32> p = {
-    b: 0
+Potato<u32, u32> p = {
+    b: 80
     a: 0
 }
 
-fn myfunc(i32@ i) -> () {
+fn myfunc(u32@ i) -> () {
     print("{i}")
 }
 
-i32 i = 8
+u32 i = p.b 
+i = p.a
+
 myfunc(i)

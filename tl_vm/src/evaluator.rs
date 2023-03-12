@@ -7,8 +7,8 @@ use std::{
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
     ast::{
-        ArgList, AstNode, EnclosedList, Expression, Param, ParamaterList, ParsedTemplate,
-        ParsedTemplateString, Statement, GenericParameter,
+        ArgList, AstNode, EnclosedList, Expression, GenericParameter, Param, ParamaterList,
+        ParsedTemplate, ParsedTemplateString, Statement,
     },
     token::{Operator, Range, SpannedToken, Token},
     Module,
@@ -194,7 +194,7 @@ impl Evaluator {
                         },
                     ) => {
                         if let ScopeValue::Struct { members, .. } = &sym.borrow().value {
-                            let value = self.evaluate_struct_init(
+                            let (value, args) = self.evaluate_struct_init(
                                 &sym,
                                 members,
                                 &args,
@@ -214,10 +214,28 @@ impl Evaluator {
                                 ScopeValue::ConstValue(value),
                                 index,
                             );
+
+                            if let Some(sym) = self.wstate().scope.find_symbol(ident.as_str()) {
+                                let mut scope = sym.borrow_mut();
+                                scope.children = args
+                                    .into_iter()
+                                    .map(|arg| {
+                                        (arg.0.clone(), Rf::new(Scope::new(
+                                            sym.clone(),
+                                            arg.0.clone(),
+                                            ScopeValue::ConstValue(arg.1.clone()),
+                                            index,
+                                        )))
+                                    })
+                                    .collect();
+                            }
                         }
                     }
                     (ty, expr) => {
+                        let expr = expr.resolve_ref_value().unwrap();
                         let expr = expr.try_implicit_cast(&ty).unwrap_or(expr);
+
+                        println!("Assign: {} \n {}", expr.format(), ty.format());
                         if expr.ty != ty {
                             self.add_error(EvaluationError {
                                 kind: EvaluationErrorKind::TypeMismatch(
@@ -340,7 +358,10 @@ impl Evaluator {
                     let symv = sym.borrow();
                     // println!("{}", self.rstate().scope.module.format());
                     match &symv.value {
-                        ScopeValue::ConstValue(cv) => ConstValue::reference(&sym, cv.ty.clone()),
+                        ScopeValue::ConstValue(cv) => {
+                            // ConstValue::
+                            ConstValue::sym_reference(&sym, cv.ty.clone())
+                        }
                         ScopeValue::Struct { .. } => ConstValue {
                             ty: Type::Symbol(sym.clone()),
                             kind: ConstValueKind::Empty,
@@ -375,6 +396,11 @@ impl Evaluator {
                 let expr = self.evaluate_expression(expr, index);
                 let args = self.evaluate_args(raw_args, index);
 
+                for a in &args {
+                    println!("{}", a.format());
+                }
+                println!("{}", expr.format());
+
                 let expr = {
                     let expr = expr.resolve_ref().unwrap();
                     let expr = expr.borrow();
@@ -402,7 +428,11 @@ impl Evaluator {
                             .zip(ptypes.into_iter())
                             .enumerate()
                             .map(|(i, (arg, (name, ty)))| {
+                                // let arg = arg.resolve_ref();
                                 let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
+
+                                println!("Arg Type: {}", ty.format());
+                                println!("Arg Value: {}", arg.format());
 
                                 if &arg.ty != ty {
                                     self.add_error(EvaluationError {
@@ -468,7 +498,7 @@ impl Evaluator {
                             })
                             .collect();
 
-                        let value = ConstValue::record_instance(rf.clone(), return_values);
+                        let value = ConstValue::record_instance(rf.clone());
 
                         self.wstate().scope.pop_scope();
 
@@ -523,7 +553,7 @@ impl Evaluator {
 
                         let return_vals = callback(has_args.as_ref().unwrap());
 
-                        ConstValue::record_instance(rf.clone(), return_vals)
+                        ConstValue::record_instance(rf.clone())
                     }
                     // TODO: throw error
                     _ => ConstValue::empty(),
@@ -540,7 +570,7 @@ impl Evaluator {
         args: &LinkedHashMap<String, ConstValue>,
         member_range_provider: impl Fn(usize) -> Option<Range>,
         full_range: Range,
-    ) -> ConstValue {
+    ) -> (ConstValue, LinkedHashMap<String, ConstValue>) {
         let arg_len = args.len();
         let len_off = members.len() != args.len();
         dbg!(members);
@@ -578,9 +608,12 @@ impl Evaluator {
             });
         } else if arg_vals.len() == members.len() {
             // Everything good!
-            return ConstValue::record_instance(symbol.clone(), arg_vals);
+            return (
+                ConstValue::record_instance(symbol.clone()),
+                arg_vals,
+            );
         }
-        ConstValue::empty()
+        (ConstValue::empty(), LinkedHashMap::new())
     }
 
     pub fn evaluate_binary_expression(
@@ -591,13 +624,27 @@ impl Evaluator {
         index: usize,
     ) -> ConstValue {
         match (op, raw_left) {
-            (Operator::Equals, Expression::Ident(SpannedToken(_, Token::Ident(name)))) => {
+            (Operator::Equals, Expression::Ident(name)) => {
                 let right = self.evaluate_expression(raw_right, index);
-                self.wstate().scope.update_value(
-                    name,
-                    ScopeValue::ConstValue(right.clone()),
-                    index,
-                );
+                let right = right.resolve_ref_value().unwrap();
+
+                let Some(sym) = self.wstate().scope.find_symbol(name.as_str()) else {
+                    self.add_error(EvaluationError { kind: EvaluationErrorKind::SymbolNotFound(name.as_str().to_string()), range: name.get_range() }
+
+                    );
+                    return ConstValue::empty()
+                };
+
+                let mut value = sym.borrow_mut();
+
+                let ScopeValue::ConstValue(cv)  = &mut value.value else {
+                    // TODO: throw error
+                    return ConstValue::empty()
+                };
+
+                let right = right.try_implicit_cast(&cv.ty).unwrap_or_else(|| right);
+                *cv = right.clone(); 
+
                 return right;
             }
             (
@@ -609,9 +656,11 @@ impl Evaluator {
                 },
             ) => {
                 let right = self.evaluate_expression(raw_right, index);
+                let right = right.resolve_ref_value().unwrap();
+                // let right = 
                 let scope = &mut self.wstate().scope;
                 let updated_value = scope.follow_member_access_mut(dleft, dright, |cv| {
-                    *cv = right.clone();
+                    *cv = right.try_implicit_cast(&cv.ty).unwrap_or_else(|| right.clone());
                 });
                 if !updated_value {
                     return ConstValue::empty();
@@ -621,35 +670,60 @@ impl Evaluator {
             (Operator::Dot, _) => {
                 let left = self.evaluate_expression(raw_left, index);
                 // println!("potato: s{}", left.format());
-                let left = left.resolve_ref();
-                let left = left.as_ref().unwrap().borrow();
-                let left = if let ScopeValue::ConstValue(cv) = &left.value {
-                    cv
-                } else {
-                    return ConstValue::empty();
-                };
+                // let left_sym = left.resolve_ref();
+                // let left = left_sym.as_ref().unwrap().borrow();
+                // let left = if let ScopeValue::ConstValue(cv) = &left.value {
+                //     cv
+                // } else {
+                //     return ConstValue::empty();
+                // };
+                match raw_right {
+                    Expression::Ident(member) => {
+                        return ConstValue::reference(
+                            // ConstValue::record_instance(rf, members),
+                            left,
+                            member.as_str().to_string(),
+                            Type::Empty,
+                        );
+                    }
+                    _ => (),
+                }
 
-                match (&left.kind, raw_right) {
+                match (left, raw_right) {
                     (
-                        ConstValueKind::StructInstance { members, .. },
+                        ConstValue {
+                            kind: ConstValueKind::StructInstance { members, rf },
+                            ..
+                        },
                         Expression::Ident(SpannedToken(_, Token::Ident(member))),
                     ) => {
-                        if let Some(val) = members.get(member) {
-                            return val.clone();
-                        }
+                        let rtype = if let Some(val) = members.get(member) {
+                            val.ty.clone()
+                        } else {
+                            return ConstValue::empty();
+                        };
+
+                        return ConstValue::reference(
+                            ConstValue::record_instance(rf),
+                            member.clone(),
+                            rtype,
+                        );
                     }
-                    (
-                        ConstValueKind::Ref { symbol, offset },
-                        Expression::Ident(SpannedToken(_, Token::Ident(member))),
-                    ) => {
-                        if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
-                            if let ConstValueKind::StructInstance { rf, members } = &cv.kind {
-                                if let Some(val) = members.get(member) {
-                                    return val.clone();
-                                }
-                            }
-                        }
-                    }
+                    // (left, Expression::Ident(ident)) => {
+
+                    // }
+                    // (
+                    //     ConstValueKind::Ref { symbol, offset },
+                    //     Expression::Ident(SpannedToken(_, Token::Ident(member))),
+                    // ) => {
+                    //     if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
+                    //         if let ConstValueKind::StructInstance { rf, members } = &cv.kind {
+                    //             if let Some(val) = members.get(member) {
+                    //                 return val.clone();
+                    //             }
+                    //         }
+                    //     }
+                    // }
                     _ => (),
                 }
             }
@@ -954,13 +1028,18 @@ impl Evaluator {
         }
     }
 
-    fn verify_generics_match(&self, params: &Vec<GenericParameter>, args: &Vec<Type>, errored_range: Range) -> bool {
+    fn verify_generics_match(
+        &self,
+        params: &Vec<GenericParameter>,
+        args: &Vec<Type>,
+        errored_range: Range,
+    ) -> bool {
         if args.len() != params.len() {
             self.add_error(EvaluationError {
                 kind: EvaluationErrorKind::ArgCountMismatch(args.len() as _, params.len() as _),
                 range: errored_range,
             });
-            return false
+            return false;
         }
 
         // TODO: Verify bindings match

@@ -1,6 +1,6 @@
 use std::{
     borrow::Borrow,
-    fmt::{Debug, Display},
+    fmt::{Debug, Display, Write},
     hash::Hasher,
     sync::Arc,
 };
@@ -65,9 +65,9 @@ impl std::hash::Hash for Type {
                 parameters.hash(state);
                 return_parameters.hash(state);
             }
-            Self::Ref { base_type } => {
-                base_type.hash(state);
-            }
+            // Self::Ref { base_type } => {
+            //     base_type.hash(state);
+            // }
             Self::Ident(s) => {
                 s.hash(state);
             }
@@ -180,6 +180,7 @@ impl Display for Type {
             Self::Empty => f.write_str("()"),
             Self::CoercibleInteger => f.write_str("{integer}"),
             Self::CoercibleFloat => f.write_str("{float}"),
+            // Self::Ref { } => f.write_str("ref"),
             Self::Ref { base_type } => {
                 write!(f, "{}@", base_type)
             }
@@ -337,6 +338,7 @@ impl TreeDisplay for Type {
                 }
             }
             Type::StructInstance { .. } => None,
+            // Type::Ref {  } => None,
             Type::Ref { base_type } => Some(&**base_type),
 
             _ => None,
@@ -373,8 +375,9 @@ pub enum ConstValueKind {
         value: bool,
     },
     Ref {
-        symbol: Rf<Scope>,
-        offset: Option<usize>,
+        // symbol: Rf<Scope>,
+        base: Box<ConstValue>,
+        offset: Option<String>,
     },
     Function {
         rf: Rf<Scope>,
@@ -406,14 +409,15 @@ impl Display for ConstValueKind {
             ConstValueKind::Integer { value } => write!(f, "{value}"),
             ConstValueKind::Float { value } => write!(f, "{value}"),
             ConstValueKind::String { string } => write!(f, "{string}"),
-            ConstValueKind::Ref { symbol, offset } => {
-                if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
-                    if let Some(offset) = offset {
-                        return write!(f, "{}.{}@", offset, cv.ty);
-                    } else {
-                        return write!(f, "{}@", cv.ty);
-                    }
+            ConstValueKind::Ref { base, offset } => {
+                write!(f, "{}", base)?;
+                // if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
+                if let Some(offset) = offset {
+                    return write!(f, ".{}@", offset);
+                } else {
+                    return f.write_char('@');
                 }
+                // }
                 write!(f, "unknown@")
             }
             ConstValueKind::Function { body, .. } => write!(f, "{}", body.format()),
@@ -499,7 +503,11 @@ impl TreeDisplay for ConstValueKind {
             ConstValueKind::Tuple(list) => list.len(),
             ConstValueKind::StructInitializer { members, .. } => members.len(),
             ConstValueKind::StructInstance { members, .. } => members.len(),
-            // ConstValueKind::Ref { symbol, offset } => symbol.borrow().num_children(),
+            ConstValueKind::Ref {
+                base,
+                offset: Some(_),
+            } => 2,
+            ConstValueKind::Ref { base, .. } => 1,
             _ => 0,
         }
     }
@@ -518,7 +526,11 @@ impl TreeDisplay for ConstValueKind {
                 }
             }
             ConstValueKind::StructInstance { .. } => None,
-            ConstValueKind::Ref { symbol, offset } => None,
+            ConstValueKind::Ref { base, offset } => match index {
+                0 => Some(&**base),
+                1 => offset.as_ref().map::<&dyn TreeDisplay, _>(|f| f),
+                _ => None
+            },
             _ => None,
         }
     }
@@ -527,7 +539,7 @@ impl TreeDisplay for ConstValueKind {
         match self {
             ConstValueKind::StructInstance { members, .. } => members.child_at_bx(index),
             ConstValueKind::StructInitializer { members } => members.child_at_bx(index),
-            ConstValueKind::Ref { symbol, offset } => Box::new(symbol.borrow().value.clone()),
+            // ConstValueKind::Ref { base, offset } => Box::new(base),
             _ => panic!(),
         }
     }
@@ -563,16 +575,42 @@ impl ConstValue {
 
     pub fn resolve_ref(&self) -> Option<Rf<Scope>> {
         match (&self.ty, &self.kind) {
-            (Type::Ref { base_type }, ConstValueKind::Ref { symbol, offset }) => {
-                let sym = symbol.borrow();
-                if let ScopeValue::ConstValue(f) = &sym.value {
-                    return f.resolve_ref().or_else(|| Some(symbol.clone()));
-                }
-                None
+            (Type::Symbol(sym), ConstValueKind::Empty) => {
+                return Some(sym.clone())
             }
-            (_, ConstValueKind::Ref { symbol, offset }) => Some(symbol.clone()),
+            (Type::Ref { .. }, ConstValueKind::Ref { base, offset: None }) => {
+                return base.resolve_ref(); 
+            }
+            (Type::Ref { .. }, ConstValueKind::Ref { base, offset: Some(index) }) => {
+                let base = base.resolve_ref();
+                let Some(base) = base else {
+                    return None;
+                };
+
+                let base = base.borrow(); 
+                let Some(child) = base.children.get(index) else {
+                    return None
+                };
+                
+                return Some(child.clone())
+            }
             _ => None,
         }
+    }
+
+    pub fn resolve_ref_value(&self) -> Option<ConstValue> {
+        let Some(sym) = self.resolve_ref() else {
+            return None
+        };
+
+        let value = sym.borrow();
+
+        let ScopeValue::ConstValue(cv) = &value.value else {
+            return None;
+        };
+
+        Some(cv.clone())
+
     }
 
     pub fn string(str: String) -> ConstValue {
@@ -652,32 +690,55 @@ impl ConstValue {
 
     pub fn record_instance(
         sym: Rf<Scope>,
-        values: LinkedHashMap<String, ConstValue>,
+        // values: LinkedHashMap<String, ConstValue>,
     ) -> ConstValue {
-        let types = values.values().map(|val| val.ty.clone());
-        let ty = LinkedHashMap::from_iter(values.keys().cloned().zip(types));
+        // let types = values.values().map(|val| val.ty.clone());
+        // let ty = LinkedHashMap::from_iter(values.keys().cloned().zip(types));
 
         ConstValue {
             ty: Type::StructInstance {
                 rf: Some(sym.clone()),
-                members: ty,
+                members: LinkedHashMap::new(),
             },
             kind: ConstValueKind::StructInstance {
                 rf: sym,
-                members: values,
+                members: LinkedHashMap::new(),
             },
         }
     }
 
-    pub fn reference(sym: &Rf<Scope>, ty: Type) -> ConstValue {
+    pub fn sym_reference(sym: &Rf<Scope>, ty: Type) -> ConstValue {
         // println!("Ref {} ", sym.borrow().format());
         ConstValue {
+            ty: Type::Symbol(sym.clone()),
+            kind: ConstValueKind::Empty,
+        }
+        // ConstValue {
+        //     ty: Type::Ref {
+        //         base_type: Box::new(ty),
+        //     },
+        //     kind: ConstValueKind::Ref {
+        //         base: Box::new(ConstValue {
+        //             ty: Type::Symbol(sym.clone()),
+        //             kind: ConstValueKind::Empty,
+        //         }),
+        //         offset: None,
+        //     },
+        // }
+    }
+
+    /// Creates a reference value with a member access expression.
+    /// 
+    /// `left` should be a value reference to scope value
+    /// `right` is an index into that scope values children
+    pub fn reference(left: ConstValue, right: String, right_ty: Type) -> ConstValue {
+        ConstValue {
             ty: Type::Ref {
-                base_type: Box::new(ty),
+                base_type: Box::new(right_ty),
             },
             kind: ConstValueKind::Ref {
-                symbol: sym.clone(),
-                offset: None,
+                base: Box::new(left),
+                offset: Some(right),
             },
         }
     }
