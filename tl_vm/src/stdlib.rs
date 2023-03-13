@@ -6,7 +6,7 @@ use tl_util::Rf;
 
 use crate::{
     const_value::{ConstValue, ConstValueKind, Type},
-    scope::{Scope, ScopeValue},
+    scope::{Scope, ScopeValue}, intrinsics::IntrinsicType,
 };
 
 pub fn std_module() -> Arc<Module> {
@@ -27,16 +27,15 @@ pub fn std_module() -> Arc<Module> {
 pub fn fill_module(module_rf: Rf<Scope>) {
     let mut module = module_rf.borrow_mut();
 
-    // module.insert("print", ScopeValue::)
-
     let io = module.insert(module_rf.clone(), "io".to_string(), ScopeValue::Module(Arc::new(Module::empty("io"))), 0);
+    fill_io(&io);
 
+
+    let io = module.insert(module_rf.clone(), "mem".to_string(), ScopeValue::Module(Arc::new(Module::empty("mem"))), 0);
     fill_io(&io);
 }
 
 pub fn fill_io(module_rf: &Rf<Scope>) {
-    // let mut module = module_rf.borrow_mut();
-
     create_func(
         &module_rf,
         "print",
@@ -56,6 +55,10 @@ pub fn fill_io(module_rf: &Rf<Scope>) {
             LinkedHashMap::new()
         }),
     );
+}
+
+pub fn fill_mem(module: &Rf<Scope>) {
+
 }
 
 fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, Type)>>(
@@ -82,6 +85,26 @@ fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, T
             parameters: LinkedHashMap::from_iter(p),
             return_parameters: LinkedHashMap::from_iter(r),
         },
+    });
+
+    mo.update(name, cv).unwrap()
+}
+
+
+fn create_intrinsinc_type<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, Type)>>(
+    module: &Rf<Scope>,
+    name: &str,
+    p: P,
+    r: R,
+    data: Rf<dyn IntrinsicType> 
+) -> Rf<Scope> {
+    let mut mo = module.borrow_mut();
+
+    let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
+
+    let cv = ScopeValue::ConstValue(ConstValue {
+        kind: ConstValueKind::IntrinsicStorage(data),
+        ty: Type::Intrinsic(sym),
     });
 
     mo.update(name, cv).unwrap()

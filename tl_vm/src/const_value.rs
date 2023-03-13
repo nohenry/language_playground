@@ -12,7 +12,10 @@ use tl_util::{
     Rf,
 };
 
-use crate::scope::{Scope, ScopeValue};
+use crate::{
+    intrinsics::IntrinsicType,
+    scope::{Scope, ScopeValue},
+};
 
 #[derive(Clone, Eq)]
 pub enum Type {
@@ -45,6 +48,7 @@ pub enum Type {
         rf: Option<Rf<Scope>>,
         members: LinkedHashMap<String, Type>,
     },
+    Intrinsic(Rf<Scope>),
 }
 
 impl std::hash::Hash for Type {
@@ -145,8 +149,8 @@ impl PartialEq for Type {
             (Self::Boolean, Self::Boolean) => true,
             (Self::String, Self::String) => true,
             (Self::Ref { base_type: bty_l }, Self::Ref { base_type: bty_r }) => bty_l == bty_r,
-            _ => false
-            // _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+            (Self::Intrinsic(l), Self::Intrinsic(r)) => l == r,
+            _ => false, // _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
 }
@@ -271,6 +275,9 @@ impl Display for Type {
                 }
                 write!(f, ")")
             }
+            Self::Intrinsic(intr) => {
+                write!(f, "Intrinsic Data")
+            }
         }
     }
 }
@@ -302,6 +309,9 @@ impl NodeDisplay for Type {
             } => write!(f, "u{width}"),
             Self::Function { .. } => f.write_str("Function"),
             Self::Ident(ident) => f.write_str(ident),
+            Self::Intrinsic(intr) => {
+                write!(f, "Intrinsic Data")
+            }
         }
     }
 }
@@ -405,6 +415,7 @@ pub enum ConstValueKind {
         rf: Rf<Scope>,
         members: LinkedHashMap<String, ConstValue>,
     },
+    IntrinsicStorage(Rf<dyn IntrinsicType>),
 }
 
 impl Display for ConstValueKind {
@@ -454,6 +465,7 @@ impl Display for ConstValueKind {
                 Ok(())
             }
             ConstValueKind::Symbol(_) => f.write_str("Symbol"),
+            ConstValueKind::IntrinsicStorage(_) => f.write_str("Intrinsic"),
         }
     }
 }
@@ -500,6 +512,7 @@ impl NodeDisplay for ConstValueKind {
             ConstValueKind::StructInitializer { .. } => write!(f, "Struct Initializer"),
             ConstValueKind::StructInstance { .. } => write!(f, "Record Instance"),
             ConstValueKind::Symbol(_) => write!(f, "Symbol"),
+            ConstValueKind::IntrinsicStorage(_) => write!(f, "Intrinsic"),
         }
     }
 }
@@ -595,8 +608,8 @@ impl ConstValue {
                 if let ScopeValue::ConstValue(cv) = &value.value {
                     return cv.resolve_ref();
                 }
-                return Some(sym.clone())
-            },
+                return Some(sym.clone());
+            }
             (Type::Ref { .. }, ConstValueKind::Symbol(sym)) => return Some(sym.clone()),
             (Type::Ref { .. }, ConstValueKind::Ref { base, offset: None }) => {
                 return base.resolve_ref();

@@ -19,6 +19,7 @@ pub mod evaluator;
 pub mod pass;
 pub mod scope;
 pub mod stdlib;
+pub mod intrinsics;
 
 #[cfg(windows)]
 const LINE_ENDING: &str = "\r\n";
