@@ -482,47 +482,14 @@ impl Evaluator {
 
                         let return_value = self.evaluate_statement(&body, index);
 
-                        // TODO: verify types here as well
-
-                        // let return_values: LinkedHashMap<_, _> = rptypes
-                        //     .into_iter()
-                        //     .map(|(name, ty)| {
-                        //         let sym = self.rstate().scope.find_symbol_local(&name);
-                        //         let vl = if let Some(sym) = sym {
-                        //             let sym = sym.borrow();
-                        //             if let ScopeValue::ConstValue(cv) = &sym.value {
-                        //                 if &cv.ty == ty {
-                        //                     cv.clone()
-                        //                 } else {
-                        //                     // TODO: error handling
-                        //                     ConstValue::empty()
-                        //                 }
-                        //             } else {
-                        //                 // TODO: error handling
-                        //                 ConstValue::empty()
-                        //             }
-                        //         } else {
-                        //             self.add_error(EvaluationError {
-                        //                 kind: EvaluationErrorKind::NotInitialized {
-                        //                     hint: TypeHint::ReturnParameter,
-                        //                 },
-                        //                 range: expression.get_range(),
-                        //             });
-                        //             ConstValue::default_for(ty)
-                        //         };
-                        //         (name.clone(), vl)
-                        //     })
-                        //     .collect();
-
-                        // let value = ConstValue::record_instance(rf.clone());
 
                         self.wstate().scope.pop_scope();
                         
+                        // TODO: verify types here as well
                         match return_value {
                             ConstValue { kind: ConstValueKind::Tuple(v), .. } => v.into_iter().last().unwrap_or_else(|| ConstValue::empty()),
                             r => r,
                         }
-                        // ConstValue::empty()
                     }
                     (
                         Type::Function {

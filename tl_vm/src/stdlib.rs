@@ -68,7 +68,7 @@ pub fn fill_io(module_rf: &Rf<Scope>) {
 }
 
 pub fn fill_mem(module: &Rf<Scope>) {
-    create_intrinsinc_type(module, "Slice", Rf::new(types::Slice {}).upcast());
+    let slice_sym = create_intrinsinc_type(module, "Slice", Rf::new(types::Slice {}).upcast());
     create_func(
         &module,
         "alloc",
@@ -80,9 +80,9 @@ pub fn fill_mem(module: &Rf<Scope>) {
             },
         )]
         .into_iter(),
-        Type::Empty,
+        Type::Symbol(slice_sym.clone()),
         Arc::new(|params| {
-            if let Some(data) = params.get("data") {
+            if let Some(data) = params.get("size") {
                 if let Some(data) = data.resolve_ref() {
                     let ScopeValue::ConstValue(cv) = &data.borrow().value else {
                         return LinkedHashMap::new()
