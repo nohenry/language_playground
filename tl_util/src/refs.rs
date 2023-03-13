@@ -16,6 +16,9 @@ impl<T> PartialEq for Rf<T> {
 
 impl<T> Eq for Rf<T> {}
 
+unsafe impl<T: ?Sized + Sync + Send> Send for Rf<T> {}
+unsafe impl<T: ?Sized + Sync + Send> Sync for Rf<T> {}
+
 impl<T: ?Sized> Clone for Rf<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())

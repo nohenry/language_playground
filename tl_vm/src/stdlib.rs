@@ -1,7 +1,7 @@
-use std::{fs::File, io::Read, sync::Arc};
+use std::{fs::File, io::Read, process::CommandEnvs, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
-use tl_core::Module;
+use tl_core::{ast::GenericParameter, Module};
 use tl_util::Rf;
 
 use crate::{
@@ -42,7 +42,7 @@ pub fn fill_module(module_rf: Rf<Scope>) {
         ScopeValue::Module(Arc::new(Module::empty("mem"))),
         0,
     );
-    fill_mem(&io);
+    fill_mem(&mem);
 }
 
 pub fn fill_io(module_rf: &Rf<Scope>) {
@@ -55,44 +55,39 @@ pub fn fill_io(module_rf: &Rf<Scope>) {
             if let Some(data) = params.get("data") {
                 if let Some(data) = data.resolve_ref() {
                     let ScopeValue::ConstValue(cv) = &data.borrow().value else {
-                        return LinkedHashMap::new()
+                        return ConstValue::empty()
                     };
                     println!("{}", cv)
                 } else {
                     println!("{}", data)
                 }
             }
-            LinkedHashMap::new()
+            ConstValue::empty()
         }),
     );
 }
 
 pub fn fill_mem(module: &Rf<Scope>) {
     let slice_sym = create_intrinsinc_type(module, "Slice", Rf::new(types::Slice {}).upcast());
+
+    let slice_sym_func = slice_sym.clone();
     create_func(
         &module,
         "alloc",
-        [(
-            "size".to_string(),
-            Type::Integer {
-                width: 64,
-                signed: false,
-            },
-        )]
+        [
+        //     (
+        //     "size".to_string(),
+        //     Type::Integer {
+        //         width: 64,
+        //         signed: false,
+        //     },
+        // )
+        ]
         .into_iter(),
         Type::Symbol(slice_sym.clone()),
-        Arc::new(|params| {
-            if let Some(data) = params.get("size") {
-                if let Some(data) = data.resolve_ref() {
-                    let ScopeValue::ConstValue(cv) = &data.borrow().value else {
-                        return LinkedHashMap::new()
-                    };
-                    println!("{}", cv)
-                } else {
-                    println!("{}", data)
-                }
-            }
-            LinkedHashMap::new()
+        Arc::new(move |params| ConstValue {
+            kind: ConstValueKind::IntrinsicStorage(Rf::new(types::Slice {}).upcast(), vec![]),
+            ty: Type::Intrinsic(slice_sym_func.clone()),
         }),
     );
 }
@@ -100,6 +95,7 @@ pub fn fill_mem(module: &Rf<Scope>) {
 pub mod types {
     use crate::intrinsics::IntrinsicType;
 
+    #[derive(Clone)]
     pub struct Slice {}
 
     impl IntrinsicType for Slice {}
@@ -110,11 +106,7 @@ fn create_func<P: Iterator<Item = (String, Type)>>(
     name: &str,
     p: P,
     r: Type,
-    func: Arc<
-        dyn Fn(&LinkedHashMap<String, ConstValue>) -> LinkedHashMap<String, ConstValue>
-            + Sync
-            + Send,
-    >,
+    func: Arc<dyn Fn(&LinkedHashMap<String, ConstValue>) -> ConstValue + Sync + Send>,
 ) -> Rf<Scope> {
     let mut mo = module.borrow_mut();
 
@@ -143,10 +135,27 @@ fn create_intrinsinc_type(
 
     let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
 
-    let cv = ScopeValue::ConstValue(ConstValue {
-        kind: ConstValueKind::IntrinsicStorage(data),
-        ty: Type::Intrinsic(sym),
-    });
+    let cv = ScopeValue::IntrinsicStruct {
+        initial_value: data,
+    };
+
+    mo.update(name, cv).unwrap()
+}
+
+fn create_generic_intrinsinc_type(
+    module: &Rf<Scope>,
+    name: &str,
+    generics: Vec<GenericParameter>,
+    data: Rf<dyn IntrinsicType + Send + Sync>,
+) -> Rf<Scope> {
+    let mut mo = module.borrow_mut();
+
+    let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
+
+    let cv = ScopeValue::IntrinsicStructTemplate {
+        initial_value: data,
+        generics,
+    };
 
     mo.update(name, cv).unwrap()
 }

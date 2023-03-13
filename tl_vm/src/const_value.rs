@@ -6,7 +6,7 @@ use std::{
 };
 
 use linked_hash_map::LinkedHashMap;
-use tl_core::ast::Statement;
+use tl_core::ast::{GenericParameter, Statement};
 use tl_util::{
     format::{Grouper, NodeDisplay, TreeDisplay},
     Rf,
@@ -137,8 +137,14 @@ impl PartialEq for Type {
                     members: r_members,
                 },
             ) => l_rf == r_rf && l_members == r_members,
+
+            (Self::Intrinsic(l), Self::Intrinsic(r)) => l == r,
+            (Self::Intrinsic(l), Self::Symbol(r)) => l == r,
+            (Self::Symbol(l), Self::Intrinsic(r)) => l == r,
+
             (Self::StructInstance { rf: Some(l_rf), .. }, Self::Symbol(sym)) => l_rf == sym,
             (Self::Symbol(sym), Self::StructInstance { rf: Some(l_rf), .. }) => sym == l_rf,
+
             (Self::Symbol(sym), right) | (right, Self::Symbol(sym)) => {
                 let sym = sym.borrow();
                 if let ScopeValue::TypeAlias { ident, ty } = &sym.value {
@@ -146,11 +152,11 @@ impl PartialEq for Type {
                 }
                 false
             }
+
             (Self::Empty, Self::Empty) => true,
             (Self::Boolean, Self::Boolean) => true,
             (Self::String, Self::String) => true,
             (Self::Ref { base_type: bty_l }, Self::Ref { base_type: bty_r }) => bty_l == bty_r,
-            (Self::Intrinsic(l), Self::Intrinsic(r)) => l == r,
             _ => false, // _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -401,11 +407,7 @@ pub enum ConstValueKind {
     },
     NativeFunction {
         rf: Rf<Scope>,
-        callback: Arc<
-            dyn Fn(&LinkedHashMap<String, ConstValue>) -> LinkedHashMap<String, ConstValue>
-                + Sync
-                + Send,
-        >,
+        callback: Arc<dyn Fn(&LinkedHashMap<String, ConstValue>) -> ConstValue + Sync + Send>,
     },
     Symbol(Rf<Scope>),
     Tuple(Vec<ConstValue>),
@@ -416,7 +418,7 @@ pub enum ConstValueKind {
         rf: Rf<Scope>,
         members: LinkedHashMap<String, ConstValue>,
     },
-    IntrinsicStorage(Rf<dyn IntrinsicType + Sync + Send>),
+    IntrinsicStorage(Rf<dyn IntrinsicType + Sync + Send>, Vec<Type>),
 }
 
 impl Display for ConstValueKind {
@@ -466,7 +468,7 @@ impl Display for ConstValueKind {
                 Ok(())
             }
             ConstValueKind::Symbol(_) => f.write_str("Symbol"),
-            ConstValueKind::IntrinsicStorage(_) => f.write_str("Intrinsic"),
+            ConstValueKind::IntrinsicStorage(_, _) => f.write_str("Intrinsic"),
         }
     }
 }
@@ -513,7 +515,7 @@ impl NodeDisplay for ConstValueKind {
             ConstValueKind::StructInitializer { .. } => write!(f, "Struct Initializer"),
             ConstValueKind::StructInstance { .. } => write!(f, "Record Instance"),
             ConstValueKind::Symbol(_) => write!(f, "Symbol"),
-            ConstValueKind::IntrinsicStorage(_) => write!(f, "Intrinsic"),
+            ConstValueKind::IntrinsicStorage(_, _) => write!(f, "Intrinsic"),
         }
     }
 }

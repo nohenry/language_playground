@@ -482,12 +482,14 @@ impl Evaluator {
 
                         let return_value = self.evaluate_statement(&body, index);
 
-
                         self.wstate().scope.pop_scope();
-                        
+
                         // TODO: verify types here as well
                         match return_value {
-                            ConstValue { kind: ConstValueKind::Tuple(v), .. } => v.into_iter().last().unwrap_or_else(|| ConstValue::empty()),
+                            ConstValue {
+                                kind: ConstValueKind::Tuple(v),
+                                ..
+                            } => v.into_iter().last().unwrap_or_else(|| ConstValue::empty()),
                             r => r,
                         }
                     }
@@ -538,9 +540,11 @@ impl Evaluator {
                             return ConstValue::empty();
                         }
 
-                        let return_vals = callback(has_args.as_ref().unwrap());
+                        let return_val = callback(has_args.as_ref().unwrap());
 
-                        ConstValue::record_instance(rf.clone())
+                        // ConstValue::record_instance(rf.clone());
+
+                        return_val
                     }
                     // TODO: throw error
                     _ => ConstValue::empty(),
@@ -883,27 +887,50 @@ impl Evaluator {
 
                 let csi = {
                     let sym = symrf.borrow();
-                    let ScopeValue::StructTemplate { constructions, construction_start_index, generics, .. } = &sym.value else {
-                        self.add_error(EvaluationError {
-                            kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Struct),
-                            range: tok.get_range(),
-                        });
-                        return Type::Empty
-                    };
+                    match &sym.value {
+                        ScopeValue::StructTemplate {
+                            generics,
+                            constructions,
+                            construction_start_index,
+                            ..
+                        } => {
+                            if !self.verify_generics_match(generics, &types, list.get_range()) {
+                                return Type::Empty;
+                            }
 
-                    if !self.verify_generics_match(generics, &types, list.get_range()) {
-                        return Type::Empty;
+                            // If we have already constructed this struct with the same type arguments, reuse this construction
+                            if let Some(child_construction_name) = constructions.get(&types) {
+                                let construction = sym
+                                    .children
+                                    .get(child_construction_name)
+                                    .expect("Compiler Bug!");
+                                return Type::Symbol(construction.clone());
+                            }
+
+                            *construction_start_index
+                        }
+                        ScopeValue::IntrinsicStructTemplate {
+                            initial_value,
+                            generics,
+                        } => {
+                            if !self.verify_generics_match(generics, &types, list.get_range()) {
+                                return Type::Empty;
+                            }
+
+                            return Type::Intrinsic(symrf.clone());
+                        }
+                        _ => {
+                            self.add_error(EvaluationError {
+                                kind: EvaluationErrorKind::TypeMismatch(
+                                    Type::Empty,
+                                    Type::Empty,
+                                    TypeHint::Struct,
+                                ),
+                                range: tok.get_range(),
+                            });
+                            return Type::Empty;
+                        }
                     }
-
-                    // If we have already constructed this struct with the same type arguments, reuse this construction
-                    if let Some(child_construction_name) = constructions.get(&types) {
-                        let Some(construction) = sym.children.get(child_construction_name) else {
-                            panic!("Compiler bug!");
-                        };
-                        return Type::Symbol(construction.clone());
-                    }
-
-                    *construction_start_index
                 };
 
                 let mut sym = symrf.borrow_mut();

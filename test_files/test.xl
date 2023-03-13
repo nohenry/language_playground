@@ -21,3 +21,5 @@ u32 i = p.a
 u32 val = myfunc(i)
 
 print("{val}")
+
+Slice val = alloc()

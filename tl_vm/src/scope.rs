@@ -11,7 +11,10 @@ use tl_util::{
     Rf,
 };
 
-use crate::const_value::{ConstValue, ConstValueKind, Type};
+use crate::{
+    const_value::{ConstValue, ConstValueKind, Type},
+    intrinsics::IntrinsicType,
+};
 
 #[derive(Clone)]
 pub enum ScopeValue {
@@ -27,6 +30,13 @@ pub enum ScopeValue {
         generics: Vec<GenericParameter>,
         constructions: HashMap<Vec<Type>, String>,
         construction_start_index: usize,
+    },
+    IntrinsicStruct {
+        initial_value: Rf<dyn IntrinsicType + Send + Sync>,
+    },
+    IntrinsicStructTemplate {
+        initial_value: Rf<dyn IntrinsicType + Send + Sync>,
+        generics: Vec<GenericParameter>,
     },
     TypeAlias {
         ident: String,
@@ -47,6 +57,8 @@ impl NodeDisplay for ScopeValue {
             ScopeValue::ConstValue(_) => f.write_str("Constant Value"),
             ScopeValue::Struct { .. } => f.write_str("Record"),
             ScopeValue::StructTemplate { .. } => f.write_str("Struct Template"),
+            ScopeValue::IntrinsicStruct { .. } => f.write_str("Intrinsic Struct"),
+            ScopeValue::IntrinsicStructTemplate { .. } => f.write_str("Intrinsic Struct Template"),
             ScopeValue::TypeAlias { .. } => f.write_str("Type Alias"),
             ScopeValue::Use(_) => f.write_str("Use"),
             ScopeValue::Module(_) => f.write_str("Module"),
@@ -61,6 +73,8 @@ impl TreeDisplay for ScopeValue {
             ScopeValue::ConstValue(c) => c.num_children(),
             ScopeValue::Struct { .. } => 1,
             ScopeValue::StructTemplate { .. } => 2,
+            ScopeValue::IntrinsicStruct { .. } => 0,
+            ScopeValue::IntrinsicStructTemplate { .. } => 1,
             ScopeValue::TypeAlias { .. } => 2,
             ScopeValue::Use(s) => s.len(),
             ScopeValue::Module(_) => 0,
@@ -81,6 +95,8 @@ impl TreeDisplay for ScopeValue {
                 1 => Some(constructions),
                 _ => None,
             },
+            ScopeValue::IntrinsicStruct { .. } => None,
+            ScopeValue::IntrinsicStructTemplate { generics, .. } => Some(generics),
             ScopeValue::TypeAlias { ident, ty } => match index {
                 0 => Some(ident),
                 1 => Some(&**ty),
