@@ -6,7 +6,7 @@ use tl_util::Rf;
 
 use crate::{
     const_value::{ConstValue, ConstValueKind, Type},
-    scope::{Scope, ScopeValue}, intrinsics::IntrinsicType,
+    scope::{Scope, ScopeValue}, intrinsics::{IntrinsicType, IntrinsicUpcast},
 };
 
 pub fn std_module() -> Arc<Module> {
@@ -31,8 +31,8 @@ pub fn fill_module(module_rf: Rf<Scope>) {
     fill_io(&io);
 
 
-    let io = module.insert(module_rf.clone(), "mem".to_string(), ScopeValue::Module(Arc::new(Module::empty("mem"))), 0);
-    fill_io(&io);
+    let mem = module.insert(module_rf.clone(), "mem".to_string(), ScopeValue::Module(Arc::new(Module::empty("mem"))), 0);
+    fill_mem(&io);
 }
 
 pub fn fill_io(module_rf: &Rf<Scope>) {
@@ -57,8 +57,38 @@ pub fn fill_io(module_rf: &Rf<Scope>) {
     );
 }
 
-pub fn fill_mem(module: &Rf<Scope>) {
 
+pub fn fill_mem(module: &Rf<Scope>) {
+    create_intrinsinc_type(module, "Slice", Rf::new(types::Slice { }).upcast() );
+    create_func(
+        &module,
+        "alloc",
+        [("size".to_string(), Type::Integer { width: 64, signed: false })].into_iter(),
+        [].into_iter(),
+        Arc::new(|params| {
+            if let Some(data) = params.get("data") {
+                if let Some(data) = data.resolve_ref() {
+                    let ScopeValue::ConstValue(cv) = &data.borrow().value else {
+                        return LinkedHashMap::new()
+                    };
+                    println!("{}", cv)
+                } else {
+                    println!("{}", data)
+                }
+            }
+            LinkedHashMap::new()
+        }),
+    );
+}
+
+pub mod types {
+    use crate::intrinsics::IntrinsicType;
+
+    pub struct Slice {
+
+    }
+
+    impl IntrinsicType for Slice { }
 }
 
 fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, Type)>>(
@@ -91,12 +121,10 @@ fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, T
 }
 
 
-fn create_intrinsinc_type<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, Type)>>(
+fn create_intrinsinc_type(
     module: &Rf<Scope>,
     name: &str,
-    p: P,
-    r: R,
-    data: Rf<dyn IntrinsicType> 
+    data: Rf<dyn IntrinsicType + Send + Sync> 
 ) -> Rf<Scope> {
     let mut mo = module.borrow_mut();
 

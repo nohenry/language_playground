@@ -415,7 +415,7 @@ pub enum ConstValueKind {
         rf: Rf<Scope>,
         members: LinkedHashMap<String, ConstValue>,
     },
-    IntrinsicStorage(Rf<dyn IntrinsicType>),
+    IntrinsicStorage(Rf<dyn IntrinsicType + Sync + Send>),
 }
 
 impl Display for ConstValueKind {

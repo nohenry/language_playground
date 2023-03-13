@@ -40,7 +40,12 @@ impl<T> Rf<T> {
     pub fn new(t: T) -> Rf<T> {
         Rf(Arc::new(RwLock::new(t)))
     }
+
+    // pub fn upcast<U: 'static>(self) -> Rf<U> {
+    //     Rf(self.0 as Arc<RwLock<U>>)
+    // }
 }
+
 
 static mut BACKTRACE: AtomicBool = AtomicBool::new(false);
 

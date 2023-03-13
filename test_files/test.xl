@@ -1,4 +1,5 @@
 use std.io 
+use std.mem
 
 type Potato <T, U> {
     T a
