@@ -11,10 +11,13 @@ Potato<u32, i32> p = {
     a: 45 
 }
 
-fn myfunc(u32@ i) -> () {
+fn myfunc(u32@ i) -> u32 {
     print("{i}")
+    83
 }
 
 u32 i = p.a
 
-myfunc(i)
+u32 val = myfunc(i)
+
+print("{val}")

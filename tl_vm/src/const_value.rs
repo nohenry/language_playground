@@ -32,7 +32,8 @@ pub enum Type {
     Boolean,
     Function {
         parameters: LinkedHashMap<String, Type>,
-        return_parameters: LinkedHashMap<String, Type>,
+        // return_parameters: LinkedHashMap<String, Type>,
+        return_type: Box<Type>,
     },
     String,
     Symbol(Rf<Scope>),
@@ -64,10 +65,10 @@ impl std::hash::Hash for Type {
             }
             Self::Function {
                 parameters,
-                return_parameters,
+                return_type,
             } => {
                 parameters.hash(state);
-                return_parameters.hash(state);
+                return_type.hash(state);
             }
             // Self::Ref { base_type } => {
             //     base_type.hash(state);
@@ -116,11 +117,11 @@ impl PartialEq for Type {
             (
                 Self::Function {
                     parameters: l_parameters,
-                    return_parameters: l_return_parameters,
+                    return_type: l_return_parameters,
                 },
                 Self::Function {
                     parameters: r_parameters,
-                    return_parameters: r_return_parameters,
+                    return_type: r_return_parameters,
                 },
             ) => l_parameters == r_parameters && l_return_parameters == r_return_parameters,
             (Self::Symbol(l0), Self::Symbol(r0)) => l0 == r0,
@@ -205,7 +206,7 @@ impl Display for Type {
             // },
             Self::Function {
                 parameters,
-                return_parameters,
+                return_type,
             } => {
                 write!(f, "(")?;
                 let mut iter = parameters.iter();
@@ -216,16 +217,16 @@ impl Display for Type {
                 for val in iter {
                     write!(f, " ,{} {}", val.1, val.0)?;
                 }
-                write!(f, ") -> (")?;
-                let mut iter = return_parameters.iter();
+                write!(f, ") -> {}", return_type)
+                // let mut iter = return_parameters.iter();
 
-                if let Some(val) = iter.next() {
-                    write!(f, "{} {}", val.1, val.0)?;
-                }
-                for val in iter {
-                    write!(f, " ,{} {}", val.1, val.0)?;
-                }
-                write!(f, ")")
+                // if let Some(val) = iter.next() {
+                //     write!(f, "{} {}", val.1, val.0)?;
+                // }
+                // for val in iter {
+                //     write!(f, " ,{} {}", val.1, val.0)?;
+                // }
+                // write!(f, ")")
             }
             Self::Symbol(rs) => {
                 let rs = rs.borrow();
@@ -339,10 +340,10 @@ impl TreeDisplay for Type {
         match self {
             Type::Function {
                 parameters,
-                return_parameters,
+                return_type,
             } => match _index {
                 0 => Some(parameters),
-                1 => Some(return_parameters),
+                1 => Some(&**return_type),
                 _ => None,
             },
             Type::Tuple(tu) => {
@@ -696,14 +697,15 @@ impl ConstValue {
     pub fn func(
         body: Statement,
         parameters: LinkedHashMap<String, Type>,
-        return_parameters: LinkedHashMap<String, Type>,
+        // return_parameters: LinkedHashMap<String, Type>,
+        return_type: Type,
         node: Rf<Scope>,
     ) -> ConstValue {
         ConstValue {
             kind: ConstValueKind::Function { body, rf: node },
             ty: Type::Function {
                 parameters,
-                return_parameters,
+                return_type: Box::new(return_type),
             },
         }
     }

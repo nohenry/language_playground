@@ -133,42 +133,29 @@ impl Parser {
             _ => None,
         }?;
 
-        let parameters = self.parse_parameters();
+        let parameters = self.parse_parameters().unwrap();
 
-        let parameters = if let Some(Token::Operator(Operator::Arrow)) = self.tokens.peek() {
-            let arrow = self.tokens.next().unwrap().clone();
-            let return_parameters = self.parse_parameters();
+        let (arrow, return_type) =
+            if let Some(Token::Operator(Operator::Arrow)) = self.tokens.peek() {
+                let arrow = self.tokens.next().unwrap().clone();
+                // let return_parameters = self.parse_parameters();
+                let return_type = self.parse_type();
 
-            match (parameters, return_parameters) {
-                (Some(parameters), Some(return_parameters)) => {
-                    if let Some(body) = self.parse_statement() {
-                        return Some(Statement::Function {
-                            fn_tok: fn_tok.clone(),
-                            ident: ident.clone(),
-                            parameters,
-                            arrow,
-                            return_parameters,
-                            body: Some(Box::new(body)),
-                        });
-                    } else {
-                        return Some(Statement::Function {
-                            fn_tok: fn_tok.clone(),
-                            ident: ident.clone(),
-                            parameters,
-                            arrow,
-                            return_parameters,
-                            body: None,
-                        });
-                    }
-                }
-                (l, _) => l,
-            }
-        } else {
-            parameters
-        };
+                (Some(arrow), return_type)
+            } else {
+                (None, None)
+            };
 
-        None
-        // parameters.map(|parameters| Expression::Record { parameters })
+        let body = self.parse_statement().map(|bd| Box::new(bd));
+
+        Some(Statement::Function {
+            fn_tok: fn_tok.clone(),
+            ident: ident.clone(),
+            parameters,
+            arrow,
+            return_type,
+            body,
+        })
     }
 
     pub fn parse_function_body(

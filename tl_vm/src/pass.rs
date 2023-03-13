@@ -96,7 +96,7 @@ impl CodePass {
                                     members: LinkedHashMap::default(),
                                     generics: generics.iter_items().cloned().collect(),
                                     constructions: HashMap::new(),
-                                    construction_start_index: 0
+                                    construction_start_index: 0,
                                 },
                                 index,
                             )
@@ -112,9 +112,7 @@ impl CodePass {
                         };
 
                         if let Some(generic) = generic {
-                            {
-
-                            }
+                            {}
 
                             self.wstate().scope.push_scope(scope);
 
@@ -137,8 +135,6 @@ impl CodePass {
                                     _ => todo!(),
                                 }
                             }
-
-
 
                             self.wstate().scope.pop_scope();
                         }
@@ -194,7 +190,7 @@ impl CodePass {
             Statement::Function {
                 ident,
                 parameters,
-                return_parameters,
+                return_type,
                 body: Some(body),
                 ..
             } => match self.pass {
@@ -207,14 +203,17 @@ impl CodePass {
                     );
 
                     let eparameters = self.evaluate_params(parameters);
-                    let ereturn_parameters = self.evaluate_params(return_parameters);
+                    let ereturn = return_type
+                        .as_ref()
+                        .map(|ty| self.evaluate_type(ty))
+                        .unwrap_or(Type::Empty);
 
                     self.wstate().scope.update_value(
                         ident.as_str(),
                         ScopeValue::ConstValue(ConstValue::func(
                             Statement::clone(body),
                             eparameters,
-                            ereturn_parameters,
+                            ereturn,
                             sym,
                         )),
                         index,
@@ -225,9 +224,9 @@ impl CodePass {
                     let Some(rf) = self.rstate().scope.find_symbol(ident.as_str()) else {
                         return;
                     };
-                    let (pvals, rvals) = {
+                    let (pvals, _) = {
                         let ScopeValue::ConstValue(ConstValue {
-                        ty: Type::Function { parameters, return_parameters },
+                        ty: Type::Function { parameters, return_type},
                         ..
                     }) = &rf.borrow().value else {
                         return;
@@ -243,16 +242,16 @@ impl CodePass {
                             })
                             .collect();
 
-                        let rvals: Vec<_> = return_parameters
-                            .iter()
-                            .map(|(name, ty)| {
-                                (
-                                    name.clone(),
-                                    ScopeValue::ConstValue(ConstValue::default_for(ty)),
-                                )
-                            })
-                            .collect();
-                        (pvals, rvals)
+                        // let rvals: Vec<_> = return_parameters
+                        //     .iter()
+                        //     .map(|(name, ty)| {
+                        //         (
+                        //             name.clone(),
+                        //             ScopeValue::ConstValue(ConstValue::default_for(ty)),
+                        //         )
+                        //     })
+                        //     .collect();
+                        (pvals, return_type.clone())
                     };
 
                     self.wstate().scope.push_scope(rf);
@@ -261,9 +260,9 @@ impl CodePass {
                         self.wstate().scope.update_value(&name, ty, index);
                     }
 
-                    for (name, ty) in rvals {
-                        self.wstate().scope.update_value(&name, ty, index);
-                    }
+                    // for (name, ty) in rvals {
+                    //     self.wstate().scope.update_value(&name, ty, index);
+                    // }
 
                     self.wstate().scope.pop_scope();
                 }

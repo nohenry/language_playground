@@ -134,12 +134,13 @@ impl Evaluator {
             Statement::Function {
                 ident,
                 parameters,
-                return_parameters,
+                return_type,
                 body: Some(body),
                 ..
             } => {
                 let params = self.evaluate_params(parameters);
-                let return_params = self.evaluate_params(return_parameters);
+                let ty = return_type.as_ref().map(|ty| self.evaluate_type(ty));
+                // let return_params = self.evaluate_params(return_parameters);
 
                 let sym = self.wstate().scope.find_symbol(ident.as_str()).unwrap();
 
@@ -148,13 +149,15 @@ impl Evaluator {
                     ty:
                         Type::Function {
                             parameters,
-                            return_parameters,
+                            return_type,
                         },
                     ..
                 }) = &mut mut_sym.value
                 {
                     *parameters = params;
-                    *return_parameters = return_params
+                    *return_type = ty
+                        .map(|ty| Box::new(ty))
+                        .unwrap_or_else(|| Box::new(Type::Empty));
                 }
                 // sym.borrow_mut().update(
                 //     ident.as_str(),
@@ -235,7 +238,7 @@ impl Evaluator {
                         }
                     }
                     (ty, expr) => {
-                        let expr = expr.resolve_ref_value().unwrap();
+                        let expr = expr.resolve_ref_value().unwrap_or_else(|| expr);
                         let expr = expr.try_implicit_cast(&ty).unwrap_or(expr);
 
                         println!("Assign: {} \n {}", expr.format(), ty.format());
@@ -422,7 +425,7 @@ impl Evaluator {
                     (
                         Type::Function {
                             parameters: ptypes,
-                            return_parameters: rptypes,
+                            return_type: rptypes,
                         },
                         ConstValueKind::Function { body, rf },
                     ) => {
@@ -477,45 +480,49 @@ impl Evaluator {
                             return ConstValue::empty();
                         }
 
-                        let _ = self.evaluate_statement(&body, index);
+                        let return_value = self.evaluate_statement(&body, index);
 
                         // TODO: verify types here as well
 
-                        let return_values: LinkedHashMap<_, _> = rptypes
-                            .into_iter()
-                            .map(|(name, ty)| {
-                                let sym = self.rstate().scope.find_symbol_local(&name);
-                                let vl = if let Some(sym) = sym {
-                                    let sym = sym.borrow();
-                                    if let ScopeValue::ConstValue(cv) = &sym.value {
-                                        if &cv.ty == ty {
-                                            cv.clone()
-                                        } else {
-                                            // TODO: error handling
-                                            ConstValue::empty()
-                                        }
-                                    } else {
-                                        // TODO: error handling
-                                        ConstValue::empty()
-                                    }
-                                } else {
-                                    self.add_error(EvaluationError {
-                                        kind: EvaluationErrorKind::NotInitialized {
-                                            hint: TypeHint::ReturnParameter,
-                                        },
-                                        range: expression.get_range(),
-                                    });
-                                    ConstValue::default_for(ty)
-                                };
-                                (name.clone(), vl)
-                            })
-                            .collect();
+                        // let return_values: LinkedHashMap<_, _> = rptypes
+                        //     .into_iter()
+                        //     .map(|(name, ty)| {
+                        //         let sym = self.rstate().scope.find_symbol_local(&name);
+                        //         let vl = if let Some(sym) = sym {
+                        //             let sym = sym.borrow();
+                        //             if let ScopeValue::ConstValue(cv) = &sym.value {
+                        //                 if &cv.ty == ty {
+                        //                     cv.clone()
+                        //                 } else {
+                        //                     // TODO: error handling
+                        //                     ConstValue::empty()
+                        //                 }
+                        //             } else {
+                        //                 // TODO: error handling
+                        //                 ConstValue::empty()
+                        //             }
+                        //         } else {
+                        //             self.add_error(EvaluationError {
+                        //                 kind: EvaluationErrorKind::NotInitialized {
+                        //                     hint: TypeHint::ReturnParameter,
+                        //                 },
+                        //                 range: expression.get_range(),
+                        //             });
+                        //             ConstValue::default_for(ty)
+                        //         };
+                        //         (name.clone(), vl)
+                        //     })
+                        //     .collect();
 
-                        let value = ConstValue::record_instance(rf.clone());
+                        // let value = ConstValue::record_instance(rf.clone());
 
                         self.wstate().scope.pop_scope();
-
-                        value
+                        
+                        match return_value {
+                            ConstValue { kind: ConstValueKind::Tuple(v), .. } => v.into_iter().last().unwrap_or_else(|| ConstValue::empty()),
+                            r => r,
+                        }
+                        // ConstValue::empty()
                     }
                     (
                         Type::Function {
@@ -690,7 +697,6 @@ impl Evaluator {
                         },
                         Expression::Ident(member),
                     ) => {
-
                         let child = left.resolve_ref().unwrap();
                         let child_scope = child.borrow();
 
@@ -706,11 +712,7 @@ impl Evaluator {
                             return ConstValue::empty();
                         };
 
-                        return ConstValue::reference(
-                            left,
-                            member.as_str().to_string(),
-                            rtype,
-                        );
+                        return ConstValue::reference(left, member.as_str().to_string(), rtype);
                     }
                     _ => (),
                 }

@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hasher, io::Read, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
-    ast::{Expression, EnclosedPunctuationList, Param, EnclosedList, GenericParameter},
+    ast::{EnclosedList, EnclosedPunctuationList, Expression, GenericParameter, Param},
     token::{Operator, SpannedToken, Token},
     Module,
 };

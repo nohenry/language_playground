@@ -6,7 +6,8 @@ use tl_util::Rf;
 
 use crate::{
     const_value::{ConstValue, ConstValueKind, Type},
-    scope::{Scope, ScopeValue}, intrinsics::{IntrinsicType, IntrinsicUpcast},
+    intrinsics::{IntrinsicType, IntrinsicUpcast},
+    scope::{Scope, ScopeValue},
 };
 
 pub fn std_module() -> Arc<Module> {
@@ -27,11 +28,20 @@ pub fn std_module() -> Arc<Module> {
 pub fn fill_module(module_rf: Rf<Scope>) {
     let mut module = module_rf.borrow_mut();
 
-    let io = module.insert(module_rf.clone(), "io".to_string(), ScopeValue::Module(Arc::new(Module::empty("io"))), 0);
+    let io = module.insert(
+        module_rf.clone(),
+        "io".to_string(),
+        ScopeValue::Module(Arc::new(Module::empty("io"))),
+        0,
+    );
     fill_io(&io);
 
-
-    let mem = module.insert(module_rf.clone(), "mem".to_string(), ScopeValue::Module(Arc::new(Module::empty("mem"))), 0);
+    let mem = module.insert(
+        module_rf.clone(),
+        "mem".to_string(),
+        ScopeValue::Module(Arc::new(Module::empty("mem"))),
+        0,
+    );
     fill_mem(&io);
 }
 
@@ -40,7 +50,7 @@ pub fn fill_io(module_rf: &Rf<Scope>) {
         &module_rf,
         "print",
         [("data".to_string(), Type::String)].into_iter(),
-        [].into_iter(),
+        Type::Empty,
         Arc::new(|params| {
             if let Some(data) = params.get("data") {
                 if let Some(data) = data.resolve_ref() {
@@ -57,14 +67,20 @@ pub fn fill_io(module_rf: &Rf<Scope>) {
     );
 }
 
-
 pub fn fill_mem(module: &Rf<Scope>) {
-    create_intrinsinc_type(module, "Slice", Rf::new(types::Slice { }).upcast() );
+    create_intrinsinc_type(module, "Slice", Rf::new(types::Slice {}).upcast());
     create_func(
         &module,
         "alloc",
-        [("size".to_string(), Type::Integer { width: 64, signed: false })].into_iter(),
-        [].into_iter(),
+        [(
+            "size".to_string(),
+            Type::Integer {
+                width: 64,
+                signed: false,
+            },
+        )]
+        .into_iter(),
+        Type::Empty,
         Arc::new(|params| {
             if let Some(data) = params.get("data") {
                 if let Some(data) = data.resolve_ref() {
@@ -84,18 +100,16 @@ pub fn fill_mem(module: &Rf<Scope>) {
 pub mod types {
     use crate::intrinsics::IntrinsicType;
 
-    pub struct Slice {
+    pub struct Slice {}
 
-    }
-
-    impl IntrinsicType for Slice { }
+    impl IntrinsicType for Slice {}
 }
 
-fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, Type)>>(
+fn create_func<P: Iterator<Item = (String, Type)>>(
     module: &Rf<Scope>,
     name: &str,
     p: P,
-    r: R,
+    r: Type,
     func: Arc<
         dyn Fn(&LinkedHashMap<String, ConstValue>) -> LinkedHashMap<String, ConstValue>
             + Sync
@@ -113,18 +127,17 @@ fn create_func<P: Iterator<Item = (String, Type)>, R: Iterator<Item = (String, T
         },
         ty: Type::Function {
             parameters: LinkedHashMap::from_iter(p),
-            return_parameters: LinkedHashMap::from_iter(r),
+            return_type: Box::new(r),
         },
     });
 
     mo.update(name, cv).unwrap()
 }
 
-
 fn create_intrinsinc_type(
     module: &Rf<Scope>,
     name: &str,
-    data: Rf<dyn IntrinsicType + Send + Sync> 
+    data: Rf<dyn IntrinsicType + Send + Sync>,
 ) -> Rf<Scope> {
     let mut mo = module.borrow_mut();
 

@@ -61,7 +61,7 @@ impl EvaluationError {
         let start = 1 + self.range.start.position as usize;
         let len = if self.range.end <= self.range.start {
             self.range.start.length as usize
-        } else if self.range.start.line_num == self.range.end.line_num  {
+        } else if self.range.start.line_num == self.range.end.line_num {
             (self.range.end.position - self.range.start.position + 1) as usize
         } else {
             0
@@ -99,7 +99,7 @@ pub enum TypeHint {
     ReturnParameter,
     Function,
     Struct,
-    StructMember
+    StructMember,
 }
 
 #[derive(Debug, Clone)]

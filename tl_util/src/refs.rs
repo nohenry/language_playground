@@ -46,7 +46,6 @@ impl<T> Rf<T> {
     // }
 }
 
-
 static mut BACKTRACE: AtomicBool = AtomicBool::new(false);
 
 pub fn set_backtrace(enabled: bool) {

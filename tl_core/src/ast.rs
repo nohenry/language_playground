@@ -1046,8 +1046,8 @@ pub enum Statement {
         fn_tok: SpannedToken,
         ident: SpannedToken,
         parameters: ParamaterList,
-        arrow: SpannedToken,
-        return_parameters: ParamaterList,
+        arrow: Option<SpannedToken>,
+        return_type: Option<Type>,
         body: Option<Box<Statement>>,
     },
 }
@@ -1079,9 +1079,12 @@ impl AstNode for Statement {
             } => Range::from((*fn_tok.span(), &body.get_range())),
             Self::Function {
                 fn_tok,
-                return_parameters,
+                return_type: Some(ty),
                 ..
-            } => Range::from((*fn_tok.span(), &return_parameters.get_range())),
+            } => Range::from((*fn_tok.span(), &ty.get_range())),
+            Self::Function {
+                fn_tok, parameters, ..
+            } => Range::from((*fn_tok.span(), &parameters.get_range())),
             Self::Block(b) => b.get_range(),
             _ => Range::default(),
         }
@@ -1118,8 +1121,17 @@ impl TreeDisplay for Statement {
                 generic: Some(_), ..
             } => 3,
             Self::TypeAlias { .. } => 2,
-            Self::Function { body: Some(_), .. } => 4,
-            Self::Function { .. } => 3,
+            Self::Function {
+                body: Some(_),
+                return_type: Some(_),
+                ..
+            } => 4,
+            Self::Function {
+                return_type: Some(_),
+                ..
+            } => 3,
+            Self::Function { body: Some(_), .. } => 3,
+            Self::Function { .. } => 2,
             Self::Block(b) => b.num_children(),
         }
     }
@@ -1168,25 +1180,43 @@ impl TreeDisplay for Statement {
             Self::Function {
                 ident,
                 parameters,
-                return_parameters,
+                return_type: Some(return_type),
                 body: Some(body),
                 ..
             } => match index {
                 0 => Some(ident),
                 1 => Some(parameters),
-                2 => Some(return_parameters),
+                2 => Some(return_type),
                 3 => Some(&**body),
                 _ => None,
             },
             Self::Function {
                 ident,
                 parameters,
-                return_parameters,
+                body: Some(body),
                 ..
             } => match index {
                 0 => Some(ident),
                 1 => Some(parameters),
-                2 => Some(return_parameters),
+                2 => Some(&**body),
+                _ => None,
+            },
+            Self::Function {
+                ident,
+                parameters,
+                return_type: Some(return_type),
+                ..
+            } => match index {
+                0 => Some(ident),
+                1 => Some(parameters),
+                2 => Some(return_type),
+                _ => None,
+            },
+            Self::Function {
+                ident, parameters, ..
+            } => match index {
+                0 => Some(ident),
+                1 => Some(parameters),
                 _ => None,
             },
             Self::Block(b) => b.child_at(index),
