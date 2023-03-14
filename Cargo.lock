@@ -123,6 +123,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "either"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
+
+[[package]]
 name = "form_urlencoded"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -270,6 +276,30 @@ checksum = "e14ddfc70884202db2244c223200c204c2bda1bc6e0998d11b5e024d657209e6"
 dependencies = [
  "unicode-bidi",
  "unicode-normalization",
+]
+
+[[package]]
+name = "inkwell"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbac11e485159a525867fb7e6aa61981453e6a72f625fde6a4ab3047b0c6dec9"
+dependencies = [
+ "either",
+ "inkwell_internals",
+ "libc",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "inkwell_internals"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87d00c17e264ce02be5bc23d7bff959188ec7137beddd06b8b6b05a7c680ea85"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -687,6 +717,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 name = "tl_codegen"
 version = "0.1.0"
 dependencies = [
+ "inkwell",
  "tl_core",
  "tl_util",
  "tl_vm",
@@ -711,6 +742,17 @@ dependencies = [
  "pollster",
  "tl_util",
  "tower-lsp",
+]
+
+[[package]]
+name = "tl_evaluator"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "handlebars",
+ "linked-hash-map",
+ "tl_core",
+ "tl_util",
 ]
 
 [[package]]
