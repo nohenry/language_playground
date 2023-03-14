@@ -1,9 +1,14 @@
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
+
 use tl_core::{
     ast::{
-        ArgList, EnclosedPunctuationList, Expression, GenericParameter, ParamaterList,
+        ArgList, AstNode, EnclosedPunctuationList, Expression, GenericParameter, ParamaterList,
         ParsedTemplate, Statement, Type,
     },
-    token::SpannedToken,
+    token::{Range, SpannedToken},
 };
 use tl_vm::{
     const_value::{ConstValue, ConstValueKind},
@@ -96,13 +101,14 @@ fn get_stype_index_from_str(ty: &str) -> u32 {
 }
 
 pub struct SemanticTokenGenerator<'a> {
-    scope: &'a ScopeManager,
+    scope: &'a mut ScopeManager,
     pub scope_index: Vec<usize>,
     pub builder: SemanticTokenBuilder,
+    // pub current_scope:
 }
 
 impl<'a> SemanticTokenGenerator<'a> {
-    pub fn new(scope: &'a ScopeManager) -> SemanticTokenGenerator<'a> {
+    pub fn new(scope: &'a mut ScopeManager) -> SemanticTokenGenerator<'a> {
         SemanticTokenGenerator {
             scope,
             scope_index: Vec::with_capacity(50),
@@ -116,23 +122,24 @@ impl<'a> SemanticTokenGenerator<'a> {
 }
 
 impl<'a> SemanticTokenGenerator<'a> {
-    pub fn recurse(&mut self, stmt: &Statement) {
+    pub fn recurse(&mut self, stmt: &Statement, index: usize) {
         match stmt {
             Statement::List(list) => {
-                for l in list.iter_items() {
-                    self.recurse(l);
+                for (i, l) in list.iter_items().enumerate() {
+                    self.recurse(l, i);
                 }
             }
             Statement::Decleration {
                 ty, ident, expr, ..
             } => {
                 self.recurse_type(ty);
-                let func = match expr {
-                    Some(Expression::Record { .. }) => get_stype_index_from_str("struct"),
-                    _ => get_stype_index_from_str("variable"),
-                };
+                // let func = match expr {
+                //     Some(Expression::Record { .. }) => get_stype_index_from_str("struct"),
+                //     _ => get_stype_index_from_str("variable"),
+                // };
 
-                self.builder.push_token(ident, func, 0);
+                self.builder
+                    .push_token(ident, get_stype_index_from_str("variable"), 0);
 
                 if let Some(expr) = expr {
                     self.recurse_expression(expr);
@@ -155,7 +162,7 @@ impl<'a> SemanticTokenGenerator<'a> {
                 fn_tok,
                 ident,
                 parameters,
-                return_parameters,
+                return_type,
                 body,
                 ..
             } => {
@@ -165,10 +172,20 @@ impl<'a> SemanticTokenGenerator<'a> {
                     .push_token(ident, get_stype_index_from_str("function"), 0);
 
                 self.recurse_params(parameters);
-                self.recurse_params(return_parameters);
+                if let Some(ty) = &return_type {
+                    self.recurse_type(ty);
+                }
+
+                let sm = self.scope.find_symbol_local(ident.as_str()).map(|f| {
+                    self.scope.push_scope(f);
+                });
 
                 if let Some(body) = body {
-                    self.recurse(body);
+                    self.recurse(body, 0);
+                }
+
+                if sm.is_some() {
+                    self.scope.pop_scope();
                 }
             }
             Statement::TypeAlias {
@@ -190,8 +207,45 @@ impl<'a> SemanticTokenGenerator<'a> {
                 self.recurse_type(ty);
             }
             Statement::Block(b) => {
-                for statement in b.items.iter() {
-                    self.recurse(statement);
+                for (i, statement) in b.items.iter().enumerate() {
+                    self.recurse(statement, i);
+                }
+            }
+            Statement::Impl {
+                impl_tok,
+                generics,
+                ty,
+                body,
+            } => {
+                self.builder
+                    .push_token(impl_tok, get_stype_index_from_str("keyword"), 0);
+
+                if let Some(generics) = &generics {
+                    self.recurse_generic(generics);
+                }
+
+                let evaluated_type = if let Some(ty) = ty {
+                    self.recurse_type(ty);
+                    self.evaluate_type(ty)
+                } else {
+                    tl_vm::const_value::Type::Empty
+                };
+
+                if let Some(body) = body {
+                    let pop = if let tl_vm::const_value::Type::Symbol(sym) = &evaluated_type {
+                        self.scope.push_scope(sym.clone());
+                        true
+                    } else {
+                        false
+                    };
+
+                    for (i, stmt) in body.iter_items().enumerate() {
+                        self.recurse(stmt, i);
+                    }
+
+                    if pop {
+                        self.scope.pop_scope();
+                    }
                 }
             }
         }
@@ -224,10 +278,7 @@ impl<'a> SemanticTokenGenerator<'a> {
                 self.scope
                     .push_scope_chain(&mut current_scope, self.scope_index.iter());
 
-                if let Some(sym) = self
-                    .scope
-                    .find_symbol_in_scope(tok.as_str(), &current_scope)
-                {
+                if let Some(sym) = self.scope.find_symbol(tok.as_str()) {
                     let sym = sym.borrow();
                     match &sym.value {
                         ScopeValue::ConstValue(ConstValue {
@@ -411,5 +462,177 @@ impl<'a> SemanticTokenGenerator<'a> {
                     .push_token(name, get_stype_index(SemanticTokenType::VARIABLE), 0);
             }
         }
+    }
+}
+
+impl SemanticTokenGenerator<'_> {
+    fn evaluate_type(&self, ty: &tl_core::ast::Type) -> tl_vm::const_value::Type {
+        match ty {
+            tl_core::ast::Type::Integer { width, signed, .. } => {
+                tl_vm::const_value::Type::Integer {
+                    width: *width,
+                    signed: *signed,
+                }
+            }
+            tl_core::ast::Type::Float { width, .. } => {
+                tl_vm::const_value::Type::Float { width: *width }
+            }
+            tl_core::ast::Type::Ident(id) => {
+                if let Some(sym) = self.scope.find_symbol(id.as_str()) {
+                    return tl_vm::const_value::Type::Symbol(sym);
+                }
+
+                tl_vm::const_value::Type::Empty
+            }
+            tl_core::ast::Type::Boolean(_) => tl_vm::const_value::Type::Boolean,
+            tl_core::ast::Type::Ref {
+                base_type: Some(ty),
+                ..
+            } => tl_vm::const_value::Type::Ref {
+                base_type: Box::new(self.evaluate_type(ty)),
+            },
+            tl_core::ast::Type::Generic {
+                base_type: Some(box tl_core::ast::Type::Ident(tok)),
+                list,
+            } => {
+                let types: Vec<_> = list.iter_items().map(|ty| self.evaluate_type(ty)).collect();
+
+                let Some(symrf) = self.scope.find_symbol(tok.as_str()) else {
+                    return tl_vm::const_value::Type::Empty
+                };
+
+                let csi = {
+                    let sym = symrf.borrow();
+                    match &sym.value {
+                        ScopeValue::StructTemplate {
+                            generics,
+                            constructions,
+                            construction_start_index,
+                            ..
+                        } => {
+                            if !self.verify_generics_match(generics, &types, list.get_range()) {
+                                return tl_vm::const_value::Type::Empty;
+                            }
+
+                            // If we have already constructed this struct with the same type arguments, reuse this construction
+                            if let Some(child_construction_name) = constructions.get(&types) {
+                                let construction = sym
+                                    .children
+                                    .get(child_construction_name)
+                                    .expect("Compiler Bug!");
+                                return tl_vm::const_value::Type::Symbol(construction.clone());
+                            }
+                            panic!("Should Prboably have returned?");
+
+                            *construction_start_index
+                        }
+                        ScopeValue::IntrinsicStructTemplate {
+                            initial_value,
+                            generics,
+                        } => {
+                            if !self.verify_generics_match(generics, &types, list.get_range()) {
+                                return tl_vm::const_value::Type::Empty;
+                            }
+
+                            return tl_vm::const_value::Type::Intrinsic(symrf.clone());
+                        }
+                        _ => {
+                            return tl_vm::const_value::Type::Empty;
+                        }
+                    }
+                };
+
+                // let mut sym = symrf.borrow_mut();
+
+                // let mut hash = DefaultHasher::new();
+                // types.hash(&mut hash);
+                // let hash = hash.finish().to_string();
+
+                // let raw_members = {
+                //     let ScopeValue::StructTemplate { constructions, raw_members, .. } = &mut sym.value else {
+                //         // self.add_error(EvaluationError {
+                //         //     kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
+                //         //     range: tok.get_range(),
+                //         // });
+                //         return tl_vm::const_value::Type::Empty
+                //     };
+
+                //     constructions.insert(types.clone(), hash.clone());
+                //     raw_members.clone()
+                // };
+
+                // // Build generic parameter symbols
+                // let children: Vec<_> = {
+                //     sym.children
+                //         .iter()
+                //         .take(csi)
+                //         .zip(types.into_iter())
+                //         .map(|((k, _), ty)| {
+                //             Scope::new(
+                //                 symrf.clone(),
+                //                 k.to_string(),
+                //                 ScopeValue::TypeAlias {
+                //                     ident: k.to_string(),
+                //                     ty: Box::new(ty),
+                //                 },
+                //                 0,
+                //             )
+                //         })
+                //         .collect()
+                // };
+
+                // let child = sym.insert(
+                //     symrf.clone(),
+                //     hash.clone(),
+                //     ScopeValue::Struct {
+                //         ident: hash,
+                //         members: LinkedHashMap::new(),
+                //     },
+                //     0,
+                // );
+
+                // // insert generic parameter symbols
+                // {
+                //     let mut child = child.borrow_mut();
+                //     for c in children {
+                //         child.insert_node(c);
+                //     }
+                // }
+
+                // {
+                //     self.scope.push_scope(child.clone());
+
+                //     // We need to regenerate types using generic parameters
+                //     let emembers = self.evaluate_struct_members(&raw_members);
+
+                //     let mut child_sym = child.borrow_mut();
+                //     let ScopeValue::Struct { members, .. } = &mut child_sym.value else {
+                //         panic!("Expected struct!")
+                //     };
+
+                //     *members = emembers;
+
+                //     self.scope.pop_scope();
+                // }
+
+                // tl_vm::const_value::Type::Symbol(child)
+            }
+            _ => tl_vm::const_value::Type::Empty,
+        }
+    }
+
+    fn verify_generics_match(
+        &self,
+        params: &Vec<GenericParameter>,
+        args: &Vec<tl_vm::const_value::Type>,
+        errored_range: Range,
+    ) -> bool {
+        if args.len() != params.len() {
+            return false;
+        }
+
+        // TODO: Verify bindings match
+
+        true
     }
 }

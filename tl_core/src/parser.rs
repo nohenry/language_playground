@@ -82,6 +82,11 @@ impl Parser {
                     return Some(us);
                 }
             }
+            Some(Token::Ident(s)) if s == "impl" => {
+                if let Some(us) = self.parse_impl() {
+                    return Some(us);
+                }
+            }
             Some(Token::Ident(s)) if s == "type" => {
                 let ty_tok = self.tokens.next().unwrap();
                 let symb = self.expect(Token::Ident(String::new())).unwrap();
@@ -186,6 +191,33 @@ impl Parser {
 
     //     Some(Statement::Decleration { ident, colon, expr })
     // }
+
+    pub fn parse_impl(&self) -> Option<Statement> {
+        let token = match self.tokens.peek() {
+            Some(Token::Ident(id)) if id == "impl" => self.tokens.next().cloned().unwrap(),
+            _ => return None,
+        };
+
+        let generics = match self.tokens.peek() {
+            Some(Token::Operator(Operator::OpenAngle)) => self.parse_generic_parameters(),
+            _ => None,
+        };
+
+        let ty = self.parse_type();
+
+        // let open_brace = self.expect(Token::Operator(Operator::OpenBrace));
+
+        let body = self.parse_enclosed_list(Operator::OpenBrace, Operator::CloseBrace, || {
+            self.parse_statement().map(|f| (f, true))
+        });
+
+        Some(Statement::Impl {
+            impl_tok: token,
+            generics,
+            ty,
+            body,
+        })
+    }
 
     pub fn parse_use(&self) -> Option<Statement> {
         let token = self.tokens.next();

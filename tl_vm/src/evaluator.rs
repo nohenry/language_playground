@@ -131,6 +131,12 @@ impl Evaluator {
             //         index,
             //     );
             // }
+            Statement::Impl {
+                generics,
+                ty: Some(ty),
+                body: Some(body),
+                ..
+            } => {}
             Statement::Function {
                 ident,
                 parameters,
@@ -241,7 +247,6 @@ impl Evaluator {
                         let expr = expr.resolve_ref_value().unwrap_or_else(|| expr);
                         let expr = expr.try_implicit_cast(&ty).unwrap_or(expr);
 
-                        println!("Assign: {} \n {}", expr.format(), ty.format());
                         if expr.ty != ty {
                             self.add_error(EvaluationError {
                                 kind: EvaluationErrorKind::TypeMismatch(
@@ -345,10 +350,8 @@ impl Evaluator {
                         ParsedTemplate::Template(t, _, _) => {
                             let expr = self.evaluate_expression(t, index);
 
-                            println!("String value: {}", expr.format());
                             if let Some(data) = expr.resolve_ref() {
                                 if let ScopeValue::ConstValue(cv) = &data.borrow().value {
-                                    println!("String value: {}", cv.format());
                                     return format!("{}", cv);
                                 }
                             }
@@ -364,16 +367,11 @@ impl Evaluator {
                 let sym = self.rstate().scope.find_symbol(id);
                 if let Some(sym) = sym {
                     let symv = sym.borrow();
-                    // println!("{}", self.rstate().scope.module.format());
                     match &symv.value {
                         ScopeValue::ConstValue(cv) => {
-                            // ConstValue::
                             ConstValue::sym_reference(&sym, cv.ty.clone())
                         }
-                        ScopeValue::Struct { .. } => ConstValue {
-                            ty: Type::Symbol(sym.clone()),
-                            kind: ConstValueKind::Empty,
-                        },
+                        ScopeValue::Struct { .. } => ConstValue::sym_reference(&sym, Type::Empty),
                         _ => ConstValue::empty(),
                     }
                 } else {
@@ -404,11 +402,6 @@ impl Evaluator {
                 let expr = self.evaluate_expression(expr, index);
                 let args = self.evaluate_args(raw_args, index);
 
-                for a in &args {
-                    println!("{}", a.format());
-                }
-                println!("{}", expr.format());
-
                 let expr = {
                     let expr = expr.resolve_ref().unwrap();
                     let expr = expr.borrow();
@@ -437,9 +430,6 @@ impl Evaluator {
                             .enumerate()
                             .map(|(i, (arg, (name, ty)))| {
                                 let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
-
-                                println!("Arg Type: {}", ty.format());
-                                println!("Arg Value: {}", arg.format());
 
                                 // let arg = if let Some(value) = arg.resolve_ref_value() {
                                 //     ConstValue {

@@ -1050,6 +1050,12 @@ pub enum Statement {
         return_type: Option<Type>,
         body: Option<Box<Statement>>,
     },
+    Impl {
+        impl_tok: SpannedToken,
+        generics: Option<EnclosedPunctuationList<GenericParameter>>,
+        ty: Option<Type>,
+        body: Option<EnclosedList<Statement>>,
+    },
 }
 
 impl AstNode for Statement {
@@ -1073,7 +1079,6 @@ impl AstNode for Statement {
             Self::List(list) => list.get_range(),
             Self::Function {
                 fn_tok,
-                // parameters,
                 body: Some(body),
                 ..
             } => Range::from((*fn_tok.span(), &body.get_range())),
@@ -1086,6 +1091,21 @@ impl AstNode for Statement {
                 fn_tok, parameters, ..
             } => Range::from((*fn_tok.span(), &parameters.get_range())),
             Self::Block(b) => b.get_range(),
+            Self::Impl {
+                impl_tok,
+                body: Some(body),
+                ..
+            } => Range::from((*impl_tok.span(), &body.get_range())),
+            Self::Impl {
+                impl_tok,
+                ty: Some(body),
+                ..
+            } => Range::from((*impl_tok.span(), &body.get_range())),
+            Self::Impl {
+                impl_tok,
+                generics: Some(body),
+                ..
+            } => Range::from((*impl_tok.span(), &body.get_range())),
             _ => Range::default(),
         }
     }
@@ -1105,6 +1125,7 @@ impl NodeDisplay for Statement {
             Self::TypeAlias { .. } => f.write_str("TypeAlias"),
             Self::List(_) => f.write_str("List"),
             Self::Block(_) => f.write_str("Block"),
+            Self::Impl { .. } => f.write_str("Impl"),
         }
     }
 }
@@ -1133,6 +1154,7 @@ impl TreeDisplay for Statement {
             Self::Function { body: Some(_), .. } => 3,
             Self::Function { .. } => 2,
             Self::Block(b) => b.num_children(),
+            Self::Impl { generics, ty, .. } => addup!(generics, ty) + 1,
         }
     }
 
@@ -1220,6 +1242,12 @@ impl TreeDisplay for Statement {
                 _ => None,
             },
             Self::Block(b) => b.child_at(index),
+            Self::Impl {
+                generics, ty, body, ..
+            } => {
+                let _ = switchon!(index, generics, ty, body);
+                None
+            }
             _ => None,
         }
     }

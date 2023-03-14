@@ -236,6 +236,7 @@ impl TreeDisplay for Scope {
 #[derive(Clone)]
 pub struct ScopeRef(usize, String);
 
+#[derive(Clone)]
 pub struct ScopeManager {
     root: Rf<Scope>,
     pub module: Rf<Scope>,
@@ -260,6 +261,10 @@ impl<'a> ScopeManager {
             module,
             current_scope: vec,
         }
+    }
+
+    pub fn reset_current_scope(&mut self) {
+        self.current_scope.truncate(1);
     }
 
     pub fn add_use(&mut self, path: Vec<String>) {
@@ -624,6 +629,13 @@ impl<'a> ScopeManager {
             return rf;
         }
         panic!()
+    }
+
+    pub fn remove_value(&mut self, name: &str) {
+        if let Some(scp) = self.current_scope.last() {
+            let mut scope = scp.borrow_mut();
+            scope.children.remove(name);
+        }
     }
 }
 

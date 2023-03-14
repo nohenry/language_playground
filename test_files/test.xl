@@ -6,20 +6,20 @@ type Potato <T, U> {
     U b
 }
 
-Potato<u32, i32> p = {
-    b: 80
-    a: 45 
+type TestImplStruct {
+    u32 a
 }
 
-fn myfunc(u32@ i) -> u32 {
-    print("{i}")
-    83
+impl TestImplStruct {
+    fn work() {
+        print("{self.a}")
+    }
 }
 
-u32 i = p.a
+TestImplStruct test = {
+    a: 987 
+}
 
-u32 val = myfunc(i)
-
-print("{val}")
+TestImplStruct.work(test)
 
 Slice val = alloc()

@@ -337,7 +337,7 @@ impl TreeDisplay for Type {
             Type::StructInstance { members, .. } => members.len(),
             Type::StructInitializer { members } => members.len(),
             Type::Ref { .. } => 1,
-            Type::Symbol(_) => 1,
+            // Type::Symbol(_) => 1,
             _ => 0,
         }
     }
@@ -371,11 +371,6 @@ impl TreeDisplay for Type {
         match self {
             Type::StructInstance { members, .. } => members.child_at_bx(_index),
             Type::StructInitializer { members, .. } => members.child_at_bx(_index),
-            Type::Symbol(sym) => {
-                // let sym = sym.borrow();
-                Box::new(sym.borrow())
-                // Box::new(Grouper("".to_string(), sym.child_at(1).unwrap()))
-            }
             _ => panic!(),
         }
     }

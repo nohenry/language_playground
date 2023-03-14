@@ -256,9 +256,9 @@ impl Parser {
 
             Operator::Exponent => 40,
 
-            Operator::Dot => 50,
+            Operator::OpenParen => 50,
 
-            Operator::OpenParen => 60,
+            Operator::Dot => 60,
 
             _ => 0, // TODO: error
         }

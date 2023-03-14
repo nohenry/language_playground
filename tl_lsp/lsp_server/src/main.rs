@@ -99,14 +99,17 @@ impl LanguageServer for Backend {
                 0
             };
 
-            let mut generator = SemanticTokenGenerator::new(&mods.1);
-            generator.scope_index.push(index);
-            generator.scope_index.push(0);
+            let mut scope = mods.1.clone();
+            scope.reset_current_scope();
+
+            let mut generator = SemanticTokenGenerator::new(&mut scope);
+            // generator.scope_index.push(index);
+            // generator.scope_index.push(0);
 
             for (i, stmt) in mods.0.stmts.iter().enumerate() {
-                generator.scope_index[1] = i;
+                // generator.scope_index[1] = i;
 
-                generator.recurse(stmt);
+                generator.recurse(stmt, i);
             }
 
             generator.build()
