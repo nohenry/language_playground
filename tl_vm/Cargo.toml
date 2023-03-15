@@ -11,3 +11,4 @@ handlebars = "4.3.6"
 linked-hash-map = "0.5.6"
 tl_core = { path = "../tl_core" }
 tl_util = { path = "../tl_util" }
+tl_evaluator = { path = "../tl_evaluator" }

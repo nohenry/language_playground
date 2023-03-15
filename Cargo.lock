@@ -770,6 +770,7 @@ dependencies = [
  "handlebars",
  "linked-hash-map",
  "tl_core",
+ "tl_evaluator",
  "tl_util",
 ]
 

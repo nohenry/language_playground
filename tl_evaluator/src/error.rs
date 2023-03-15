@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::{Display, Debug}};
 
 use colored::Colorize;
 use tl_core::token::{Operator, Range};
@@ -33,11 +33,11 @@ pub struct EvaluationError<Type: EvaluationType> {
 
 impl <Type: EvaluationType> Display for EvaluationError<Type> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)
+        std::fmt::Display::fmt(&self.kind, f)
     }
 }
 
-impl <Type: EvaluationType> EvaluationError<Type> {
+impl <Type: EvaluationType + Display> EvaluationError<Type> {
     pub fn print(&self, file_path: &str, lines: &[&str]) {
         let padding = (self.range.start.line_num + 1).to_string().len() + 2;
         println!("{}: {}", self.kind.get_level(), self.kind);
@@ -92,7 +92,7 @@ impl <Type: EvaluationType> EvaluationError<Type> {
     }
 }
 
-impl <Type: EvaluationType> Error for EvaluationError<Type> {}
+impl <Type: EvaluationType + Debug> Error for EvaluationError<Type> {}
 
 #[derive(Debug, Clone)]
 pub enum TypeHint {
@@ -113,7 +113,7 @@ pub enum EvaluationErrorKind<Type: EvaluationType> {
     SymbolNotFound(String),
 }
 
-impl <Type: EvaluationType> EvaluationErrorKind<Type> {
+impl <Type: EvaluationType + Display> EvaluationErrorKind<Type> {
     pub fn get_level(&self) -> ErrorLevel {
         match self {
             EvaluationErrorKind::TypeMismatch(_, _, _) => ErrorLevel::Error,
