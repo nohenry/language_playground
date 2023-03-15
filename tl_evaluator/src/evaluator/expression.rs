@@ -93,7 +93,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evalu
                 };
 
                 if expr.is_function() {
-                    let ptypes = expr.get_type().function_parameters();
+                    let ptypes = expr.get_type().function_parameters_rf();
                     let rptypes = expr.get_type().function_return();
                     let body = expr.function_body();
                     let rf = expr.function_rf();
@@ -116,7 +116,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evalu
                             //     arg
                             // };
 
-                            if arg.get_type() != &ty {
+                            if arg.get_type() != ty {
                                 self.add_error(EvaluationError {
                                     kind: EvaluationErrorKind::TypeMismatch(
                                         arg.into(),
@@ -157,7 +157,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evalu
                     }
                 } else if expr.is_native_function() {
                     let ptypes: LinkedHashMap<String, T> =
-                        expr.get_type().function_parameters().collect();
+                        expr.get_type().function_parameters_rf().map(|(s, t)| (s.clone(), t.clone())).collect();
                     let rptypes = expr.get_type().function_return();
                     // let body = expr.function_body();
                     let callback = expr.native_function_callback();

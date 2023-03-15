@@ -3,9 +3,9 @@ use linked_hash_map::LinkedHashMap;
 use tl_core::ast::{Statement, Type};
 use tl_util::Rf;
 
-use crate::{evaluation_type::EvaluationType, scope::scope::Scope};
+use crate::{evaluation_type::EvaluationType, scope::{scope::Scope, intrinsics::IntrinsicType}};
 
-pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display {
+pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display + Sync + Send + 'static {
     type Type: EvaluationType<Value = Self>;
 
     /* Struct Methods */
@@ -20,7 +20,7 @@ pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display {
     fn is_struct_initializer(&self) -> bool;
 
     fn empty() -> Self;
-    fn is_empty() -> bool;
+    fn is_empty(&self) -> bool;
     fn default_for(ty: &Self::Type) -> Self;
     fn resolve_ref(&self) -> Option<Rf<Scope<Self::Type, Self>>>;
     fn resolve_ref_value(&self) -> Option<Self>;
@@ -74,8 +74,8 @@ pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display {
 
     fn tuple(values: Vec<Self>) -> Self;
     fn is_tuple(&self) -> bool;
-    fn tuple_value(&self) -> Vec<Self>;
-    fn tuple_value_rf(&self) -> Vec<Self>;
+    fn tuple_value(self) -> Vec<Self>;
+    fn tuple_value_rf(&self) -> &Vec<Self>;
 
 
     /// Creates a reference value with a member access expression.
@@ -83,7 +83,11 @@ pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display {
     /// `left` should be a value reference to scope value
     /// `right` is an index into that scope values children
     fn reference(left: Self, right: String, right_ty: Self::Type) -> Self;
+    fn is_reference(&self) -> bool;
+
     fn sym_reference(sym: &Rf<Scope<Self::Type, Self>>, ty: Self::Type) -> Self;
+
+    fn intrinsic_storage(sym: Rf<Scope<Self::Type, Self>>, storage: Rf<dyn IntrinsicType + Sync + Send>, generics: Vec<Self::Type>) -> Self;
 
     fn try_implicit_cast(&self, ty: &Self::Type) -> Option<Self>;
 

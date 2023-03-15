@@ -222,6 +222,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
     Evaluator<T, V, TypeFirst>
 {
+    pub fn evaluate(&self) {
+        for (index, stmt) in self.module.stmts.iter().enumerate() {
+            self.evaluate_statement(stmt, index)
+        }
+    }
+
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
             // Struct decleration
@@ -346,6 +352,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
     Evaluator<T, V, MemberPass>
 {
+    pub fn evaluate(&self) {
+        for (index, stmt) in self.module.stmts.iter().enumerate() {
+            self.evaluate_statement(stmt, index)
+        }
+    }
+
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
             // Struct decleration
@@ -459,7 +471,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                         return;
                     }
 
-                    let parameters = value.get_type().function_parameters();
+                    let parameters = value.get_type().function_parameters_rf();
                     let pvals: Vec<_> = parameters
                         .map(|(name, ty)| {
                             (

@@ -5,7 +5,7 @@ use tl_util::Rf;
 use crate::{scope::scope::Scope, evaluation_value::EvaluationValue};
 
 
-pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug {
+pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug + Sync + Send + 'static {
     type Value: EvaluationValue<Type = Self>;
 
     fn is_empty(&self) -> bool;
@@ -35,7 +35,9 @@ pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debu
     fn integer_width(&self) -> u8;
     fn integer_signed(&self) -> bool;
 
-    fn function_parameters(&self) -> impl Iterator<Item = (String, Self)>;
+    fn float_width(&self) -> u8;
+
+    fn function_parameters(self) -> impl Iterator<Item = (String, Self)>;
     fn function_parameters_rf(&self) -> impl Iterator<Item = (&String, &Self)>;
     fn set_function_parameters(&mut self, parameters: impl Iterator<Item = (String, Self)>);
     // fn function_parameters_mut(&self) -> impl Iterator<Item = (&mut String, &mut Self)>;

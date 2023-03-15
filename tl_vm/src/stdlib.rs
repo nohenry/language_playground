@@ -4,10 +4,15 @@ use linked_hash_map::LinkedHashMap;
 use tl_core::{ast::GenericParameter, Module};
 use tl_util::Rf;
 
-use crate::{
-    const_value::{ConstValue, ConstValueKind, Type},
-    intrinsics::{IntrinsicType, IntrinsicUpcast},
-    scope::{Scope, ScopeValue},
+use crate::const_value::{ConstValue, ConstValueKind, Type};
+
+use tl_evaluator::{
+    evaluation_type::EvaluationType,
+    evaluation_value::EvaluationValue,
+    scope::{
+        intrinsics::{IntrinsicType, IntrinsicUpcast},
+        scope::{Scope, ScopeValue},
+    },
 };
 
 pub fn std_module() -> Arc<Module> {
@@ -25,7 +30,9 @@ pub fn std_module() -> Arc<Module> {
     Arc::new(module)
 }
 
-pub fn fill_module(module_rf: Rf<Scope>) {
+pub fn fill_module<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
+    module_rf: Rf<Scope<T, V>>,
+) {
     let mut module = module_rf.borrow_mut();
 
     let io = module.insert(
@@ -45,29 +52,33 @@ pub fn fill_module(module_rf: Rf<Scope>) {
     fill_mem(&mem);
 }
 
-pub fn fill_io(module_rf: &Rf<Scope>) {
+pub fn fill_io<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
+    module_rf: &Rf<Scope<T, V>>,
+) {
     create_func(
         &module_rf,
         "print",
-        [("data".to_string(), Type::String)].into_iter(),
-        Type::Empty,
+        [("data".to_string(), T::string())].into_iter(),
+        T::empty(),
         Arc::new(|params| {
             if let Some(data) = params.get("data") {
                 if let Some(data) = data.resolve_ref() {
-                    let ScopeValue::ConstValue(cv) = &data.borrow().value else {
-                        return ConstValue::empty()
+                    let ScopeValue::EvaluationValue(cv) = &data.borrow().value else {
+                        return V::empty()
                     };
                     println!("{}", cv)
                 } else {
                     println!("{}", data)
                 }
             }
-            ConstValue::empty()
+            V::empty()
         }),
     );
 }
 
-pub fn fill_mem(module: &Rf<Scope>) {
+pub fn fill_mem<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
+    module: &Rf<Scope<T, V>>,
+) {
     let slice_sym = create_intrinsinc_type(module, "Slice", Rf::new(types::Slice {}).upcast());
 
     let slice_sym_func = slice_sym.clone();
@@ -84,16 +95,19 @@ pub fn fill_mem(module: &Rf<Scope>) {
         // )
         ]
         .into_iter(),
-        Type::Symbol(slice_sym.clone()),
-        Arc::new(move |params| ConstValue {
-            kind: ConstValueKind::IntrinsicStorage(Rf::new(types::Slice {}).upcast(), vec![]),
-            ty: Type::Intrinsic(slice_sym_func.clone()),
+        T::symbol(slice_sym.clone()),
+        Arc::new(move |params| {
+            V::intrinsic_storage(
+                slice_sym_func.clone(),
+                Rf::new(types::Slice {}).upcast(),
+                vec![],
+            )
         }),
     );
 }
 
 pub mod types {
-    use crate::intrinsics::IntrinsicType;
+    use tl_evaluator::scope::intrinsics::IntrinsicType;
 
     #[derive(Clone)]
     pub struct Slice {}
@@ -101,36 +115,47 @@ pub mod types {
     impl IntrinsicType for Slice {}
 }
 
-fn create_func<P: Iterator<Item = (String, Type)>>(
-    module: &Rf<Scope>,
+fn create_func<
+    T: EvaluationType<Value = V>,
+    V: EvaluationValue<Type = T>,
+    P: Iterator<Item = (String, T)>,
+>(
+    module: &Rf<Scope<T, V>>,
     name: &str,
     p: P,
-    r: Type,
-    func: Arc<dyn Fn(&LinkedHashMap<String, ConstValue>) -> ConstValue + Sync + Send>,
-) -> Rf<Scope> {
+    r: T,
+    func: Arc<dyn Fn(&LinkedHashMap<String, V>) -> V + Sync + Send>,
+) -> Rf<Scope<T, V>> {
     let mut mo = module.borrow_mut();
 
     let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
 
-    let cv = ScopeValue::ConstValue(ConstValue {
-        kind: ConstValueKind::NativeFunction {
-            rf: sym,
-            callback: func,
-        },
-        ty: Type::Function {
-            parameters: LinkedHashMap::from_iter(p),
-            return_type: Box::new(r),
-        },
-    });
+    let cv = ScopeValue::EvaluationValue(V::native_function(
+        func,
+        LinkedHashMap::from_iter(p),
+        r,
+        sym,
+    ));
+
+    // ConstValue {
+    //     kind: ConstValueKind::NativeFunction {
+    //         rf: sym,
+    //         callback: func,
+    //     },
+    //     ty: Type::Function {
+    //         parameters: LinkedHashMap::from_iter(p),
+    //         return_type: Box::new(r),
+    //     },
+    // }
 
     mo.update(name, cv).unwrap()
 }
 
-fn create_intrinsinc_type(
-    module: &Rf<Scope>,
+fn create_intrinsinc_type<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
+    module: &Rf<Scope<T, V>>,
     name: &str,
     data: Rf<dyn IntrinsicType + Send + Sync>,
-) -> Rf<Scope> {
+) -> Rf<Scope<T, V>> {
     let mut mo = module.borrow_mut();
 
     let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
@@ -142,12 +167,12 @@ fn create_intrinsinc_type(
     mo.update(name, cv).unwrap()
 }
 
-fn create_generic_intrinsinc_type(
-    module: &Rf<Scope>,
+fn create_generic_intrinsinc_type<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
+    module: &Rf<Scope<T, V>>,
     name: &str,
     generics: Vec<GenericParameter>,
     data: Rf<dyn IntrinsicType + Send + Sync>,
-) -> Rf<Scope> {
+) -> Rf<Scope<T, V>> {
     let mut mo = module.borrow_mut();
 
     let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);

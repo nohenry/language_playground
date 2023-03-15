@@ -12,10 +12,8 @@ use tl_util::{
     Rf,
 };
 
-use crate::{
-    intrinsics::IntrinsicType,
-    scope::{Scope, ScopeValue},
-};
+use tl_evaluator::scope::scope::{Scope, ScopeValue};
+use tl_evaluator::scope::intrinsics::IntrinsicType;
 
 #[derive(Clone, Eq)]
 pub enum Type {
@@ -36,7 +34,7 @@ pub enum Type {
         return_type: Box<Type>,
     },
     String,
-    Symbol(Rf<Scope>),
+    Symbol(Rf<Scope<Self, ConstValue>>),
     Ref {
         base_type: Box<Type>,
     },
@@ -46,10 +44,10 @@ pub enum Type {
         members: LinkedHashMap<String, Type>,
     },
     StructInstance {
-        rf: Option<Rf<Scope>>,
+        rf: Option<Rf<Scope<Self, ConstValue>>>,
         members: LinkedHashMap<String, Type>,
     },
-    Intrinsic(Rf<Scope>),
+    Intrinsic(Rf<Scope<Self, ConstValue>>),
 }
 
 impl std::hash::Hash for Type {
@@ -397,20 +395,20 @@ pub enum ConstValueKind {
         offset: Option<String>,
     },
     Function {
-        rf: Rf<Scope>,
+        rf: Rf<Scope<Type, ConstValue>>,
         body: Statement,
     },
     NativeFunction {
-        rf: Rf<Scope>,
+        rf: Rf<Scope<Type, ConstValue>>,
         callback: Arc<dyn Fn(&LinkedHashMap<String, ConstValue>) -> ConstValue + Sync + Send>,
     },
-    Symbol(Rf<Scope>),
+    Symbol(Rf<Scope<Type, ConstValue>>),
     Tuple(Vec<ConstValue>),
     StructInitializer {
         members: LinkedHashMap<String, ConstValue>,
     },
     StructInstance {
-        rf: Rf<Scope>,
+        rf: Rf<Scope<Type, ConstValue>>,
         members: LinkedHashMap<String, ConstValue>,
     },
     IntrinsicStorage(Rf<dyn IntrinsicType + Sync + Send>, Vec<Type>),
@@ -483,7 +481,7 @@ impl ConstValueKind {
         }
     }
 
-    pub fn as_record_instance(&self) -> (&Rf<Scope>, &LinkedHashMap<String, ConstValue>) {
+    pub fn as_record_instance(&self) -> (&Rf<Scope<Type, ConstValue>>, &LinkedHashMap<String, ConstValue>) {
         match self {
             ConstValueKind::StructInstance { rf, members } => (rf, members),
             _ => panic!(),
@@ -594,7 +592,7 @@ impl ConstValue {
         }
     }
 
-    pub fn resolve_ref(&self) -> Option<Rf<Scope>> {
+    pub fn resolve_ref(&self) -> Option<Rf<Scope<Type, ConstValue>>> {
         match (&self.ty, &self.kind) {
             (
                 Type::Ref {
@@ -603,7 +601,7 @@ impl ConstValue {
                 ConstValueKind::Symbol(sym),
             ) => {
                 let value = sym.borrow();
-                if let ScopeValue::ConstValue(cv) = &value.value {
+                if let ScopeValue::EvaluationValue(cv) = &value.value {
                     return cv.resolve_ref();
                 }
                 return Some(sym.clone());
@@ -642,7 +640,7 @@ impl ConstValue {
 
         let value = sym.borrow();
 
-        let ScopeValue::ConstValue(cv) = &value.value else {
+        let ScopeValue::EvaluationValue(cv) = &value.value else {
             return None;
         };
 
@@ -696,7 +694,7 @@ impl ConstValue {
         parameters: LinkedHashMap<String, Type>,
         // return_parameters: LinkedHashMap<String, Type>,
         return_type: Type,
-        node: Rf<Scope>,
+        node: Rf<Scope<Type, ConstValue>>,
     ) -> ConstValue {
         ConstValue {
             kind: ConstValueKind::Function { body, rf: node },
@@ -726,7 +724,7 @@ impl ConstValue {
     }
 
     pub fn record_instance(
-        sym: Rf<Scope>,
+        sym: Rf<Scope<Type, ConstValue>>,
         // values: LinkedHashMap<String, ConstValue>,
     ) -> ConstValue {
         // let types = values.values().map(|val| val.ty.clone());
@@ -744,7 +742,7 @@ impl ConstValue {
         }
     }
 
-    pub fn sym_reference(sym: &Rf<Scope>, ty: Type) -> ConstValue {
+    pub fn sym_reference(sym: &Rf<Scope<Type, ConstValue>>, ty: Type) -> ConstValue {
         // println!("Ref {} ", sym.borrow().format());
         ConstValue {
             // ty: Type::Symbol(sym.clone()),

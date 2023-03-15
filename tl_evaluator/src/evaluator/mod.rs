@@ -10,8 +10,8 @@ use tl_util::Rf;
 use crate::error::{EvaluationError, EvaluationErrorKind, TypeHint};
 use crate::evaluation_type::EvaluationType;
 use crate::evaluation_value::EvaluationValue;
-use crate::pass::{EvaluationPass, Pass};
-use crate::scope::scope::Scope;
+use crate::pass::{EvaluationPass, Pass, TypeFirst, MemberPass};
+use crate::scope::scope::{Scope, ScopeValue};
 use crate::scope::scope_manager::ScopeManager;
 
 mod expression;
@@ -29,8 +29,56 @@ pub struct Evaluator<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>,
     pass: PhantomData<P>,
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evaluator<T, V, P> {
-    pub fn new(module: Arc<Module>, scope_manager: ScopeManager<T, V>) -> Evaluator<T, V, P> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, TypeFirst> {
+    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, index: usize) -> Evaluator<T, V, TypeFirst> {
+        let scope = Rf::new(Scope::new(
+            root.clone(),
+            module.name.to_string(),
+            ScopeValue::Module(module.clone()),
+            index,
+        ));
+
+        Evaluator {
+            module,
+            state: RwLock::new(EvaluatorState {
+                scope: ScopeManager::new(root, scope),
+                errors: Vec::new(),
+            }),
+            pass: PhantomData,
+        }
+    }
+}
+
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, MemberPass> {
+    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, index: usize) -> Evaluator<T, V, TypeFirst> {
+        let scope = Rf::new(Scope::new(
+            root.clone(),
+            module.name.to_string(),
+            ScopeValue::Module(module.clone()),
+            index,
+        ));
+
+        Evaluator {
+            module,
+            state: RwLock::new(EvaluatorState {
+                scope: ScopeManager::new(root, scope),
+                errors: Vec::new(),
+            }),
+            pass: PhantomData,
+        }
+    }
+
+    pub fn new_with_state(state: EvaluatorState<T, V>, module: Arc<Module>) -> Evaluator<T, V, TypeFirst> {
+        Evaluator {
+            module,
+            state: RwLock::new(state),
+            pass: PhantomData,
+        }
+    }
+}
+
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, EvaluationPass> {
+    pub fn new(module: Arc<Module>, scope_manager: ScopeManager<T, V>) -> Evaluator<T, V, EvaluationPass> {
         Evaluator {
             module,
             state: RwLock::new(EvaluatorState {
@@ -40,13 +88,19 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evalua
             pass: PhantomData,
         }
     }
+}
 
-    fn rstate(&self) -> RwLockReadGuard<'_, EvaluatorState<T, V>> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evaluator<T, V, P> {
+        fn rstate(&self) -> RwLockReadGuard<'_, EvaluatorState<T, V>> {
         self.state.read().unwrap()
     }
 
     fn wstate(&self) -> RwLockWriteGuard<'_, EvaluatorState<T, V>> {
         self.state.write().unwrap()
+    }
+
+    pub fn finish(self) -> EvaluatorState<T, V> {
+        self.state.into_inner().unwrap()
     }
 }
 
