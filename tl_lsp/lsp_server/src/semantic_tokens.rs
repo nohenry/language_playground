@@ -1,8 +1,3 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
-
 use tl_core::{
     ast::{
         ArgList, AstNode, EnclosedPunctuationList, Expression, GenericParameter, ParamaterList,
@@ -10,9 +5,10 @@ use tl_core::{
     },
     token::{Range, SpannedToken},
 };
-use tl_vm::{
-    const_value::{ConstValue, ConstValueKind},
-    scope::{ScopeManager, ScopeValue},
+use tl_evaluator::{
+    evaluation_type::EvaluationType,
+    evaluation_value::EvaluationValue,
+    scope::{scope::ScopeValue, scope_manager::ScopeManager},
 };
 use tower_lsp::lsp_types::{SemanticToken, SemanticTokenType};
 
@@ -100,15 +96,17 @@ fn get_stype_index_from_str(ty: &str) -> u32 {
         .unwrap_or(0) as u32
 }
 
-pub struct SemanticTokenGenerator<'a> {
-    scope: &'a mut ScopeManager,
+pub struct SemanticTokenGenerator<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> {
+    scope: &'a mut ScopeManager<T, V>,
     pub scope_index: Vec<usize>,
     pub builder: SemanticTokenBuilder,
     // pub current_scope:
 }
 
-impl<'a> SemanticTokenGenerator<'a> {
-    pub fn new(scope: &'a mut ScopeManager) -> SemanticTokenGenerator<'a> {
+impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
+    SemanticTokenGenerator<'a, T, V>
+{
+    pub fn new(scope: &'a mut ScopeManager<T, V>) -> SemanticTokenGenerator<'a, T, V> {
         SemanticTokenGenerator {
             scope,
             scope_index: Vec::with_capacity(50),
@@ -121,7 +119,9 @@ impl<'a> SemanticTokenGenerator<'a> {
     }
 }
 
-impl<'a> SemanticTokenGenerator<'a> {
+impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
+    SemanticTokenGenerator<'a, T, V>
+{
     pub fn recurse(&mut self, stmt: &Statement, index: usize) {
         match stmt {
             Statement::List(list) => {
@@ -228,11 +228,12 @@ impl<'a> SemanticTokenGenerator<'a> {
                     self.recurse_type(ty);
                     self.evaluate_type(ty)
                 } else {
-                    tl_vm::const_value::Type::Empty
+                    T::empty()
                 };
 
                 if let Some(body) = body {
-                    let pop = if let tl_vm::const_value::Type::Symbol(sym) = &evaluated_type {
+                    let pop = if evaluated_type.is_symbol() {
+                        let sym = evaluated_type.symbol_rf();
                         self.scope.push_scope(sym.clone());
                         true
                     } else {
@@ -281,11 +282,7 @@ impl<'a> SemanticTokenGenerator<'a> {
                 if let Some(sym) = self.scope.find_symbol(tok.as_str()) {
                     let sym = sym.borrow();
                     match &sym.value {
-                        ScopeValue::ConstValue(ConstValue {
-                            kind:
-                                ConstValueKind::Function { .. } | ConstValueKind::NativeFunction { .. },
-                            ..
-                        }) => {
+                        ScopeValue::EvaluationValue(value) if value.is_function() || value.is_native_function() => {
                             self.builder.push_token(
                                 tok,
                                 get_stype_index(SemanticTokenType::FUNCTION),
@@ -299,10 +296,7 @@ impl<'a> SemanticTokenGenerator<'a> {
                                 0,
                             );
                         }
-                        ScopeValue::ConstValue(ConstValue {
-                            kind: ConstValueKind::StructInstance { .. },
-                            ..
-                        }) => {
+                        ScopeValue::EvaluationValue(value) if value.is_struct_instance() => {
                             self.builder.push_token(
                                 tok,
                                 get_stype_index(SemanticTokenType::TYPE),
@@ -465,32 +459,23 @@ impl<'a> SemanticTokenGenerator<'a> {
     }
 }
 
-impl SemanticTokenGenerator<'_> {
-    fn evaluate_type(&self, ty: &tl_core::ast::Type) -> tl_vm::const_value::Type {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> SemanticTokenGenerator<'_, T, V> {
+    fn evaluate_type(&self, ty: &tl_core::ast::Type) -> T {
         match ty {
-            tl_core::ast::Type::Integer { width, signed, .. } => {
-                tl_vm::const_value::Type::Integer {
-                    width: *width,
-                    signed: *signed,
-                }
-            }
-            tl_core::ast::Type::Float { width, .. } => {
-                tl_vm::const_value::Type::Float { width: *width }
-            }
+            tl_core::ast::Type::Integer { width, signed, .. } => T::integer(*width, *signed),
+            tl_core::ast::Type::Float { width, .. } => T::float(*width),
             tl_core::ast::Type::Ident(id) => {
                 if let Some(sym) = self.scope.find_symbol(id.as_str()) {
-                    return tl_vm::const_value::Type::Symbol(sym);
+                    return T::symbol(sym);
                 }
 
-                tl_vm::const_value::Type::Empty
+                T::empty()
             }
-            tl_core::ast::Type::Boolean(_) => tl_vm::const_value::Type::Boolean,
+            tl_core::ast::Type::Boolean(_) => T::bool(),
             tl_core::ast::Type::Ref {
                 base_type: Some(ty),
                 ..
-            } => tl_vm::const_value::Type::Ref {
-                base_type: Box::new(self.evaluate_type(ty)),
-            },
+            } => T::rf(self.evaluate_type(ty)),
             tl_core::ast::Type::Generic {
                 base_type: Some(box tl_core::ast::Type::Ident(tok)),
                 list,
@@ -498,7 +483,7 @@ impl SemanticTokenGenerator<'_> {
                 let types: Vec<_> = list.iter_items().map(|ty| self.evaluate_type(ty)).collect();
 
                 let Some(symrf) = self.scope.find_symbol(tok.as_str()) else {
-                    return tl_vm::const_value::Type::Empty
+                    return T::empty()
                 };
 
                 let csi = {
@@ -511,7 +496,7 @@ impl SemanticTokenGenerator<'_> {
                             ..
                         } => {
                             if !self.verify_generics_match(generics, &types, list.get_range()) {
-                                return tl_vm::const_value::Type::Empty;
+                                return T::empty()
                             }
 
                             // If we have already constructed this struct with the same type arguments, reuse this construction
@@ -520,7 +505,7 @@ impl SemanticTokenGenerator<'_> {
                                     .children
                                     .get(child_construction_name)
                                     .expect("Compiler Bug!");
-                                return tl_vm::const_value::Type::Symbol(construction.clone());
+                                return T::symbol(construction.clone())
                             }
                             panic!("Should Prboably have returned?");
 
@@ -531,13 +516,13 @@ impl SemanticTokenGenerator<'_> {
                             generics,
                         } => {
                             if !self.verify_generics_match(generics, &types, list.get_range()) {
-                                return tl_vm::const_value::Type::Empty;
+                                return T::empty()
                             }
 
-                            return tl_vm::const_value::Type::Intrinsic(symrf.clone());
+                            return T::intrinsic(symrf.clone());
                         }
                         _ => {
-                            return tl_vm::const_value::Type::Empty;
+                            return T::empty()
                         }
                     }
                 };
@@ -617,14 +602,14 @@ impl SemanticTokenGenerator<'_> {
 
                 // tl_vm::const_value::Type::Symbol(child)
             }
-            _ => tl_vm::const_value::Type::Empty,
+            _ => T::empty(),
         }
     }
 
     fn verify_generics_match(
         &self,
         params: &Vec<GenericParameter>,
-        args: &Vec<tl_vm::const_value::Type>,
+        args: &Vec<T>,
         errored_range: Range,
     ) -> bool {
         if args.len() != params.len() {

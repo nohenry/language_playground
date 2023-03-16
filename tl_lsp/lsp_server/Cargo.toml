@@ -9,6 +9,7 @@ edition = "2021"
 tl_core = { path = "../../tl_core" }
 tl_util = { path = "../../tl_util" }
 tl_vm = { path = "../../tl_vm" }
+tl_evaluator = { path = "../../tl_evaluator" }
 
 tokio = { version = "1.24.2", features = ["full"] }
 serde = "*"

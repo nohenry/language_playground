@@ -50,7 +50,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V,
 }
 
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, MemberPass> {
-    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, index: usize) -> Evaluator<T, V, TypeFirst> {
+    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, index: usize) -> Evaluator<T, V, MemberPass> {
         let scope = Rf::new(Scope::new(
             root.clone(),
             module.name.to_string(),
@@ -68,7 +68,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V,
         }
     }
 
-    pub fn new_with_state(state: EvaluatorState<T, V>, module: Arc<Module>) -> Evaluator<T, V, TypeFirst> {
+    pub fn new_with_state(state: EvaluatorState<T, V>, module: Arc<Module>) -> Evaluator<T, V, MemberPass> {
         Evaluator {
             module,
             state: RwLock::new(state),

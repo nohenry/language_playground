@@ -7,11 +7,15 @@ use semantic_tokens::{SemanticTokenGenerator, STOKEN_TYPES};
 use tl_core::ast::AstNode;
 use tl_core::token::Span;
 use tl_core::Module;
+use tl_evaluator::error::ErrorLevel;
+use tl_evaluator::evaluator::Evaluator;
+use tl_evaluator::pass::{MemberPass, TypeFirst};
+use tl_evaluator::scope::scope::{Scope, ScopeValue};
+use tl_evaluator::scope::scope_manager::ScopeManager;
 use tl_util::Rf;
-use tl_vm::error::ErrorLevel;
-use tl_vm::pass::CodePass;
-use tl_vm::scope::{Scope, ScopeManager, ScopeValue};
 use tl_vm::stdlib::fill_module;
+use tl_vm::vm_type::Type;
+use tl_vm::vm_value::VmValue;
 use tokio::net::TcpListener;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::request::Request;
@@ -35,10 +39,10 @@ pub struct Backend {
     element_names: HashSet<String>,
     style_enum: HashMap<String, CompletionType>,
 
-    documents: RwLock<HashMap<Url, (Arc<Module>, ScopeManager)>>,
+    documents: RwLock<HashMap<Url, (Arc<Module>, ScopeManager<Type, VmValue>)>>,
     client: Arc<Client>,
 
-    symbol_tree: Rf<Scope>,
+    symbol_tree: Rf<Scope<Type, VmValue>>,
 }
 
 #[tower_lsp::async_trait]
@@ -185,8 +189,23 @@ impl LanguageServer for Backend {
 
         let module = Arc::new(out.0);
 
-        let code_pass = CodePass::new(self.symbol_tree.clone(), module.clone(), 1);
-        let code_pass_state = code_pass.run();
+        let code_pass = Evaluator::<Type, VmValue, TypeFirst>::new(
+            self.symbol_tree.clone(),
+            module.clone(),
+            1,
+        );
+        code_pass.evaluate();
+        let code_pass_state = code_pass.finish();
+
+        let code_pass = Evaluator::<Type, VmValue, MemberPass>::new_with_state(
+            code_pass_state,
+            module.clone(),
+        );
+        code_pass.evaluate();
+        let code_pass_state = code_pass.finish();
+
+        // let code_pass = CodePass::new(self.symbol_tree.clone(), module.clone(), 1);
+        // let code_pass_state = code_pass.run();
 
         let diags: Vec<_> = code_pass_state
             .errors
@@ -225,8 +244,20 @@ impl LanguageServer for Backend {
 
             let module = Arc::new(out.0);
 
-            let code_pass = CodePass::new(self.symbol_tree.clone(), module.clone(), 1);
-            let code_pass_state = code_pass.run();
+            let code_pass = Evaluator::<Type, VmValue, TypeFirst>::new(
+                self.symbol_tree.clone(),
+                module.clone(),
+                1,
+            );
+            code_pass.evaluate();
+            let code_pass_state = code_pass.finish();
+
+            let code_pass = Evaluator::<Type, VmValue, MemberPass>::new_with_state(
+                code_pass_state,
+                module.clone(),
+            );
+            code_pass.evaluate();
+            let code_pass_state = code_pass.finish();
 
             let diags: Vec<_> = code_pass_state
                 .errors

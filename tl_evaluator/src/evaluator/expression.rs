@@ -10,12 +10,15 @@ use crate::{
     error::{EvaluationError, EvaluationErrorKind, TypeHint},
     evaluation_type::EvaluationType,
     evaluation_value::EvaluationValue,
-    scope::scope::ScopeValue, pass::{EvaluationPass, TypeFirst, Pass},
+    pass::EvaluationPass,
+    scope::scope::ScopeValue,
 };
 
 use super::Evaluator;
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evaluator<T, V, EvaluationPass> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
+    Evaluator<T, V, EvaluationPass>
+{
     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> V {
         match expression {
             Expression::Integer(val, _, _) => V::cinteger(*val),
@@ -94,7 +97,6 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evalu
 
                 if expr.is_function() {
                     let ptypes = expr.get_type().function_parameters_rf();
-                    let rptypes = expr.get_type().function_return();
                     let body = expr.function_body();
                     let rf = expr.function_rf();
 
@@ -156,12 +158,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evalu
                         return_value
                     }
                 } else if expr.is_native_function() {
-                    let ptypes: LinkedHashMap<String, T> =
-                        expr.get_type().function_parameters_rf().map(|(s, t)| (s.clone(), t.clone())).collect();
-                    let rptypes = expr.get_type().function_return();
-                    // let body = expr.function_body();
+                    let ptypes: LinkedHashMap<String, T> = expr
+                        .get_type()
+                        .function_parameters_rf()
+                        .map(|(s, t)| (s.clone(), t.clone()))
+                        .collect();
                     let callback = expr.native_function_callback();
-                    let rf = expr.native_function_rf();
 
                     let arglen = args.len();
                     let plen = ptypes.len();
@@ -412,7 +414,6 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display> Evalu
         }
     }
 }
-
 
 // impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, P: Pass> Evaluator<T, V, P> {
 //     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> V {

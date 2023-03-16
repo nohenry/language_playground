@@ -3,9 +3,6 @@
 #![feature(box_patterns)]
 #![feature(iter_intersperse)]
 
-use evaluation_type::EvaluationType;
-use evaluation_value::EvaluationValue;
-
 pub mod evaluation_type;
 pub mod evaluation_value;
 pub mod evaluator;

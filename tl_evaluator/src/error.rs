@@ -193,7 +193,7 @@ impl <Type: EvaluationType> Display for EvaluationErrorKind<Type> {
             Self::TypeMismatch(_, _, TypeHint::StructMember) => {
                 f.write_str(&"struct member type mismatch".bold().bright_white())
             }
-            Self::TypeMismatch(_, _, _) => f.write_str(&"type mismatch".bold().bright_white()),
+            // Self::TypeMismatch(_, _, _) => f.write_str(&"type mismatch".bold().bright_white()),
             Self::ArgCountMismatch(_, _) => f.write_str(&"type mismatch".bold().bright_white()),
             Self::NotInitialized { .. } => f.write_str(&"never initialized".bold().bright_white()),
             Self::BinExpMismatch { .. } => {

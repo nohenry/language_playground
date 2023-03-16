@@ -114,8 +114,9 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                 let ty = self.evaluate_type(ty);
                 let expr = self.evaluate_expression(raw_expr, index);
 
-                if ty.is_symbol() {
+                if ty.is_symbol() && expr.is_struct_initializer() {
                     let sym = ty.symbol_rf();
+                    println!("{}", expr.format());
                     let args = expr.get_struct_members();
 
                     if let ScopeValue::Struct { members, .. } = &sym.borrow().value {

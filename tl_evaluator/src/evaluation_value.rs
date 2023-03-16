@@ -1,11 +1,19 @@
-use std::{fmt::{Debug, Display}, sync::Arc};
 use linked_hash_map::LinkedHashMap;
-use tl_core::ast::{Statement, Type};
-use tl_util::Rf;
+use std::{fmt::Display, sync::Arc};
+use tl_core::ast::Statement;
+use tl_util::{
+    format::{NodeDisplay, TreeDisplay},
+    Rf,
+};
 
-use crate::{evaluation_type::EvaluationType, scope::{scope::Scope, intrinsics::IntrinsicType}};
+use crate::{
+    evaluation_type::EvaluationType,
+    scope::{intrinsics::IntrinsicType, scope::Scope},
+};
 
-pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display + Sync + Send + 'static {
+pub trait EvaluationValue:
+    Sized + Clone + Into<Self::Type> + Display + Sync + NodeDisplay + TreeDisplay + Send + 'static
+{
     type Type: EvaluationType<Value = Self>;
 
     /* Struct Methods */
@@ -67,16 +75,15 @@ pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display + Sync + S
         node: Rf<Scope<Self::Type, Self>>,
     ) -> Self;
     fn is_native_function(&self) -> bool;
-    fn native_function_callback(&self) -> &Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send>;
+    fn native_function_callback(
+        &self,
+    ) -> &Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send>;
     fn native_function_rf(&self) -> &Rf<Scope<Self::Type, Self>>;
-
-
 
     fn tuple(values: Vec<Self>) -> Self;
     fn is_tuple(&self) -> bool;
     fn tuple_value(self) -> Vec<Self>;
     fn tuple_value_rf(&self) -> &Vec<Self>;
-
 
     /// Creates a reference value with a member access expression.
     ///
@@ -87,7 +94,11 @@ pub trait EvaluationValue: Sized + Clone + Into<Self::Type> + Display + Sync + S
 
     fn sym_reference(sym: &Rf<Scope<Self::Type, Self>>, ty: Self::Type) -> Self;
 
-    fn intrinsic_storage(sym: Rf<Scope<Self::Type, Self>>, storage: Rf<dyn IntrinsicType + Sync + Send>, generics: Vec<Self::Type>) -> Self;
+    fn intrinsic_storage(
+        sym: Rf<Scope<Self::Type, Self>>,
+        storage: Rf<dyn IntrinsicType + Sync + Send>,
+        generics: Vec<Self::Type>,
+    ) -> Self;
 
     fn try_implicit_cast(&self, ty: &Self::Type) -> Option<Self>;
 

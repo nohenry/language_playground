@@ -67,8 +67,9 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evalua
                             *construction_start_index
                         }
                         ScopeValue::IntrinsicStructTemplate {
-                            initial_value,
+                            // initial_value,
                             generics,
+                            ..
                         } => {
                             if !self.verify_generics_match(generics, &types, list.get_range()) {
                                 return T::empty()

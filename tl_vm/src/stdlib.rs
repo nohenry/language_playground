@@ -1,10 +1,8 @@
-use std::{fs::File, io::Read, process::CommandEnvs, sync::Arc};
+use std::{fs::File, io::Read, sync::Arc};
 
 use linked_hash_map::LinkedHashMap;
 use tl_core::{ast::GenericParameter, Module};
 use tl_util::Rf;
-
-use crate::const_value::{ConstValue, ConstValueKind, Type};
 
 use tl_evaluator::{
     evaluation_type::EvaluationType,
@@ -96,7 +94,7 @@ pub fn fill_mem<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
         ]
         .into_iter(),
         T::symbol(slice_sym.clone()),
-        Arc::new(move |params| {
+        Arc::new(move |_params| {
             V::intrinsic_storage(
                 slice_sym_func.clone(),
                 Rf::new(types::Slice {}).upcast(),
@@ -158,7 +156,7 @@ fn create_intrinsinc_type<T: EvaluationType<Value = V>, V: EvaluationValue<Type 
 ) -> Rf<Scope<T, V>> {
     let mut mo = module.borrow_mut();
 
-    let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
+    let _sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
 
     let cv = ScopeValue::IntrinsicStruct {
         initial_value: data,
@@ -175,7 +173,7 @@ fn create_generic_intrinsinc_type<T: EvaluationType<Value = V>, V: EvaluationVal
 ) -> Rf<Scope<T, V>> {
     let mut mo = module.borrow_mut();
 
-    let sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
+    let _sym = mo.insert(module.clone(), name.to_string(), ScopeValue::Root, 0);
 
     let cv = ScopeValue::IntrinsicStructTemplate {
         initial_value: data,
