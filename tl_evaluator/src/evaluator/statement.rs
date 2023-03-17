@@ -6,7 +6,7 @@ use tl_util::{format::TreeDisplay, Rf};
 
 use crate::{
     error::{EvaluationError, EvaluationErrorKind, TypeHint},
-    evaluation_type::EvaluationType,
+    evaluation_type::{EvaluationType, EvaluationTypeProvider},
     evaluation_value::EvaluationValue,
     pass::{EvaluationPass, MemberPass, TypeFirst},
     scope::scope::{Scope, ScopeValue},
@@ -14,8 +14,11 @@ use crate::{
 
 use super::Evaluator;
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
-    Evaluator<T, V, EvaluationPass>
+impl<
+        T: EvaluationType<Value = V>,
+        V: EvaluationValue<Type = T> + Display,
+        TP: EvaluationTypeProvider<Type = T>,
+    > Evaluator<T, V, TP, EvaluationPass>
 {
     pub fn evaluate(&self) -> Vec<V> {
         let vals = self
@@ -99,9 +102,10 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                         value
                             .get_type_mut()
                             .set_function_parameters(params.into_iter());
-                        value
-                            .get_type_mut()
-                            .set_function_return(ty.map(|ty| ty).unwrap_or_else(|| T::empty()));
+                        value.get_type_mut().set_function_return(
+                            ty.map(|ty| ty)
+                                .unwrap_or_else(|| self.type_provider.empty()),
+                        );
                     }
                 }
             }
@@ -220,8 +224,11 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
-    Evaluator<T, V, TypeFirst>
+impl<
+        T: EvaluationType<Value = V>,
+        V: EvaluationValue<Type = T> + Display,
+        TP: EvaluationTypeProvider<Type = T>,
+    > Evaluator<T, V, TP, TypeFirst>
 {
     pub fn evaluate(&self) {
         for (index, stmt) in self.module.stmts.iter().enumerate() {
@@ -274,7 +281,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                                     b.as_str(),
                                     ScopeValue::TypeAlias {
                                         ident: b.as_str().to_string(),
-                                        ty: Box::new(T::empty()),
+                                        ty: Box::new(self.type_provider.empty()),
                                     },
                                     index,
                                 );
@@ -295,7 +302,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                     ident.as_str(),
                     ScopeValue::TypeAlias {
                         ident: ident.as_str().to_string(),
-                        ty: Box::new(T::empty()),
+                        ty: Box::new(self.type_provider.empty()),
                     },
                     index,
                 );
@@ -318,7 +325,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                 let ereturn = return_type
                     .as_ref()
                     .map(|ty| self.evaluate_type(ty))
-                    .unwrap_or(T::empty());
+                    .unwrap_or(self.type_provider.empty());
 
                 self.wstate().scope.update_value(
                     ident.as_str(),
@@ -350,8 +357,11 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
-    Evaluator<T, V, MemberPass>
+impl<
+        T: EvaluationType<Value = V>,
+        V: EvaluationValue<Type = T> + Display,
+        TP: EvaluationTypeProvider<Type = T>,
+    > Evaluator<T, V, TP, MemberPass>
 {
     pub fn evaluate(&self) {
         for (index, stmt) in self.module.stmts.iter().enumerate() {
@@ -420,7 +430,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                                     b.as_str(),
                                     ScopeValue::TypeAlias {
                                         ident: b.as_str().to_string(),
-                                        ty: Box::new(T::empty()),
+                                        ty: Box::new(self.type_provider.empty()),
                                     },
                                     index,
                                 );
@@ -519,12 +529,16 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                 );
 
                 let mut eparameters = self.evaluate_params(parameters);
-                eparameters.insert("self".to_string(), T::rf(T::symbol(member_ty.clone())));
+                eparameters.insert(
+                    "self".to_string(),
+                    self.type_provider
+                        .rf(self.type_provider.symbol(member_ty.clone())),
+                );
 
                 let ereturn = return_type
                     .as_ref()
                     .map(|ty| self.evaluate_type(ty))
-                    .unwrap_or(T::empty());
+                    .unwrap_or(self.type_provider.empty());
 
                 self.wstate().scope.update_value(
                     ident.as_str(),

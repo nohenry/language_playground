@@ -8,7 +8,7 @@ use tl_core::Module;
 use tl_util::Rf;
 
 use crate::error::{EvaluationError, EvaluationErrorKind, TypeHint};
-use crate::evaluation_type::EvaluationType;
+use crate::evaluation_type::{EvaluationType, EvaluationTypeProvider};
 use crate::evaluation_value::EvaluationValue;
 use crate::pass::{EvaluationPass, Pass, TypeFirst, MemberPass};
 use crate::scope::scope::{Scope, ScopeValue};
@@ -23,14 +23,15 @@ pub struct EvaluatorState<T: EvaluationType<Value = V>, V: EvaluationValue<Type 
     pub errors: Vec<EvaluationError<T>>,
 }
 
-pub struct Evaluator<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> {
+pub struct Evaluator<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>, P: Pass> {
     module: Arc<Module>,
     pub state: RwLock<EvaluatorState<T, V>>,
     pass: PhantomData<P>,
+    pub type_provider: TP,
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, TypeFirst> {
-    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, index: usize) -> Evaluator<T, V, TypeFirst> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>> Evaluator<T, V, TP, TypeFirst> {
+    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, type_provider: TP, index: usize) -> Evaluator<T, V, TP, TypeFirst> {
         let scope = Rf::new(Scope::new(
             root.clone(),
             module.name.to_string(),
@@ -45,12 +46,13 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V,
                 errors: Vec::new(),
             }),
             pass: PhantomData,
+            type_provider
         }
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, MemberPass> {
-    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, index: usize) -> Evaluator<T, V, MemberPass> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>> Evaluator<T, V, TP, MemberPass> {
+    pub fn new(root: Rf<Scope<T, V>>, module: Arc<Module>, type_provider: TP, index: usize) -> Evaluator<T, V, TP, MemberPass> {
         let scope = Rf::new(Scope::new(
             root.clone(),
             module.name.to_string(),
@@ -65,20 +67,22 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V,
                 errors: Vec::new(),
             }),
             pass: PhantomData,
+            type_provider
         }
     }
 
-    pub fn new_with_state(state: EvaluatorState<T, V>, module: Arc<Module>) -> Evaluator<T, V, MemberPass> {
+    pub fn new_with_state(state: EvaluatorState<T, V>, type_provider: TP, module: Arc<Module>) -> Evaluator<T, V, TP, MemberPass> {
         Evaluator {
             module,
             state: RwLock::new(state),
             pass: PhantomData,
+            type_provider
         }
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, EvaluationPass> {
-    pub fn new(module: Arc<Module>, scope_manager: ScopeManager<T, V>) -> Evaluator<T, V, EvaluationPass> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>> Evaluator<T, V, TP, EvaluationPass> {
+    pub fn new(module: Arc<Module>, scope_manager: ScopeManager<T, V>, type_provider: TP) -> Evaluator<T, V, TP, EvaluationPass> {
         Evaluator {
             module,
             state: RwLock::new(EvaluatorState {
@@ -86,11 +90,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V,
                 errors: Vec::new(),
             }),
             pass: PhantomData,
+            type_provider
         }
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evaluator<T, V, P> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>, P: Pass> Evaluator<T, V, TP, P> {
         fn rstate(&self) -> RwLockReadGuard<'_, EvaluatorState<T, V>> {
         self.state.read().unwrap()
     }
@@ -104,7 +109,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evalua
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V, EvaluationPass> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>,TP: EvaluationTypeProvider<Type = T> > Evaluator<T, V, TP, EvaluationPass> {
     fn evaluate_args(&self, args: &ArgList, index: usize) -> Vec<V> {
         args.iter_items()
             .map(|expr| self.evaluate_expression(expr, index))
@@ -112,7 +117,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Evaluator<T, V,
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, P: Pass> Evaluator<T, V, P> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>, P: Pass> Evaluator<T, V, TP, P> {
     pub fn evaluate_params(&self, params: &ParamaterList) -> LinkedHashMap<String, T> {
         let iter = params.items.iter_items().filter_map(|f| {
             if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {

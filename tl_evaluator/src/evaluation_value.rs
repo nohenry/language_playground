@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub trait EvaluationValue:
-    Sized + Clone + Into<Self::Type> + Display + Sync + NodeDisplay + TreeDisplay + Send + 'static
+    Sized + Clone + Into<Self::Type> + Display + NodeDisplay + TreeDisplay + 'static
 {
     type Type: EvaluationType<Value = Self>;
 

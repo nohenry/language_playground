@@ -5,7 +5,7 @@ use tl_util::Rf;
 use crate::{scope::scope::Scope, evaluation_value::EvaluationValue};
 
 
-pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug + Sync + Send + 'static {
+pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug + 'static {
     type Value: EvaluationValue<Type = Self>;
 
     fn is_empty(&self) -> bool;
@@ -20,17 +20,17 @@ pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debu
     fn is_ref(&self) -> bool;
     fn is_intrinsic(&self) -> bool;
 
-    fn empty() -> Self;
-    fn string() -> Self;
-    fn integer(width: u8, signed: bool) -> Self;
-    fn cinteger() -> Self;
-    fn float(width: u8) -> Self;
-    fn cfloat() -> Self;
-    fn bool() -> Self;
-    fn function() -> Self;
-    fn symbol(symbol: Rf<Scope<Self, Self::Value>>) -> Self;
-    fn rf(base_type: Self) -> Self;
-    fn intrinsic(symbol: Rf<Scope<Self, Self::Value>>) -> Self;
+    // fn empty() -> Self;
+    // fn string() -> Self;
+    // fn integer(width: u8, signed: bool) -> Self;
+    // fn cinteger() -> Self;
+    // fn float(width: u8) -> Self;
+    // fn cfloat() -> Self;
+    // fn bool() -> Self;
+    // fn function() -> Self;
+    // fn symbol(symbol: Rf<Scope<Self, Self::Value>>) -> Self;
+    // fn rf(base_type: Self) -> Self;
+    // fn intrinsic(symbol: Rf<Scope<Self, Self::Value>>) -> Self;
 
     fn integer_width(&self) -> u8;
     fn integer_signed(&self) -> bool;
@@ -47,4 +47,20 @@ pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debu
     fn symbol_rf(&self) -> &Rf<Scope<Self, Self::Value>>;
     fn intrinsic_rf(&self) -> &Rf<Scope<Self, Self::Value>>;
 
+}
+
+pub trait EvaluationTypeProvider {
+    type Type: EvaluationType;
+
+    fn empty(&self) -> Self::Type;
+    fn string(&self) -> Self::Type;
+    fn integer(&self, width: u8, signed: bool) -> Self::Type;
+    fn cinteger(&self) -> Self::Type;
+    fn float(&self, width: u8) -> Self::Type;
+    fn cfloat(&self) -> Self::Type;
+    fn bool(&self) -> Self::Type;
+    fn function(&self) -> Self::Type;
+    fn symbol(&self, symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>) -> Self::Type;
+    fn rf(&self, base_type: Self::Type) -> Self::Type;
+    fn intrinsic(&self, symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>) -> Self::Type;
 }

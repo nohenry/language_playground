@@ -8,7 +8,7 @@ use tl_core::{
 
 use crate::{
     error::{EvaluationError, EvaluationErrorKind, TypeHint},
-    evaluation_type::EvaluationType,
+    evaluation_type::{EvaluationType, EvaluationTypeProvider},
     evaluation_value::EvaluationValue,
     pass::EvaluationPass,
     scope::scope::ScopeValue,
@@ -16,8 +16,8 @@ use crate::{
 
 use super::Evaluator;
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
-    Evaluator<T, V, EvaluationPass>
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: EvaluationTypeProvider<Type = T>>
+    Evaluator<T, V, TP,EvaluationPass>
 {
     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> V {
         match expression {
@@ -53,7 +53,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display>
                         ScopeValue::EvaluationValue(cv) => {
                             V::sym_reference(&sym, cv.get_type().clone())
                         }
-                        ScopeValue::Struct { .. } => V::sym_reference(&sym, T::empty()),
+                        ScopeValue::Struct { .. } => V::sym_reference(&sym, self.type_provider.empty()),
                         _ => V::empty(),
                     }
                 } else {

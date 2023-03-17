@@ -93,6 +93,9 @@ impl std::hash::Hash for Type {
             Self::Symbol(sym) => {
                 Scope::hash(sym, state);
             }
+            Self::Intrinsic(sym) => {
+                Scope::hash(sym, state);
+            }
             _ => (),
         }
     }
