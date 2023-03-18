@@ -1,6 +1,11 @@
 #![feature(return_position_impl_trait_in_trait)]
 
-use std::{fs::File, io::Read, path::Path, sync::Arc};
+use std::{
+    fs::{File, OpenOptions},
+    io::Read,
+    path::Path,
+    sync::Arc,
+};
 
 use inkwell::context::Context;
 use llvm_type::LlvmType;
@@ -26,6 +31,7 @@ const LINE_ENDING: &str = "\n";
 #[derive(Clone)]
 pub struct LlvmTypeProvider<'a> {
     context: &'a inkwell::context::Context,
+    module: &'a inkwell::module::Module,
 }
 
 impl EvaluationTypeProvider for LlvmTypeProvider<'_> {
@@ -84,6 +90,8 @@ impl EvaluationTypeProvider for LlvmTypeProvider<'_> {
     ) -> Self::Type {
         todo!()
     }
+
+    
 }
 
 pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
@@ -111,10 +119,22 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
 
     // ** LLVM setup
     let llvm_context = Context::create();
+    let llvm_module = llvm_context.create_module("mymod");
+    
+    let i32_type = llvm_context.i32_type();
+    let func_type = i32_type.fn_type(&[i32_type.into()], false);
+    let func = llvm_module.add_function("main", func_type, None);
+
+    {
+        // let output = OpenOptions::new().write(true).create(true).open("output.ll").unwrap();
+        let path = Path::new("output.bc");
+        llvm_module.write_bitcode_to_path(&path);
+    }
 
     // ** Codegen
     let context = LlvmTypeProvider {
         context: &llvm_context,
+        module: &llvm_module
     };
 
     let code_pass = Evaluator::<LlvmType, LlvmValue, LlvmTypeProvider, TypeFirst>::new(
@@ -139,7 +159,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     let evaluator = Evaluator::<LlvmType, LlvmValue, LlvmTypeProvider, EvaluationPass>::new(
         module,
         code_pass_state.scope,
-        context
+        context,
     );
     let _values = evaluator.evaluate();
 
