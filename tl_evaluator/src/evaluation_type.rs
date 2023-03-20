@@ -1,11 +1,12 @@
 use std::{hash::Hash, fmt::{Display, Debug}};
 
+use linked_hash_map::LinkedHashMap;
 use tl_util::Rf;
 
 use crate::{scope::scope::Scope, evaluation_value::EvaluationValue};
 
 
-pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug + 'static {
+pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug {
     type Value: EvaluationValue<Type = Self>;
 
     fn is_empty(&self) -> bool;
@@ -49,8 +50,8 @@ pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debu
 
 }
 
-pub trait EvaluationTypeProvider {
-    type Type: EvaluationType;
+pub trait EvaluationTypeProvider<'a> {
+    type Type: EvaluationType + 'a;
 
     fn empty(&self) -> Self::Type;
     fn string(&self) -> Self::Type;
@@ -63,4 +64,14 @@ pub trait EvaluationTypeProvider {
     fn symbol(&self, symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>) -> Self::Type;
     fn rf(&self, base_type: Self::Type) -> Self::Type;
     fn intrinsic(&self, symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>) -> Self::Type;
+
+
+    // fn inform_function_decleration(&self);
+    fn function_def(
+        &self,
+        body: tl_core::ast::Statement,
+        parameters: LinkedHashMap<String, Self::Type>,
+        return_type: Self::Type,
+        node: tl_util::Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>,
+    ) -> <Self::Type as EvaluationType>::Value;
 }

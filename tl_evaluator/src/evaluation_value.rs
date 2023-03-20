@@ -7,12 +7,12 @@ use tl_util::{
 };
 
 use crate::{
-    evaluation_type::EvaluationType,
+    evaluation_type::{EvaluationType, EvaluationTypeProvider},
     scope::{intrinsics::IntrinsicType, scope::Scope},
 };
 
 pub trait EvaluationValue:
-    Sized + Clone + Into<Self::Type> + Display + NodeDisplay + TreeDisplay + 'static
+    Sized + Clone + Into<Self::Type> + Display + NodeDisplay + TreeDisplay 
 {
     type Type: EvaluationType<Value = Self>;
 
@@ -27,7 +27,7 @@ pub trait EvaluationValue:
     fn create_struct_initializer(values: LinkedHashMap<String, Self>) -> Self;
     fn is_struct_initializer(&self) -> bool;
 
-    fn empty() -> Self;
+    fn empty<'a>(tp: &impl EvaluationTypeProvider<'a, Type = Self::Type>) -> Self;
     fn is_empty(&self) -> bool;
     fn default_for(ty: &Self::Type) -> Self;
     fn resolve_ref(&self) -> Option<Rf<Scope<Self::Type, Self>>>;

@@ -52,11 +52,15 @@
                     "--bin=tl_compiler",
                     "--package=tl_compiler"
                 ],
+                "env": {
+                    "LLVM_SYS_150_PREFIX": "/opt/homebrew/opt/llvm",
+                },
                 "filter": {
                     "name": "tl_compiler",
                     "kind": "bin"
                 }
             },
+            
             "args": [],
             "cwd": "${workspaceFolder}"
         },

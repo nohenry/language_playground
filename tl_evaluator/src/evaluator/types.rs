@@ -7,7 +7,7 @@ use crate::{evaluation_type::{EvaluationType, EvaluationTypeProvider}, evaluatio
 
 use super::Evaluator;
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<Type = T>, P: Pass> Evaluator<T, V, TP, P> {
+impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<'a, Type = T>, P: Pass> Evaluator<'a, T, V, TP, P> {
     pub fn evaluate_type(&self, ty: &tl_core::ast::Type) -> T {
         match ty {
             tl_core::ast::Type::Integer { width, signed, .. } => self.type_provider.integer(*width, *signed),

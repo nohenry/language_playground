@@ -16,8 +16,8 @@ use crate::{
 
 use super::Evaluator;
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: EvaluationTypeProvider<Type = T>>
-    Evaluator<T, V, TP,EvaluationPass>
+impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: EvaluationTypeProvider<'a, Type = T>>
+    Evaluator<'a, T, V, TP,EvaluationPass>
 {
     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> V {
         match expression {
@@ -54,14 +54,14 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                             V::sym_reference(&sym, cv.get_type().clone())
                         }
                         ScopeValue::Struct { .. } => V::sym_reference(&sym, self.type_provider.empty()),
-                        _ => V::empty(),
+                        _ => V::empty(self.type_provider.as_ref()),
                     }
                 } else {
                     self.add_error(EvaluationError {
                         kind: EvaluationErrorKind::SymbolNotFound(id.to_string()),
                         range: tok.get_range(),
                     });
-                    V::empty()
+                    V::empty(self.type_provider.as_ref())
                 }
             }
             Expression::BinaryExpression {
@@ -90,7 +90,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                     let expr = if let ScopeValue::EvaluationValue(cv) = &expr.value {
                         cv.clone()
                     } else {
-                        return V::empty();
+                        return V::empty(self.type_provider.as_ref());
                     };
                     expr
                 };
@@ -140,7 +140,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                         .collect();
 
                     if has_args.is_none() {
-                        return V::empty();
+                        return V::empty(self.type_provider.as_ref());
                     }
 
                     let return_value = self.evaluate_statement(&body, index);
@@ -153,7 +153,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                             .tuple_value()
                             .into_iter()
                             .last()
-                            .unwrap_or_else(|| V::empty())
+                            .unwrap_or_else(|| V::empty(self.type_provider.as_ref()))
                     } else {
                         return_value
                     }
@@ -192,13 +192,13 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                         .collect();
 
                     if has_args.is_none() {
-                        return V::empty();
+                        return V::empty(self.type_provider.as_ref());
                     } else if arglen != plen {
                         self.add_error(EvaluationError {
                             kind: EvaluationErrorKind::ArgCountMismatch(arglen as _, plen as _),
                             range: raw_args.get_range(),
                         });
-                        return V::empty();
+                        return V::empty(self.type_provider.as_ref());
                     }
 
                     let return_val = callback(has_args.as_ref().unwrap());
@@ -207,10 +207,10 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
 
                     return_val
                 } else {
-                    V::empty()
+                    V::empty(self.type_provider.as_ref())
                 }
             }
-            _ => V::empty(),
+            _ => V::empty(self.type_provider.as_ref()),
         }
     }
 
@@ -230,14 +230,14 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                     self.add_error(EvaluationError { kind: EvaluationErrorKind::SymbolNotFound(name.as_str().to_string()), range: name.get_range() }
 
                     );
-                    return V::empty()
+                    return V::empty(self.type_provider.as_ref())
                 };
 
                 let mut value = sym.borrow_mut();
 
                 let ScopeValue::EvaluationValue(cv)  = &mut value.value else {
                     // TODO: throw error
-                    return V::empty()
+                    return V::empty(self.type_provider.as_ref())
                 };
 
                 let right = right
@@ -265,7 +265,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                         .unwrap_or_else(|| right.clone());
                 });
                 if !updated_value {
-                    return V::empty();
+                    return V::empty(self.type_provider.as_ref());
                 };
                 return right;
             }
@@ -281,12 +281,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                             let value = val.borrow();
 
                             let ScopeValue::EvaluationValue(cv) = &value.value else {
-                                return V::empty()
+                                return V::empty(self.type_provider.as_ref())
                             };
 
                             cv.get_type().clone()
                         } else {
-                            return V::empty();
+                            return V::empty(self.type_provider.as_ref());
                         };
 
                         return V::reference(left, member.as_str().to_string(), rtype);
@@ -308,7 +308,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                 Operator::Exponent => {
                     V::cinteger(left.integer_value().pow(right.integer_value() as _))
                 }
-                _ => V::empty(),
+                _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_integer() && right.is_cinteger()
             || left.is_cinteger() && right.is_integer()
@@ -336,7 +336,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                     width,
                     signed,
                 ),
-                _ => V::empty(),
+                _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_integer()
             && right.is_integer()
@@ -364,7 +364,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                     width,
                     signed,
                 ),
-                _ => V::empty(),
+                _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_cfloat() && right.is_cfloat() {
             match op {
@@ -373,7 +373,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                 Operator::Multiply => V::cfloat(left.float_value() * right.float_value()),
                 Operator::Divide => V::cfloat(left.float_value() / right.float_value()),
                 Operator::Exponent => V::cfloat(left.float_value().powf(right.float_value())),
-                _ => V::empty(),
+                _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_float() && right.is_cfloat() || left.is_cfloat() && right.is_float() {
             let width = if left.is_float() {
@@ -387,7 +387,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                 Operator::Multiply => V::float(left.float_value() * right.float_value(), width),
                 Operator::Divide => V::float(left.float_value() / right.float_value(), width),
                 Operator::Exponent => V::float(left.float_value().powf(right.float_value()), width),
-                _ => V::empty(),
+                _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_float() && right.is_float() && left.float_width() == right.float_width() {
             let width = left.float_width();
@@ -397,10 +397,10 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                 Operator::Multiply => V::float(left.float_value() * right.float_value(), width),
                 Operator::Divide => V::float(left.float_value() / right.float_value(), width),
                 Operator::Exponent => V::float(left.float_value().powf(right.float_value()), width),
-                _ => V::empty(),
+                _ => V::empty(self.type_provider.as_ref()),
             }
         } else {
-            V::empty()
+            V::empty(self.type_provider.as_ref())
         };
 
         if res.get_type().is_empty() {
@@ -408,7 +408,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
                 kind: EvaluationErrorKind::BinExpMismatch(op.clone(), left.into(), right.into()),
                 range: Range::from((&raw_left.get_range(), &raw_right.get_range())),
             });
-            V::empty()
+            V::empty(self.type_provider.as_ref())
         } else {
             res
         }
@@ -417,6 +417,6 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, TP: E
 
 // impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, P: Pass> Evaluator<T, V, P> {
 //     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> V {
-//         V::empty()
+//         V::empty(self.type_provider.as_ref())
 //     }
 // }

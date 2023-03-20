@@ -1,30 +1,30 @@
 use std::fmt::{Debug, Display};
 
 use linked_hash_map::LinkedHashMap;
-use tl_evaluator::evaluation_value::EvaluationValue;
+use tl_evaluator::{evaluation_value::EvaluationValue, evaluation_type::EvaluationTypeProvider};
 use tl_util::format::{NodeDisplay, TreeDisplay};
 
 use crate::llvm_type::LlvmType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct LlvmValue {
-    ty: LlvmType,
-    llvm_value: inkwell::values::AnyValueEnum<'static>,
+pub struct LlvmValue<'a> {
+    ty: LlvmType<'a>,
+    llvm_value: inkwell::values::AnyValueEnum<'a>,
 }
 
-impl Display for LlvmValue {
+impl Display for LlvmValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self, f)
     }
 }
 
-impl NodeDisplay for LlvmValue {
+impl NodeDisplay for LlvmValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         Display::fmt(&self, f)
     }
 }
 
-impl TreeDisplay for LlvmValue {
+impl TreeDisplay for LlvmValue<'_> {
     fn num_children(&self) -> usize {
         0 
     }
@@ -34,8 +34,8 @@ impl TreeDisplay for LlvmValue {
     }
 }
 
-impl EvaluationValue for LlvmValue {
-    type Type = LlvmType;
+impl <'a> EvaluationValue for LlvmValue<'a> {
+    type Type = LlvmType<'a>;
 
     fn get_struct_members_rf(&self) -> impl Iterator<Item = (&String, &Self)> {
         [].into_iter()
@@ -71,7 +71,7 @@ impl EvaluationValue for LlvmValue {
         todo!()
     }
 
-    fn empty() -> Self {
+    fn empty<'b>(tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>) -> Self {
         todo!()
     }
 
@@ -271,8 +271,8 @@ impl EvaluationValue for LlvmValue {
     }
 }
 
-impl Into<LlvmType> for LlvmValue {
-    fn into(self) -> LlvmType {
+impl <'a> Into<LlvmType<'a>> for LlvmValue<'a> {
+    fn into(self) -> LlvmType<'a> {
         self.to_type()
     }
 }

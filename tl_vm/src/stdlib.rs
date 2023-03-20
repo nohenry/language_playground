@@ -62,14 +62,14 @@ pub fn fill_io<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>(
             if let Some(data) = params.get("data") {
                 if let Some(data) = data.resolve_ref() {
                     let ScopeValue::EvaluationValue(cv) = &data.borrow().value else {
-                        return V::empty()
+                        return V::empty(self.type_provider.as_ref())
                     };
                     println!("{}", cv)
                 } else {
                     println!("{}", data)
                 }
             }
-            V::empty()
+            V::empty(self.type_provider.as_ref())
         }),
     );
 }

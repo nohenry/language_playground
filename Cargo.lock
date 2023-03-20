@@ -783,7 +783,6 @@ dependencies = [
  "tl_codegen",
  "tl_core",
  "tl_util",
- "tl_vm",
 ]
 
 [[package]]

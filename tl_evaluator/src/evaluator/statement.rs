@@ -14,11 +14,11 @@ use crate::{
 
 use super::Evaluator;
 
-impl<
+impl<'a,
         T: EvaluationType<Value = V>,
         V: EvaluationValue<Type = T> + Display,
-        TP: EvaluationTypeProvider<Type = T>,
-    > Evaluator<T, V, TP, EvaluationPass>
+        TP: EvaluationTypeProvider<'a, Type = T>,
+    > Evaluator<'a, T, V, TP, EvaluationPass>
 {
     pub fn evaluate(&self) -> Vec<V> {
         let vals = self
@@ -41,7 +41,7 @@ impl<
                 ..
             } => {
                 let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
-                    return V::empty();
+                    return V::empty(self.type_provider.as_ref());
                 };
                 self.wstate().scope.push_scope(sym.clone());
 
@@ -64,7 +64,7 @@ impl<
                 ..
             } => {
                 let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
-                    return V::empty();
+                    return V::empty(self.type_provider.as_ref());
                 };
                 self.wstate().scope.push_scope(sym.clone());
 
@@ -176,7 +176,7 @@ impl<
                             ),
                             range: raw_expr.get_range(),
                         });
-                        return V::empty();
+                        return V::empty(self.type_provider.as_ref());
                     }
                     self.wstate().scope.insert_value(
                         ident.as_str(),
@@ -220,15 +220,15 @@ impl<
             }
             _ => (),
         }
-        V::empty()
+        V::empty(self.type_provider.as_ref())
     }
 }
 
-impl<
+impl<'a,
         T: EvaluationType<Value = V>,
         V: EvaluationValue<Type = T> + Display,
-        TP: EvaluationTypeProvider<Type = T>,
-    > Evaluator<T, V, TP, TypeFirst>
+        TP: EvaluationTypeProvider<'a, Type = T>,
+    > Evaluator<'a, T, V, TP, TypeFirst>
 {
     pub fn evaluate(&self) {
         for (index, stmt) in self.module.stmts.iter().enumerate() {
@@ -317,7 +317,7 @@ impl<
             } => {
                 let sym = self.wstate().scope.insert_value(
                     ident.as_str(),
-                    ScopeValue::EvaluationValue(V::empty()),
+                    ScopeValue::EvaluationValue(V::empty(self.type_provider.as_ref())),
                     index,
                 );
 
@@ -327,21 +327,24 @@ impl<
                     .map(|ty| self.evaluate_type(ty))
                     .unwrap_or(self.type_provider.empty());
 
+                // self.type_provider.inform_function_decleration();
+                let function = self.type_provider.function_def(
+                    Statement::clone(body),
+                    eparameters,
+                    ereturn,
+                    sym,
+                );
+
                 self.wstate().scope.update_value(
                     ident.as_str(),
-                    ScopeValue::EvaluationValue(V::function(
-                        Statement::clone(body),
-                        eparameters,
-                        ereturn,
-                        sym,
-                    )),
+                    ScopeValue::EvaluationValue(function),
                     index,
                 );
             }
             Statement::Decleration { ident, .. } => {
                 self.wstate().scope.insert_value(
                     ident.as_str(),
-                    ScopeValue::EvaluationValue(V::empty()),
+                    ScopeValue::EvaluationValue(V::empty(self.type_provider.as_ref())),
                     index,
                 );
             }
@@ -357,11 +360,11 @@ impl<
     }
 }
 
-impl<
+impl<'a,
         T: EvaluationType<Value = V>,
         V: EvaluationValue<Type = T> + Display,
-        TP: EvaluationTypeProvider<Type = T>,
-    > Evaluator<T, V, TP, MemberPass>
+        TP: EvaluationTypeProvider<'a, Type = T>,
+    > Evaluator<'a, T, V, TP, MemberPass>
 {
     pub fn evaluate(&self) {
         for (index, stmt) in self.module.stmts.iter().enumerate() {
@@ -524,7 +527,7 @@ impl<
             } => {
                 let sym = self.wstate().scope.insert_value(
                     ident.as_str(),
-                    ScopeValue::EvaluationValue(V::empty()),
+                    ScopeValue::EvaluationValue(V::empty(self.type_provider.as_ref())),
                     index,
                 );
 
