@@ -28,101 +28,104 @@ use tl_evaluator::{
 };
 use tl_util::{format::TreeDisplay, Rf};
 
+use crate::evaluator::LlvmEvaluator;
+
 pub mod context;
 pub mod llvm_type;
 pub mod llvm_value;
+pub mod evaluator;
 
 #[cfg(windows)]
 const LINE_ENDING: &str = "\r\n";
 #[cfg(not(windows))]
 const LINE_ENDING: &str = "\n";
 
-pub struct LlvmTypeProvider<'a> {
-    module: inkwell::module::Module<'a>,
-    context: &'a inkwell::context::Context,
-}
+// pub struct LlvmTypeProvider<'a> {
+//     module: inkwell::module::Module<'a>,
+//     context: &'a inkwell::context::Context,
+// }
 
-impl<'a> EvaluationTypeProvider<'a> for LlvmTypeProvider<'a> {
-    type Type = LlvmType<'a>;
+// impl<'a> EvaluationTypeProvider<'a> for LlvmTypeProvider<'a> {
+//     type Type = LlvmType<'a>;
 
-    fn empty(&self) -> Self::Type {
-        LlvmType::Empty(self.context.void_type())
-    }
+//     fn empty(&self) -> Self::Type {
+//         LlvmType::Empty(self.context.void_type())
+//     }
 
-    fn string(&self) -> Self::Type {
-        todo!()
-    }
+//     fn string(&self) -> Self::Type {
+//         todo!()
+//     }
 
-    fn integer(&self, width: u8, signed: bool) -> Self::Type {
-        LlvmType::Integer {
-            signed,
-            llvm_type: self.context.custom_width_int_type(width as _),
-        }
-    }
+//     fn integer(&self, width: u8, signed: bool) -> Self::Type {
+//         LlvmType::Integer {
+//             signed,
+//             llvm_type: self.context.custom_width_int_type(width as _),
+//         }
+//     }
 
-    fn cinteger(&self) -> Self::Type {
-        LlvmType::CoercibleInteger(self.context.i64_type())
-    }
+//     fn cinteger(&self) -> Self::Type {
+//         LlvmType::CoercibleInteger(self.context.i64_type())
+//     }
 
-    fn float(&self, width: u8) -> Self::Type {
-        let ty = match width {
-            16 => self.context.f16_type(),
-            32 => self.context.f32_type(),
-            64 => self.context.f64_type(),
-            128 => self.context.f128_type(),
-            _ => panic!("Unsupported float width!"),
-        };
-        LlvmType::Float(ty)
-    }
+//     fn float(&self, width: u8) -> Self::Type {
+//         let ty = match width {
+//             16 => self.context.f16_type(),
+//             32 => self.context.f32_type(),
+//             64 => self.context.f64_type(),
+//             128 => self.context.f128_type(),
+//             _ => panic!("Unsupported float width!"),
+//         };
+//         LlvmType::Float(ty)
+//     }
 
-    fn cfloat(&self) -> Self::Type {
-        LlvmType::CoercibleFloat(self.context.f64_type())
-    }
+//     fn cfloat(&self) -> Self::Type {
+//         LlvmType::CoercibleFloat(self.context.f64_type())
+//     }
 
-    fn bool(&self) -> Self::Type {
-        LlvmType::Boolean(self.context.bool_type())
-    }
+//     fn bool(&self) -> Self::Type {
+//         LlvmType::Boolean(self.context.bool_type())
+//     }
 
-    fn function(&self) -> Self::Type {
-        todo!()
-    }
+//     fn function(&self) -> Self::Type {
+//         todo!()
+//     }
 
-    fn symbol(
-        &self,
-        symbol: Rf<
-            Scope<Self::Type, <Self::Type as tl_evaluator::evaluation_type::EvaluationType>::Value>,
-        >,
-    ) -> Self::Type {
-        LlvmType::Symbol(symbol)
-    }
+//     fn symbol(
+//         &self,
+//         symbol: Rf<
+//             Scope<Self::Type, <Self::Type as tl_evaluator::evaluation_type::EvaluationType>::Value>,
+//         >,
+//     ) -> Self::Type {
+//         LlvmType::Symbol(symbol)
+//     }
 
-    fn rf(&self, base_type: Self::Type) -> Self::Type {
-        let ptr_ty = base_type.llvm_ptr_ty(AddressSpace::default());
-        LlvmType::Ref {
-            base_type: Box::new(base_type),
-            llvm_type: ptr_ty,
-        }
-    }
+//     fn rf(&self, base_type: Self::Type) -> Self::Type {
+//         let ptr_ty = base_type.llvm_ptr_ty(AddressSpace::default());
+//         LlvmType::Ref {
+//             base_type: Box::new(base_type),
+//             llvm_type: ptr_ty,
+//         }
+//     }
 
-    fn intrinsic(
-        &self,
-        symbol: Rf<
-            Scope<Self::Type, <Self::Type as tl_evaluator::evaluation_type::EvaluationType>::Value>,
-        >,
-    ) -> Self::Type {
-        LlvmType::Intrinsic(symbol)
-    }
+//     fn intrinsic(
+//         &self,
+//         symbol: Rf<
+//             Scope<Self::Type, <Self::Type as tl_evaluator::evaluation_type::EvaluationType>::Value>,
+//         >,
+//     ) -> Self::Type {
+//         LlvmType::Intrinsic(symbol)
+//     }
 
-    fn function_def(
-        &self,
-        body: tl_core::ast::Statement,
-        parameters: LinkedHashMap<String, LlvmType<'a>>,
-        return_type: LlvmType<'a>,
-        node: tl_util::Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
-    ) -> LlvmValue<'a> {
-        LlvmValue::function(body, parameters, return_type, node, self)
-    }
-}
+//     fn function_def(
+//         &self,
+//         body: tl_core::ast::Statement,
+//         parameters: LinkedHashMap<String, LlvmType<'a>>,
+//         return_type: LlvmType<'a>,
+//         node: tl_util::Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
+//     ) -> LlvmValue<'a> {
+//         LlvmValue::function(body, parameters, return_type, node, self)
+//     }
+// }
 
 pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     let mut file = match File::open(path.as_ref()) {
@@ -165,26 +168,24 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         let llvm_module = llvm_context.create_module("mymod");
         let symbol_tree = Rf::new(Scope::<LlvmType, LlvmValue>::root());
     
-        let context = Rc::new(LlvmTypeProvider {
-            context: &llvm_context,
-            module: llvm_module,
-        });
+        // let context = Rc::new(LlvmTypeProvider {
+        //     context: &llvm_context,
+        //     module: llvm_module,
+        // });
         
 
         {
-            let code_pass = Evaluator::<LlvmType, LlvmValue, LlvmTypeProvider, TypeFirst>::new(
+            let code_pass = LlvmEvaluator::<TypeFirst>::new(
                 symbol_tree.clone(),
                 module.clone(),
-                context.clone(),
                 1,
             );
             code_pass.evaluate();
             let code_pass_state = code_pass.finish();
 
             let code_pass =
-                Evaluator::<LlvmType, LlvmValue, LlvmTypeProvider, MemberPass>::new_with_state(
+                LlvmEvaluator::<MemberPass>::new_with_state(
                     code_pass_state,
-                    context.clone(),
                     module.clone(),
                 );
             code_pass.evaluate();
@@ -192,10 +193,9 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
 
             println!("{}", symbol_tree.format());
 
-            let evaluator = Evaluator::<LlvmType, LlvmValue, LlvmTypeProvider, EvaluationPass>::new(
+            let evaluator = LlvmEvaluator::<EvaluationPass>::new(
                 module,
                 code_pass_state.scope,
-                context.clone(),
             );
             let _values = evaluator.evaluate();
 
