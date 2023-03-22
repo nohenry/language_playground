@@ -1,6 +1,9 @@
 use std::fmt::{Debug, Display, Pointer};
 
-use inkwell::{types::{FloatType, FunctionType, IntType, PointerType, StructType, VoidType, AnyTypeEnum}, AddressSpace};
+use inkwell::{
+    types::{AnyTypeEnum, FloatType, FunctionType, IntType, PointerType, StructType, VoidType},
+    AddressSpace,
+};
 use linked_hash_map::LinkedHashMap;
 use tl_evaluator::{evaluation_type::EvaluationType, scope::scope::Scope};
 use tl_util::{
@@ -12,8 +15,8 @@ use crate::llvm_value::LlvmValue;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum LlvmType<'a> {
-    CoercibleInteger,
-    CoercibleFloat,
+    CoercibleInteger(IntType<'a>),
+    CoercibleFloat(FloatType<'a>),
     Integer {
         signed: bool,
         llvm_type: IntType<'a>,
@@ -106,8 +109,8 @@ impl NodeDisplay for LlvmType<'_> {
             Self::StructInstance { .. } => write!(f, "Struct Instance"),
             Self::Tuple { .. } => write!(f, "Tuple"),
             Self::Empty { .. } => write!(f, "Empty"),
-            Self::CoercibleInteger => write!(f, "Coercible Integer"),
-            Self::CoercibleFloat => write!(f, "Coercible Float"),
+            Self::CoercibleInteger(_) => write!(f, "Coercible Integer"),
+            Self::CoercibleFloat(_) => write!(f, "Coercible Float"),
             Self::Ref { .. } => write!(f, "Reference"),
             Self::Float { .. } => write!(f, "f"),
             Self::Integer {
@@ -137,107 +140,176 @@ impl TreeDisplay for LlvmType<'_> {
     }
 }
 
-impl <'a> EvaluationType for LlvmType<'a> {
+impl<'a> EvaluationType for LlvmType<'a> {
     type Value = LlvmValue<'a>;
 
     fn is_empty(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Empty(_) => true,
+            _ => false,
+        }
     }
 
     fn is_string(&self) -> bool {
-        todo!()
+        match self {
+            // LlvmType::String => true,
+            _ => false,
+        }
     }
 
     fn is_integer(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Integer { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_cinteger(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::CoercibleInteger { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_float(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Float { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_cfloat(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::CoercibleFloat { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_bool(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Boolean { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_function(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Function { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_symbol(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Symbol { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_ref(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Ref { .. } => true,
+            _ => false,
+        }
     }
 
     fn is_intrinsic(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Intrinsic { .. } => true,
+            _ => false,
+        }
     }
 
     fn integer_width(&self) -> u8 {
-        todo!()
+        match self {
+            LlvmType::Integer { llvm_type, .. } => llvm_type.get_bit_width() as _,
+            _ => 0,
+        }
     }
 
     fn integer_signed(&self) -> bool {
-        todo!()
+        match self {
+            LlvmType::Integer { signed, .. } => *signed,
+            _ => false,
+        }
     }
 
     fn float_width(&self) -> u8 {
-        todo!()
+        self.get_float_width()
     }
 
     fn function_parameters(self) -> impl Iterator<Item = (String, Self)> {
-        [].into_iter()
+        match self {
+            LlvmType::Function { parameters, .. } => parameters.into_iter(),
+            _ => panic!("Expected to be function!"),
+        }
     }
 
     fn function_parameters_rf(&self) -> impl Iterator<Item = (&String, &Self)> {
-        [].into_iter()
+        match self {
+            LlvmType::Function { parameters, .. } => parameters.iter(),
+            _ => panic!("Expected to be function!"),
+        }
     }
 
     fn set_function_parameters(&mut self, parameters: impl Iterator<Item = (String, Self)>) {
-        todo!()
+        match self {
+            LlvmType::Function { parameters: ps, .. } => {
+                *ps = LinkedHashMap::from_iter(parameters);
+            }
+            _ => panic!("Expected to be function!"),
+        }
     }
 
     fn function_return(&self) -> &Self {
-        todo!()
+        match self {
+            LlvmType::Function { return_type, .. } => &**return_type,
+            _ => panic!("Expected to be function!"),
+        }
     }
 
     fn set_function_return(&mut self, ty: Self) {
-        todo!()
+        match self {
+            LlvmType::Function { return_type, .. } => {
+                *return_type = Box::new(ty);
+            }
+            _ => panic!("Expected to be function!"),
+        }
     }
 
     fn symbol_rf(&self) -> &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self, Self::Value>> {
-        todo!()
+        match self {
+            LlvmType::Symbol(sym) => sym,
+            _ => panic!("Expected to be symbol!"),
+        }
     }
 
     fn intrinsic_rf(&self) -> &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self, Self::Value>> {
-        todo!()
+        match self {
+            LlvmType::Intrinsic(sym) => sym,
+            _ => panic!("Expected to be intrinsic!"),
+        }
     }
 }
 
-impl <'a> LlvmType<'a> {
+impl<'a> LlvmType<'a> {
     pub fn llvm_type(&self) -> Option<AnyTypeEnum<'a>> {
         let ty = match self {
-            LlvmType::Empty(void)  => (*void).into(),
+            LlvmType::Empty(void) => (*void).into(),
             LlvmType::Boolean(bool) => (*bool).into(),
             LlvmType::Float(f) => (*f).into(),
             LlvmType::Integer { llvm_type, .. } => (*llvm_type).into(),
+            LlvmType::CoercibleInteger(llvm_type) => (*llvm_type).into(),
+            LlvmType::CoercibleFloat(llvm_type) => (*llvm_type).into(),
             LlvmType::Function { llvm_type, .. } => (*llvm_type).into(),
-            LlvmType::Ref { llvm_type: Some(llvm_type), .. } => (*llvm_type).into(),
+            LlvmType::Ref {
+                llvm_type: Some(llvm_type),
+                ..
+            } => (*llvm_type).into(),
             LlvmType::StructInitializer { llvm_type, .. } => (*llvm_type).into(),
             LlvmType::StructInstance { llvm_type, .. } => (*llvm_type).into(),
             LlvmType::Tuple { llvm_type, .. } => (*llvm_type).into(),
-            _ => return None
+            _ => return None,
         };
 
         Some(ty)
@@ -252,9 +324,16 @@ impl <'a> LlvmType<'a> {
             AnyTypeEnum::PointerType(p) => p.ptr_type(addrspac),
             AnyTypeEnum::StructType(p) => p.ptr_type(addrspac),
             AnyTypeEnum::VectorType(v) => v.ptr_type(addrspac),
-            _ => return None
+            _ => return None,
         };
 
         Some(ty)
+    }
+
+    pub fn get_float_width(&self) -> u8 {
+        match self {
+            Self::Float(f) => 64,
+            _ => 0,
+        }
     }
 }

@@ -21,9 +21,9 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
 {
     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> V {
         match expression {
-            Expression::Integer(val, _, _) => V::cinteger(*val),
-            Expression::Float(val, _, _) => V::cfloat(*val),
-            Expression::Boolean(b, _) => V::bool(*b),
+            Expression::Integer(val, _, _) => V::cinteger(*val, self.type_provider.as_ref()),
+            Expression::Float(val, _, _) => V::cfloat(*val, self.type_provider.as_ref()),
+            Expression::Boolean(b, _) => V::bool(*b, self.type_provider.as_ref()),
             Expression::String(ParsedTemplateString(vs), _) => {
                 let str = vs
                     .iter()
@@ -43,7 +43,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                     })
                     .intersperse("".to_string())
                     .collect::<String>();
-                V::string(str)
+                V::string(str, self.type_provider.as_ref())
             }
             Expression::Ident(tok @ SpannedToken(_, Token::Ident(id))) => {
                 let sym = self.rstate().scope.find_symbol(id);
@@ -51,9 +51,9 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                     let symv = sym.borrow();
                     match &symv.value {
                         ScopeValue::EvaluationValue(cv) => {
-                            V::sym_reference(&sym, cv.get_type().clone())
+                            V::sym_reference(&sym, cv.get_type().clone(), self.type_provider.as_ref())
                         }
-                        ScopeValue::Struct { .. } => V::sym_reference(&sym, self.type_provider.empty()),
+                        ScopeValue::Struct { .. } => V::sym_reference(&sym, self.type_provider.empty(), self.type_provider.as_ref()),
                         _ => V::empty(self.type_provider.as_ref()),
                     }
                 } else {
@@ -75,7 +75,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                         .map(|f| (f.name().clone(), self.evaluate_expression(&f.expr, index))),
                 );
 
-                V::create_struct_initializer(hmp)
+                V::create_struct_initializer(hmp, self.type_provider.as_ref())
             }
             Expression::FunctionCall {
                 expr,
@@ -107,7 +107,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                         .zip(ptypes.into_iter())
                         .enumerate()
                         .map(|(i, (arg, (name, ty)))| {
-                            let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
+                            let arg = arg.try_implicit_cast(&ty, self.type_provider.as_ref()).unwrap_or(arg);
 
                             // let arg = if let Some(value) = arg.resolve_ref_value() {
                             //     ConstValue {
@@ -173,7 +173,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                         .zip(ptypes.into_iter())
                         .enumerate()
                         .map(|(i, (arg, (name, ty)))| {
-                            let arg = arg.try_implicit_cast(&ty).unwrap_or(arg);
+                            let arg = arg.try_implicit_cast(&ty, self.type_provider.as_ref()).unwrap_or(arg);
 
                             if arg.get_type() != &ty {
                                 self.add_error(EvaluationError {
@@ -241,7 +241,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                 };
 
                 let right = right
-                    .try_implicit_cast(cv.get_type())
+                    .try_implicit_cast(cv.get_type(), self.type_provider.as_ref())
                     .unwrap_or_else(|| right);
                 *cv = right.clone();
 
@@ -261,7 +261,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                 let scope = &mut self.wstate().scope;
                 let updated_value = scope.follow_member_access_mut(dleft, dright, |cv| {
                     *cv = right
-                        .try_implicit_cast(cv.get_type())
+                        .try_implicit_cast(cv.get_type(), self.type_provider.as_ref())
                         .unwrap_or_else(|| right.clone());
                 });
                 if !updated_value {
@@ -289,7 +289,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                             return V::empty(self.type_provider.as_ref());
                         };
 
-                        return V::reference(left, member.as_str().to_string(), rtype);
+                        return V::reference(left, member.as_str().to_string(), rtype, self.type_provider.as_ref());
                     }
                     _ => (),
                 }
@@ -301,12 +301,12 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
 
         let res = if left.is_cinteger() && right.is_cinteger() {
             match op {
-                Operator::Plus => V::cinteger(left.integer_value() + right.integer_value()),
-                Operator::Minus => V::cinteger(left.integer_value() - right.integer_value()),
-                Operator::Multiply => V::cinteger(left.integer_value() * right.integer_value()),
-                Operator::Divide => V::cinteger(left.integer_value() / right.integer_value()),
+                Operator::Plus => V::cinteger(left.integer_value() + right.integer_value(), self.type_provider.as_ref()),
+                Operator::Minus => V::cinteger(left.integer_value() - right.integer_value(), self.type_provider.as_ref()),
+                Operator::Multiply => V::cinteger(left.integer_value() * right.integer_value(), self.type_provider.as_ref()),
+                Operator::Divide => V::cinteger(left.integer_value() / right.integer_value(), self.type_provider.as_ref()),
                 Operator::Exponent => {
-                    V::cinteger(left.integer_value().pow(right.integer_value() as _))
+                    V::cinteger(left.integer_value().pow(right.integer_value() as _), self.type_provider.as_ref())
                 }
                 _ => V::empty(self.type_provider.as_ref()),
             }
@@ -320,21 +320,22 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
             };
             match op {
                 Operator::Plus => {
-                    V::integer(left.integer_value() + right.integer_value(), width, signed)
+                    V::integer(left.integer_value() + right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Minus => {
-                    V::integer(left.integer_value() - right.integer_value(), width, signed)
+                    V::integer(left.integer_value() - right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Multiply => {
-                    V::integer(left.integer_value() * right.integer_value(), width, signed)
+                    V::integer(left.integer_value() * right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Divide => {
-                    V::integer(left.integer_value() / right.integer_value(), width, signed)
+                    V::integer(left.integer_value() / right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Exponent => V::integer(
                     left.integer_value().pow(right.integer_value() as _),
                     width,
                     signed,
+                    self.type_provider.as_ref()
                 ),
                 _ => V::empty(self.type_provider.as_ref()),
             }
@@ -348,31 +349,32 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
 
             match op {
                 Operator::Plus => {
-                    V::integer(left.integer_value() + right.integer_value(), width, signed)
+                    V::integer(left.integer_value() + right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Minus => {
-                    V::integer(left.integer_value() - right.integer_value(), width, signed)
+                    V::integer(left.integer_value() - right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Multiply => {
-                    V::integer(left.integer_value() * right.integer_value(), width, signed)
+                    V::integer(left.integer_value() * right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Divide => {
-                    V::integer(left.integer_value() / right.integer_value(), width, signed)
+                    V::integer(left.integer_value() / right.integer_value(), width, signed, self.type_provider.as_ref())
                 }
                 Operator::Exponent => V::integer(
                     left.integer_value().pow(right.integer_value() as _),
                     width,
                     signed,
+                    self.type_provider.as_ref()
                 ),
                 _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_cfloat() && right.is_cfloat() {
             match op {
-                Operator::Plus => V::cfloat(left.float_value() + right.float_value()),
-                Operator::Minus => V::cfloat(left.float_value() - right.float_value()),
-                Operator::Multiply => V::cfloat(left.float_value() * right.float_value()),
-                Operator::Divide => V::cfloat(left.float_value() / right.float_value()),
-                Operator::Exponent => V::cfloat(left.float_value().powf(right.float_value())),
+                Operator::Plus => V::cfloat(left.float_value() + right.float_value(), self.type_provider.as_ref()),
+                Operator::Minus => V::cfloat(left.float_value() - right.float_value(), self.type_provider.as_ref()),
+                Operator::Multiply => V::cfloat(left.float_value() * right.float_value(), self.type_provider.as_ref()),
+                Operator::Divide => V::cfloat(left.float_value() / right.float_value(), self.type_provider.as_ref()),
+                Operator::Exponent => V::cfloat(left.float_value().powf(right.float_value()), self.type_provider.as_ref()),
                 _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_float() && right.is_cfloat() || left.is_cfloat() && right.is_float() {
@@ -382,21 +384,21 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T> + Display, T
                 right.float_width()
             };
             match op {
-                Operator::Plus => V::float(left.float_value() + right.float_value(), width),
-                Operator::Minus => V::float(left.float_value() - right.float_value(), width),
-                Operator::Multiply => V::float(left.float_value() * right.float_value(), width),
-                Operator::Divide => V::float(left.float_value() / right.float_value(), width),
-                Operator::Exponent => V::float(left.float_value().powf(right.float_value()), width),
+                Operator::Plus => V::float(left.float_value() + right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Minus => V::float(left.float_value() - right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Multiply => V::float(left.float_value() * right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Divide => V::float(left.float_value() / right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Exponent => V::float(left.float_value().powf(right.float_value()), width, self.type_provider.as_ref()),
                 _ => V::empty(self.type_provider.as_ref()),
             }
         } else if left.is_float() && right.is_float() && left.float_width() == right.float_width() {
             let width = left.float_width();
             match op {
-                Operator::Plus => V::float(left.float_value() + right.float_value(), width),
-                Operator::Minus => V::float(left.float_value() - right.float_value(), width),
-                Operator::Multiply => V::float(left.float_value() * right.float_value(), width),
-                Operator::Divide => V::float(left.float_value() / right.float_value(), width),
-                Operator::Exponent => V::float(left.float_value().powf(right.float_value()), width),
+                Operator::Plus => V::float(left.float_value() + right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Minus => V::float(left.float_value() - right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Multiply => V::float(left.float_value() * right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Divide => V::float(left.float_value() / right.float_value(), width, self.type_provider.as_ref()),
+                Operator::Exponent => V::float(left.float_value().powf(right.float_value()), width, self.type_provider.as_ref()),
                 _ => V::empty(self.type_provider.as_ref()),
             }
         } else {

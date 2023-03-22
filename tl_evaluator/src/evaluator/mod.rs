@@ -160,7 +160,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: Evaluat
             .enumerate()
             .filter_map(|(i, (name, ty))| {
                 if let Some(arg) = args.get(name) {
-                    let arg = arg.try_implicit_cast(ty).unwrap_or_else(|| arg.clone());
+                    let arg = arg.try_implicit_cast(ty, self.type_provider.as_ref()).unwrap_or_else(|| arg.clone());
 
                     if arg.get_type() == ty {
                         return Some((name.clone(), arg));
@@ -188,7 +188,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: Evaluat
             });
         } else if arg_vals.len() == members.len() {
             // Everything good!
-            return (V::create_struct_instance(symbol.clone()), arg_vals);
+            return (V::create_struct_instance(symbol.clone(), self.type_provider.as_ref()), arg_vals);
         }
         (V::empty(self.type_provider.as_ref()), LinkedHashMap::new())
     }

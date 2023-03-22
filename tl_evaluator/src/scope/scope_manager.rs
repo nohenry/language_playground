@@ -383,7 +383,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> ScopeManage
     ) -> Option<ScopeValue<T, V>> {
         println!("Update value");
         // tl_util::set_backtrace(false);
-        // std::env::set_var("RUST_LIB_BACKTRACE", "0");
+        // std::enV::set_var("RUST_LIB_BACKTRACE", "0", self.type_provider.as_ref(), self.type_provider.as_ref());
         {
             if let Some(sym) = { self.find_symbol(name) } {
                 let old_value = std::mem::replace(&mut sym.borrow_mut().value, value);
@@ -398,7 +398,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> ScopeManage
             );
         }
         // tl_util::set_backtrace(true);
-        // std::env::set_var("RUST_LIB_BACKTRACE", "1");
+        // std::enV::set_var("RUST_LIB_BACKTRACE", "1", self.type_provider.as_ref(), self.type_provider.as_ref());
 
         None
     }

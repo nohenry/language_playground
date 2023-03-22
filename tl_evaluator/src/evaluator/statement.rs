@@ -165,7 +165,7 @@ impl<'a,
                     }
                 } else {
                     let expr = expr.resolve_ref_value().unwrap_or_else(|| expr);
-                    let expr = expr.try_implicit_cast(&ty).unwrap_or(expr);
+                    let expr = expr.try_implicit_cast(&ty, self.type_provider.as_ref()).unwrap_or(expr);
 
                     if expr.get_type() != &ty {
                         self.add_error(EvaluationError {
@@ -199,7 +199,7 @@ impl<'a,
                         .enumerate()
                         .map(|(index, stmt)| self.evaluate_statement(stmt, index))
                         .collect();
-                    return V::tuple(values);
+                    return V::tuple(values, self.type_provider.as_ref());
                 }
             }
             Statement::Block(list) => {
@@ -215,7 +215,7 @@ impl<'a,
                         .enumerate()
                         .map(|(index, stmt)| self.evaluate_statement(stmt, index))
                         .collect();
-                    return V::tuple(values);
+                    return V::tuple(values, self.type_provider.as_ref());
                 }
             }
             _ => (),
@@ -550,6 +550,7 @@ impl<'a,
                         eparameters,
                         ereturn,
                         sym.clone(),
+                        self.type_provider.as_ref()
                     )),
                     index,
                 );

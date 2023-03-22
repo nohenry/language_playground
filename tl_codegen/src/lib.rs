@@ -1,5 +1,6 @@
 #![feature(return_position_impl_trait_in_trait)]
 #![feature(impl_trait_projections)]
+#![feature(box_patterns)]
 
 use std::{
     fs::{File, OpenOptions},
@@ -60,7 +61,7 @@ impl<'a> EvaluationTypeProvider<'a> for LlvmTypeProvider<'a> {
     }
 
     fn cinteger(&self) -> Self::Type {
-        LlvmType::CoercibleInteger
+        LlvmType::CoercibleInteger(self.context.i64_type())
     }
 
     fn float(&self, width: u8) -> Self::Type {
@@ -75,7 +76,7 @@ impl<'a> EvaluationTypeProvider<'a> for LlvmTypeProvider<'a> {
     }
 
     fn cfloat(&self) -> Self::Type {
-        LlvmType::CoercibleFloat
+        LlvmType::CoercibleFloat(self.context.f64_type())
     }
 
     fn bool(&self) -> Self::Type {
@@ -119,7 +120,7 @@ impl<'a> EvaluationTypeProvider<'a> for LlvmTypeProvider<'a> {
         return_type: LlvmType<'a>,
         node: tl_util::Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
     ) -> LlvmValue<'a> {
-        LlvmValue::function(body, parameters, return_type, node)
+        LlvmValue::function(body, parameters, return_type, node, self)
     }
 }
 
