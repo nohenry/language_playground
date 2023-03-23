@@ -4,14 +4,16 @@ use std::{
 };
 
 use inkwell::{
+    basic_block::BasicBlock,
+    module::Linkage,
     types::StructType,
-    values::{FloatValue, FunctionValue, IntValue, PointerValue, StructValue},
+    values::{BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue, StructValue},
     AddressSpace,
 };
 use linked_hash_map::LinkedHashMap;
 use tl_core::ast::{Statement, Type};
 use tl_evaluator::{
-    evaluation_type::{EvaluationTypeProvider, EvaluationType},
+    evaluation_type::{EvaluationType, EvaluationTypeProvider},
     evaluation_value::EvaluationValue,
     scope::{
         intrinsics::IntrinsicType,
@@ -23,7 +25,7 @@ use tl_util::{
     Rf,
 };
 
-use crate::llvm_type::LlvmType;
+use crate::{llvm_type::LlvmType, LlvmContext};
 
 #[derive(Clone)]
 pub enum LlvmValueKind<'a> {
@@ -53,6 +55,7 @@ pub enum LlvmValueKind<'a> {
         rf: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
         body: Statement,
         llvm_value: FunctionValue<'a>,
+        entry_block: BasicBlock<'a>,
     },
     NativeFunction {
         rf: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
@@ -227,9 +230,10 @@ impl TreeDisplay for LlvmValueKind<'_> {
 
 #[derive(Clone)]
 pub struct LlvmValue<'a> {
-    ty: LlvmType<'a>,
+    pub ty: LlvmType<'a>,
+    pub kind: LlvmValueKind<'a>,
+    pub inst: Option<PointerValue<'a>>,
     // llvm_value: inkwell::values::AnyValueEnum<'a>,
-    kind: LlvmValueKind<'a>,
 }
 
 impl Display for LlvmValue<'_> {
@@ -261,8 +265,57 @@ impl TreeDisplay for LlvmValue<'_> {
     }
 }
 
+impl<'a> LlvmValue<'a> {
+    pub fn gen_function<'b>(
+        name: &str,
+        body: tl_core::ast::Statement,
+        parameters: LinkedHashMap<String, LlvmType<'a>>,
+        return_type: <Self as EvaluationValue>::Type,
+        node: tl_util::Rf<tl_evaluator::scope::scope::Scope<LlvmType<'a>, Self>>,
+        tp: &<Self as EvaluationValue>::Ctx,
+    ) -> (Self, BasicBlock<'a>) {
+        let ty = return_type.llvm_fn_type(&[]).unwrap();
+        let val = tp.module.add_function(name, ty, None);
+        let bb = tp.context.append_basic_block(val.clone(), "entry");
+
+        (
+            LlvmValue {
+                ty: LlvmType::Function {
+                    parameters,
+                    return_type: Box::new(return_type),
+                    llvm_type: ty,
+                },
+                kind: LlvmValueKind::Function {
+                    rf: node,
+                    body,
+                    llvm_value: val,
+                    entry_block: bb,
+                },
+                inst: None,
+            },
+            bb,
+        )
+    }
+
+    pub fn llvm_basc_value(&self) -> Option<BasicValueEnum<'a>> {
+        let value = match &self.kind {
+            LlvmValueKind::Integer { llvm_value, .. } => (*llvm_value).into(),
+            LlvmValueKind::Float { llvm_value, .. } => (*llvm_value).into(),
+            LlvmValueKind::Bool { llvm_value, .. } => (*llvm_value).into(),
+            LlvmValueKind::Ref { llvm_value, .. } => (*llvm_value).into(),
+            LlvmValueKind::Tuple(_, llvm_value) => (*llvm_value).into(),
+            LlvmValueKind::StructInitializer { llvm_value, .. } => (*llvm_value).into(),
+            LlvmValueKind::StructInstance { llvm_value, .. } => (*llvm_value).into(),
+            _ => return None,
+        };
+
+        Some(value)
+    }
+}
+
 impl<'a> EvaluationValue for LlvmValue<'a> {
     type Type = LlvmType<'a>;
+    type Ctx = LlvmContext<'a>;
 
     fn get_struct_members_rf(&self) -> impl Iterator<Item = (&String, &Self)> {
         [].into_iter()
@@ -282,7 +335,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
     fn create_struct_instance<'b>(
         sym: tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>>,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
+        tp: &Self::Ctx,
     ) -> Self {
         todo!()
     }
@@ -291,10 +344,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         todo!()
     }
 
-    fn create_struct_initializer<'b>(
-        values: LinkedHashMap<String, Self>,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
-    ) -> Self {
+    fn create_struct_initializer<'b>(values: LinkedHashMap<String, Self>, tp: &Self::Ctx) -> Self {
         todo!()
     }
 
@@ -302,10 +352,11 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         todo!()
     }
 
-    fn empty<'b>(tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>) -> Self {
+    fn empty<'b>(tp: &Self::Ctx) -> Self {
         LlvmValue {
             ty: tp.empty(),
             kind: LlvmValueKind::Empty,
+            inst: None,
         }
     }
 
@@ -319,14 +370,21 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
     fn default_for(ty: &Self::Type) -> Self {
         let kind = match ty {
             LlvmType::Empty(_) => LlvmValueKind::Empty,
-            LlvmType::Integer { llvm_type, .. } => LlvmValueKind::Integer { value: 0, llvm_value: llvm_type.const_zero() },
-            LlvmType::Float(llvm_type) => LlvmValueKind::Float { value: 0.0, llvm_value: llvm_type.const_zero() },
+            LlvmType::Integer { llvm_type, .. } => LlvmValueKind::Integer {
+                value: 0,
+                llvm_value: llvm_type.const_zero(),
+            },
+            LlvmType::Float(llvm_type) => LlvmValueKind::Float {
+                value: 0.0,
+                llvm_value: llvm_type.const_zero(),
+            },
             _ => LlvmValueKind::Empty,
         };
 
         LlvmValue {
             ty: ty.clone(),
             kind,
+            inst: None,
         }
     }
 
@@ -394,7 +452,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         Some(cv.clone())
     }
 
-    fn string<'b>(str: String, tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>) -> Self {
+    fn string<'b>(str: String, tp: &Self::Ctx) -> Self {
         todo!()
     }
 
@@ -406,12 +464,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         todo!()
     }
 
-    fn integer<'b>(
-        value: u64,
-        width: u8,
-        signed: bool,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
-    ) -> Self {
+    fn integer<'b>(value: u64, width: u8, signed: bool, tp: &Self::Ctx) -> Self {
         let ty = tp.integer(width, signed);
         let val = ty
             .llvm_type()
@@ -425,6 +478,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 value,
                 llvm_value: val,
             },
+            inst: None,
         }
     }
 
@@ -450,7 +504,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn cinteger<'b>(value: u64, tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>) -> Self {
+    fn cinteger<'b>(value: u64, tp: &Self::Ctx) -> Self {
         let ty = tp.cinteger();
         let val = ty
             .llvm_type()
@@ -464,6 +518,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 value,
                 llvm_value: val.into(),
             },
+            inst: None,
         }
     }
 
@@ -474,11 +529,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn float<'b>(
-        value: f64,
-        width: u8,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
-    ) -> Self {
+    fn float<'b>(value: f64, width: u8, tp: &Self::Ctx) -> Self {
         let ty = tp.float(width);
         let val = ty.llvm_type().unwrap().into_float_type().const_float(value);
 
@@ -488,6 +539,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 value,
                 llvm_value: val.into(),
             },
+            inst: None,
         }
     }
 
@@ -509,7 +561,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn cfloat<'b>(value: f64, tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>) -> Self {
+    fn cfloat<'b>(value: f64, tp: &Self::Ctx) -> Self {
         let ty = tp.cfloat();
         let val = ty.llvm_type().unwrap().into_float_type().const_float(value);
 
@@ -519,6 +571,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 value,
                 llvm_value: val.into(),
             },
+            inst: None,
         }
     }
 
@@ -529,7 +582,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn bool<'b>(value: bool, tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>) -> Self {
+    fn bool<'b>(value: bool, tp: &Self::Ctx) -> Self {
         let ty = tp.bool();
         let val = ty
             .llvm_type()
@@ -543,6 +596,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 value,
                 llvm_value: val.into(),
             },
+            inst: None,
         }
     }
 
@@ -561,13 +615,32 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
     }
 
     fn function<'b>(
+        name: &str,
         body: tl_core::ast::Statement,
         parameters: LinkedHashMap<String, Self::Type>,
         return_type: Self::Type,
         node: tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>>,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
+        tp: &Self::Ctx,
     ) -> Self {
-        todo!()
+        // todo!()
+        let ty = return_type.llvm_fn_type(&[]).unwrap();
+        let val = tp.module.add_function(name, ty, None);
+        let bb = tp.context.append_basic_block(val.clone(), "entry");
+
+        LlvmValue {
+            ty: LlvmType::Function {
+                parameters,
+                return_type: Box::new(return_type),
+                llvm_type: ty,
+            },
+            kind: LlvmValueKind::Function {
+                rf: node,
+                body,
+                llvm_value: val,
+                entry_block: bb,
+            },
+            inst: None,
+        }
     }
 
     fn is_function(&self) -> bool {
@@ -596,7 +669,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         parameters: LinkedHashMap<String, Self::Type>,
         return_type: Self::Type,
         node: tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>>,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
+        tp: &Self::Ctx,
     ) -> Self {
         todo!()
     }
@@ -626,10 +699,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn tuple<'b>(
-        values: Vec<Self>,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
-    ) -> Self {
+    fn tuple<'b>(values: Vec<Self>, tp: &Self::Ctx) -> Self {
         todo!()
     }
 
@@ -654,12 +724,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn reference<'b>(
-        left: Self,
-        right: String,
-        right_ty: Self::Type,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
-    ) -> Self {
+    fn reference<'b>(left: Self, right: String, right_ty: Self::Type, tp: &Self::Ctx) -> Self {
         let rtype = right_ty.llvm_ptr_ty(AddressSpace::default());
         // let pt = left.
         todo!()
@@ -686,7 +751,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
     fn sym_reference<'b>(
         sym: &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>>,
         ty: Self::Type,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
+        tp: &Self::Ctx,
     ) -> Self {
         todo!()
     }
@@ -695,24 +760,22 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         sym: tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>>,
         storage: tl_util::Rf<dyn tl_evaluator::scope::intrinsics::IntrinsicType + Sync + Send>,
         generics: Vec<Self::Type>,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
+        tp: &Self::Ctx,
     ) -> Self {
         LlvmValue {
             kind: LlvmValueKind::IntrinsicStorage(storage, generics),
             ty: LlvmType::Intrinsic(sym),
+            inst: None,
         }
     }
 
-    fn try_implicit_cast<'b>(
-        &self,
-        ty: &Self::Type,
-        tp: &impl EvaluationTypeProvider<'b, Type = Self::Type>,
-    ) -> Option<Self> {
+    fn try_implicit_cast<'b>(&self, ty: &Self::Type, tp: &Self::Ctx) -> Option<Self> {
         match (self, ty) {
             (
                 LlvmValue {
                     kind: LlvmValueKind::Integer { value, .. },
                     ty: LlvmType::CoercibleInteger(_),
+                    ..
                 },
                 LlvmType::Integer { signed, llvm_type },
             ) => Some(LlvmValue::integer(
@@ -725,6 +788,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 LlvmValue {
                     kind: LlvmValueKind::Float { value, .. },
                     ty: LlvmType::CoercibleFloat(_),
+                    ..
                 },
                 LlvmType::Float(f),
             ) => Some(LlvmValue::float(*value, ty.get_float_width(), tp)),

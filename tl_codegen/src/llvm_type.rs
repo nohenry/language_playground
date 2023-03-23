@@ -1,7 +1,10 @@
 use std::fmt::{Debug, Display, Pointer};
 
 use inkwell::{
-    types::{AnyTypeEnum, FloatType, FunctionType, IntType, PointerType, StructType, VoidType},
+    types::{
+        AnyTypeEnum, BasicMetadataTypeEnum, BasicTypeEnum, FloatType, FunctionType, IntType,
+        PointerType, StructType, VoidType,
+    },
     AddressSpace,
 };
 use linked_hash_map::LinkedHashMap;
@@ -309,6 +312,48 @@ impl<'a> LlvmType<'a> {
             LlvmType::StructInitializer { llvm_type, .. } => (*llvm_type).into(),
             LlvmType::StructInstance { llvm_type, .. } => (*llvm_type).into(),
             LlvmType::Tuple { llvm_type, .. } => (*llvm_type).into(),
+            _ => return None,
+        };
+
+        Some(ty)
+    }
+
+    pub fn llvm_basic_type(&self) -> Option<BasicTypeEnum<'a>> {
+        let ty = match self {
+            LlvmType::Boolean(bool) => (*bool).into(),
+            LlvmType::Float(f) => (*f).into(),
+            LlvmType::Integer { llvm_type, .. } => (*llvm_type).into(),
+            LlvmType::CoercibleInteger(llvm_type) => (*llvm_type).into(),
+            LlvmType::CoercibleFloat(llvm_type) => (*llvm_type).into(),
+            LlvmType::Ref {
+                llvm_type: Some(llvm_type),
+                ..
+            } => (*llvm_type).into(),
+            LlvmType::StructInitializer { llvm_type, .. } => (*llvm_type).into(),
+            LlvmType::StructInstance { llvm_type, .. } => (*llvm_type).into(),
+            LlvmType::Tuple { llvm_type, .. } => (*llvm_type).into(),
+            _ => return None,
+        };
+
+        Some(ty)
+    }
+
+    pub fn llvm_fn_type(&self, params: &[BasicMetadataTypeEnum<'a>]) -> Option<FunctionType<'a>> {
+        let ty = match self {
+            LlvmType::Empty(void) => (*void).fn_type(params, false),
+            LlvmType::Boolean(bool) => (*bool).fn_type(params, false),
+            LlvmType::Float(f) => (*f).fn_type(params, false),
+            LlvmType::Integer { llvm_type, .. } => (*llvm_type).fn_type(params, false),
+            LlvmType::CoercibleInteger(llvm_type) => (*llvm_type).fn_type(params, false),
+            LlvmType::CoercibleFloat(llvm_type) => (*llvm_type).fn_type(params, false),
+            // LlvmType::Function { llvm_type, .. } => (*llvm_type).fn_type(params, false),
+            LlvmType::Ref {
+                llvm_type: Some(llvm_type),
+                ..
+            } => (*llvm_type).fn_type(params, false),
+            LlvmType::StructInitializer { llvm_type, .. } => (*llvm_type).fn_type(params, false),
+            LlvmType::StructInstance { llvm_type, .. } => (*llvm_type).fn_type(params, false),
+            LlvmType::Tuple { llvm_type, .. } => (*llvm_type).fn_type(params, false),
             _ => return None,
         };
 

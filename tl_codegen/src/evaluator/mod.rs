@@ -16,14 +16,17 @@ use tl_evaluator::{
 };
 use tl_util::Rf;
 
-use crate::{llvm_type::LlvmType, llvm_value::LlvmValue};
+use crate::{llvm_type::LlvmType, llvm_value::LlvmValue, LlvmContext};
 
 mod statement;
+mod expression;
+mod types;
 
 pub struct LlvmEvaluator<'a, P: Pass> {
     module: Arc<Module>,
     pub state: RwLock<EvaluatorState<LlvmType<'a>, LlvmValue<'a>>>,
     pd: PhantomData<&'a P>,
+    pub context: Rc<LlvmContext<'a>>,
 }
 
 impl<'a, P: Pass> Evaluator<P> for LlvmEvaluator<'a, P> {
@@ -36,6 +39,7 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
         root: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
         module: Arc<Module>,
         index: usize,
+        context: Rc<LlvmContext<'a>>,
     ) -> LlvmEvaluator<'a, TypeFirst> {
         let scope = Rf::new(Scope::new(
             root.clone(),
@@ -51,6 +55,7 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
                 errors: Vec::new(),
             }),
             pd: PhantomData,
+            context,
         }
     }
 }
@@ -60,6 +65,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
         root: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
         module: Arc<Module>,
         index: usize,
+        context: Rc<LlvmContext<'a>>,
     ) -> LlvmEvaluator<'a, MemberPass> {
         let scope = Rf::new(Scope::new(
             root.clone(),
@@ -75,17 +81,20 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 errors: Vec::new(),
             }),
             pd: PhantomData,
+            context
         }
     }
 
     pub fn new_with_state(
         state: EvaluatorState<LlvmType<'a>, LlvmValue<'a>>,
         module: Arc<Module>,
+        context: Rc<LlvmContext<'a>>,
     ) -> LlvmEvaluator<'a, MemberPass> {
         LlvmEvaluator {
             module,
             state: RwLock::new(state),
             pd: PhantomData,
+            context
         }
     }
 }
@@ -94,6 +103,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
     pub fn new(
         module: Arc<Module>,
         scope_manager: ScopeManager<LlvmType<'a>, LlvmValue<'a>>,
+        context: Rc<LlvmContext<'a>>,
     ) -> LlvmEvaluator<'a, EvaluationPass> {
         LlvmEvaluator {
             module,
@@ -102,6 +112,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 errors: Vec::new(),
             }),
             pd: PhantomData,
+            context,
         }
     }
 }
@@ -207,7 +218,7 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
         } else if arg_vals.len() == members.len() {
             // Everything good!
             return (
-                V::create_struct_instance(symbol.clone(), self.type_provider.as_ref()),
+                LlvmValue::create_struct_instance(symbol.clone(), self.type_provider.as_ref()),
                 arg_vals,
             );
         }

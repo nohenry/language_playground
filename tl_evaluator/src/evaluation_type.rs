@@ -50,8 +50,8 @@ pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debu
 
 }
 
-pub trait EvaluationTypeProvider<'a> {
-    type Type: EvaluationType + 'a;
+pub trait EvaluationTypeProvider {
+    type Type: EvaluationType;
 
     fn empty(&self) -> Self::Type;
     fn string(&self) -> Self::Type;
