@@ -13,17 +13,16 @@ use tl_evaluator::{
     pass::EvaluationPass,
     scope::scope::ScopeValue,
 };
+use tl_util::format::TreeDisplay;
 
-use crate::{llvm_value::LlvmValue, llvm_type::LlvmType};
+use crate::{llvm_type::LlvmType, llvm_value::LlvmValue};
 
 use super::LlvmEvaluator;
 
 impl<'a> LlvmEvaluator<'a, EvaluationPass> {
     pub fn evaluate_expression(&self, expression: &Expression, index: usize) -> LlvmValue<'a> {
         match expression {
-            Expression::Integer(val, _, _) => {
-                LlvmValue::cinteger(*val, self.context.as_ref())
-            }
+            Expression::Integer(val, _, _) => LlvmValue::cinteger(*val, self.context.as_ref()),
             Expression::Float(val, _, _) => LlvmValue::cfloat(*val, self.context.as_ref()),
             Expression::Boolean(b, _) => LlvmValue::bool(*b, self.context.as_ref()),
             Expression::String(ParsedTemplateString(vs), _) => {
@@ -34,7 +33,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         ParsedTemplate::Template(t, _, _) => {
                             let expr = self.evaluate_expression(t, index);
 
-                            if let Some(data) = expr.resolve_ref() {
+                            if let Some(data) = expr.resolve_ref(self.context.as_ref()) {
                                 if let ScopeValue::EvaluationValue(cv) = &data.borrow().value {
                                     return format!("{}", cv);
                                 }
@@ -52,11 +51,14 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 if let Some(sym) = sym {
                     let symv = sym.borrow();
                     match &symv.value {
-                        ScopeValue::EvaluationValue(cv) => LlvmValue::sym_reference(
-                            &sym,
-                            cv.get_type().clone(),
-                            self.context.as_ref(),
-                        ),
+                        ScopeValue::EvaluationValue(cv) => {
+                            let mut rf = LlvmValue::sym_reference(
+                                &sym,
+                                cv.get_type().clone(),
+                                self.context.as_ref(),
+                            );
+                            rf
+                        }
                         ScopeValue::Struct { .. } => LlvmValue::sym_reference(
                             &sym,
                             self.context.empty(),
@@ -93,7 +95,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 let args = self.evaluate_args(raw_args, index);
 
                 let expr = {
-                    let expr = expr.resolve_ref().unwrap();
+                    let expr = expr.resolve_ref(self.context.as_ref()).unwrap();
                     let expr = expr.borrow();
                     let expr = if let ScopeValue::EvaluationValue(cv) = &expr.value {
                         cv.clone()
@@ -120,7 +122,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                                 .unwrap_or(arg);
 
                             // let arg = if let Some(value) = arg.resolve_ref_value() {
-                            //     ConstValue {
+                            //     LlvmValue {
                             //         ty: value.ty,
                             //         kind: arg.kind,
                             //     }
@@ -215,7 +217,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                     let return_val = callback(has_args.as_ref().unwrap());
 
-                    // ConstValue::record_instance(rf.clone());
+                    // LlvmValue::record_instance(rf.clone());
 
                     return_val
                 } else {
@@ -236,7 +238,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
         match (op, raw_left) {
             (Operator::Equals, Expression::Ident(name)) => {
                 let right = self.evaluate_expression(raw_right, index);
-                let right = right.resolve_ref_value().unwrap();
+                let right = right.resolve_ref_value(self.context.as_ref()).unwrap();
 
                 let Some(sym) = self.wstate().scope.find_symbol(name.as_str()) else {
                     self.add_error(EvaluationError { kind: EvaluationErrorKind::SymbolNotFound(name.as_str().to_string()), range: name.get_range() }
@@ -268,7 +270,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 },
             ) => {
                 let right = self.evaluate_expression(raw_right, index);
-                let right = right.resolve_ref_value().unwrap();
+                let right = right.resolve_ref_value(self.context.as_ref()).unwrap();
                 // let right =
                 let scope = &mut self.wstate().scope;
                 let updated_value = scope.follow_member_access_mut(dleft, dright, |cv| {
@@ -286,7 +288,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                 match (raw_right, left.get_type().is_ref()) {
                     (Expression::Ident(member), true) => {
-                        let child = left.resolve_ref().unwrap();
+                        let child = left.resolve_ref(self.context.as_ref()).unwrap();
                         let child_scope = child.borrow();
 
                         let rtype = if let Some(val) = child_scope.children.get(member.as_str()) {
@@ -316,202 +318,220 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
         let left = self.evaluate_expression(raw_left, index);
         let right = self.evaluate_expression(raw_right, index);
 
-        let res = if left.is_cinteger() && right.is_cinteger() {
-            match op {
+        println!("{}", left.format());
+        let left = left
+            .resolve_ref_value(self.context.as_ref())
+            .unwrap_or(left);
+        let right = right
+            .resolve_ref_value(self.context.as_ref())
+            .unwrap_or(right);
+
+        let res = match (&left.ty, &right.ty) {
+            (LlvmType::CoercibleInteger(_), LlvmType::CoercibleInteger(_)) => match op {
                 Operator::Plus => LlvmValue::cinteger(
-                    left.integer_value() + right.integer_value(),
+                    left.kind.as_integer() + right.kind.as_integer(),
                     self.context.as_ref(),
                 ),
                 Operator::Minus => LlvmValue::cinteger(
-                    left.integer_value() - right.integer_value(),
+                    left.kind.as_integer() - right.kind.as_integer(),
                     self.context.as_ref(),
                 ),
                 Operator::Multiply => LlvmValue::cinteger(
-                    left.integer_value() * right.integer_value(),
+                    left.kind.as_integer() * right.kind.as_integer(),
                     self.context.as_ref(),
                 ),
                 Operator::Divide => LlvmValue::cinteger(
-                    left.integer_value() / right.integer_value(),
+                    left.kind.as_integer() / right.kind.as_integer(),
                     self.context.as_ref(),
                 ),
                 Operator::Exponent => LlvmValue::cinteger(
-                    left.integer_value().pow(right.integer_value() as _),
+                    left.kind.as_integer().pow(right.kind.as_integer() as _),
                     self.context.as_ref(),
                 ),
                 _ => LlvmValue::empty(self.context.as_ref()),
-            }
-        } else if left.is_integer() && right.is_cinteger()
-            || left.is_cinteger() && right.is_integer()
-        {
-            let (width, signed) = if left.is_integer() {
-                (left.integer_width(), left.is_signed())
-            } else {
-                (right.integer_width(), right.is_signed())
-            };
-            match op {
-                Operator::Plus => LlvmValue::integer(
-                    left.integer_value() + right.integer_value(),
-                    width,
+            },
+            (
+                LlvmType::Integer {
+                    // width,
                     signed,
+                    llvm_type: ty,
+                },
+                LlvmType::CoercibleInteger(_),
+            )
+            | (
+                LlvmType::CoercibleInteger(_),
+                LlvmType::Integer {
+                    // width,
+                    signed,
+                    llvm_type: ty,
+                },
+            ) => {
+                self.context.builder.build_int_add(
+                    left.llvm_basc_value().unwrap().into_int_value(),
+                    right.llvm_basc_value().unwrap().into_int_value(),
+                    "",
+                );
+                match op {
+                    Operator::Plus => LlvmValue::integer(
+                        left.kind.as_integer() + right.kind.as_integer(),
+                        ty.get_bit_width() as _,
+                        *signed,
+                        self.context.as_ref(),
+                    ),
+                    Operator::Minus => LlvmValue::integer(
+                        left.kind.as_integer() - right.kind.as_integer(),
+                        ty.get_bit_width() as _,
+                        *signed,
+                        self.context.as_ref(),
+                    ),
+                    Operator::Multiply => LlvmValue::integer(
+                        left.kind.as_integer() * right.kind.as_integer(),
+                        ty.get_bit_width() as _,
+                        *signed,
+                        self.context.as_ref(),
+                    ),
+                    Operator::Divide => LlvmValue::integer(
+                        left.kind.as_integer() / right.kind.as_integer(),
+                        ty.get_bit_width() as _,
+                        *signed,
+                        self.context.as_ref(),
+                    ),
+                    Operator::Exponent => LlvmValue::integer(
+                        left.kind.as_integer().pow(right.kind.as_integer() as _),
+                        ty.get_bit_width() as _,
+                        *signed,
+                        self.context.as_ref(),
+                    ),
+                    _ => LlvmValue::empty(self.context.as_ref()),
+                }
+            }
+            (
+                LlvmType::Integer {
+                    signed,
+                    llvm_type: ty,
+                },
+                LlvmType::Integer {
+                    signed: rs,
+                    llvm_type: rty,
+                },
+            ) if ty.get_bit_width() == rty.get_bit_width() && signed == rs => match op {
+                Operator::Plus => LlvmValue::integer(
+                    left.kind.as_integer() + right.kind.as_integer(),
+                    ty.get_bit_width() as _,
+                    *signed,
                     self.context.as_ref(),
                 ),
                 Operator::Minus => LlvmValue::integer(
-                    left.integer_value() - right.integer_value(),
-                    width,
-                    signed,
+                    left.kind.as_integer() - right.kind.as_integer(),
+                    ty.get_bit_width() as _,
+                    *signed,
                     self.context.as_ref(),
                 ),
                 Operator::Multiply => LlvmValue::integer(
-                    left.integer_value() * right.integer_value(),
-                    width,
-                    signed,
+                    left.kind.as_integer() * right.kind.as_integer(),
+                    ty.get_bit_width() as _,
+                    *signed,
                     self.context.as_ref(),
                 ),
                 Operator::Divide => LlvmValue::integer(
-                    left.integer_value() / right.integer_value(),
-                    width,
-                    signed,
+                    left.kind.as_integer() / right.kind.as_integer(),
+                    ty.get_bit_width() as _,
+                    *signed,
                     self.context.as_ref(),
                 ),
                 Operator::Exponent => LlvmValue::integer(
-                    left.integer_value().pow(right.integer_value() as _),
-                    width,
-                    signed,
+                    left.kind.as_integer().pow(right.kind.as_integer() as _),
+                    ty.get_bit_width() as _,
+                    *signed,
                     self.context.as_ref(),
                 ),
                 _ => LlvmValue::empty(self.context.as_ref()),
-            }
-        } else if left.is_integer()
-            && right.is_integer()
-            && left.integer_width() == right.integer_width()
-            && left.is_signed() == right.is_signed()
-        {
-            let width = left.integer_width();
-            let signed = left.is_signed();
-
-            match op {
-                Operator::Plus => LlvmValue::integer(
-                    left.integer_value() + right.integer_value(),
-                    width,
-                    signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Minus => LlvmValue::integer(
-                    left.integer_value() - right.integer_value(),
-                    width,
-                    signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Multiply => LlvmValue::integer(
-                    left.integer_value() * right.integer_value(),
-                    width,
-                    signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Divide => LlvmValue::integer(
-                    left.integer_value() / right.integer_value(),
-                    width,
-                    signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Exponent => LlvmValue::integer(
-                    left.integer_value().pow(right.integer_value() as _),
-                    width,
-                    signed,
-                    self.context.as_ref(),
-                ),
-                _ => LlvmValue::empty(self.context.as_ref()),
-            }
-        } else if left.is_cfloat() && right.is_cfloat() {
-            match op {
+            },
+            (LlvmType::CoercibleFloat(_), LlvmType::CoercibleFloat(_)) => match op {
                 Operator::Plus => LlvmValue::cfloat(
-                    left.float_value() + right.float_value(),
+                    left.kind.as_float() + right.kind.as_float(),
                     self.context.as_ref(),
                 ),
                 Operator::Minus => LlvmValue::cfloat(
-                    left.float_value() - right.float_value(),
+                    left.kind.as_float() - right.kind.as_float(),
                     self.context.as_ref(),
                 ),
                 Operator::Multiply => LlvmValue::cfloat(
-                    left.float_value() * right.float_value(),
+                    left.kind.as_float() * right.kind.as_float(),
                     self.context.as_ref(),
                 ),
                 Operator::Divide => LlvmValue::cfloat(
-                    left.float_value() / right.float_value(),
+                    left.kind.as_float() / right.kind.as_float(),
                     self.context.as_ref(),
                 ),
                 Operator::Exponent => LlvmValue::cfloat(
-                    left.float_value().powf(right.float_value()),
+                    left.kind.as_float().powf(right.kind.as_float()),
                     self.context.as_ref(),
                 ),
                 _ => LlvmValue::empty(self.context.as_ref()),
-            }
-        } else if left.is_float() && right.is_cfloat() || left.is_cfloat() && right.is_float() {
-            let width = if left.is_float() {
-                left.float_width()
-            } else {
-                right.float_width()
-            };
-            match op {
+            },
+            (ty @ LlvmType::Float(_), LlvmType::CoercibleFloat(_))
+            | (LlvmType::CoercibleFloat(_), ty @ LlvmType::Float(_)) => match op {
                 Operator::Plus => LlvmValue::float(
-                    left.float_value() + right.float_value(),
-                    width,
+                    left.kind.as_float() + right.kind.as_float(),
+                    ty.get_float_width(),
                     self.context.as_ref(),
                 ),
                 Operator::Minus => LlvmValue::float(
-                    left.float_value() - right.float_value(),
-                    width,
+                    left.kind.as_float() - right.kind.as_float(),
+                    ty.get_float_width(),
                     self.context.as_ref(),
                 ),
                 Operator::Multiply => LlvmValue::float(
-                    left.float_value() * right.float_value(),
-                    width,
+                    left.kind.as_float() * right.kind.as_float(),
+                    ty.get_float_width(),
                     self.context.as_ref(),
                 ),
                 Operator::Divide => LlvmValue::float(
-                    left.float_value() / right.float_value(),
-                    width,
+                    left.kind.as_float() / right.kind.as_float(),
+                    ty.get_float_width(),
                     self.context.as_ref(),
                 ),
                 Operator::Exponent => LlvmValue::float(
-                    left.float_value().powf(right.float_value()),
-                    width,
+                    left.kind.as_float().powf(right.kind.as_float()),
+                    ty.get_float_width(),
                     self.context.as_ref(),
                 ),
                 _ => LlvmValue::empty(self.context.as_ref()),
+            },
+            (lty @ LlvmType::Float(_), rty @ LlvmType::Float(_))
+                if lty.get_float_width() == rty.get_float_width() =>
+            {
+                match op {
+                    Operator::Plus => LlvmValue::float(
+                        left.kind.as_float() + right.kind.as_float(),
+                        lty.get_float_width(),
+                        self.context.as_ref(),
+                    ),
+                    Operator::Minus => LlvmValue::float(
+                        left.kind.as_float() - right.kind.as_float(),
+                        lty.get_float_width(),
+                        self.context.as_ref(),
+                    ),
+                    Operator::Multiply => LlvmValue::float(
+                        left.kind.as_float() * right.kind.as_float(),
+                        lty.get_float_width(),
+                        self.context.as_ref(),
+                    ),
+                    Operator::Divide => LlvmValue::float(
+                        left.kind.as_float() / right.kind.as_float(),
+                        lty.get_float_width(),
+                        self.context.as_ref(),
+                    ),
+                    Operator::Exponent => LlvmValue::float(
+                        left.kind.as_float().powf(right.kind.as_float()),
+                        lty.get_float_width(),
+                        self.context.as_ref(),
+                    ),
+                    _ => LlvmValue::empty(self.context.as_ref()),
+                }
             }
-        } else if left.is_float() && right.is_float() && left.float_width() == right.float_width() {
-            let width = left.float_width();
-            match op {
-                Operator::Plus => LlvmValue::float(
-                    left.float_value() + right.float_value(),
-                    width,
-                    self.context.as_ref(),
-                ),
-                Operator::Minus => LlvmValue::float(
-                    left.float_value() - right.float_value(),
-                    width,
-                    self.context.as_ref(),
-                ),
-                Operator::Multiply => LlvmValue::float(
-                    left.float_value() * right.float_value(),
-                    width,
-                    self.context.as_ref(),
-                ),
-                Operator::Divide => LlvmValue::float(
-                    left.float_value() / right.float_value(),
-                    width,
-                    self.context.as_ref(),
-                ),
-                Operator::Exponent => LlvmValue::float(
-                    left.float_value().powf(right.float_value()),
-                    width,
-                    self.context.as_ref(),
-                ),
-                _ => LlvmValue::empty(self.context.as_ref()),
-            }
-        } else {
-            LlvmValue::empty(self.context.as_ref())
+            _ => LlvmValue::empty(self.context.as_ref()),
         };
 
         if res.get_type().is_empty() {

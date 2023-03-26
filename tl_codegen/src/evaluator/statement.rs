@@ -34,6 +34,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) -> LlvmValue<'a> {
         match statement {
+            // Non-generic struct definition
             Statement::TypeAlias {
                 ident,
                 generic: None,
@@ -57,6 +58,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                 self.wstate().scope.pop_scope();
             }
+            // Generic struct definition
             Statement::TypeAlias {
                 ident,
                 generic: Some(gen),
@@ -108,6 +110,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                     }
                 }
             }
+            // Variable decleration
             Statement::Decleration {
                 ty,
                 ident,
@@ -163,7 +166,20 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         }
                     }
                 } else {
-                    let expr = expr.resolve_ref_value().unwrap_or_else(|| expr);
+
+                    let expr = match (&expr.ty, &ty) {
+                        (
+                            LlvmType::Ref { base_type: lty, .. },
+                            LlvmType::Ref { base_type: rty, .. },
+                        ) if lty == rty => {
+                            expr.clone()
+                        }
+                        _ => expr
+                            .resolve_ref_value(self.context.as_ref())
+                            .unwrap_or_else(|| expr),
+                    };
+                    println!("{}", expr.format());
+                    // let expr =
                     let mut expr = expr
                         .try_implicit_cast(&ty, self.context.as_ref())
                         .unwrap_or(expr);
@@ -519,7 +535,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 let ty = self.evaluate_type(ty);
                 let ty = ty.llvm_basic_type().unwrap();
 
-                let alloc = self.context.builder.build_alloca(ty, "");
+                let alloc = self.context.builder.build_alloca(ty, ident.as_str());
                 self.wstate().scope.insert_value(
                     ident.as_str(),
                     ScopeValue::EvaluationValue(LlvmValue {

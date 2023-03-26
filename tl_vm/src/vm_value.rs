@@ -126,10 +126,7 @@ impl VmValueKind {
 
     pub fn as_record_instance(
         &self,
-    ) -> (
-        &Rf<Scope<Type, VmValue>>,
-        &LinkedHashMap<String, VmValue>,
-    ) {
+    ) -> (&Rf<Scope<Type, VmValue>>, &LinkedHashMap<String, VmValue>) {
         match self {
             VmValueKind::StructInstance { rf, members } => (rf, members),
             _ => panic!(),

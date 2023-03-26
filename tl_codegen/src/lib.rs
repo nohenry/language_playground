@@ -36,7 +36,8 @@ use tl_util::{format::TreeDisplay, Rf};
 use crate::evaluator::LlvmEvaluator;
 
 pub mod context;
-pub mod evaluator;
+// pub mod evaluator;
+pub mod eval;
 pub mod llvm_type;
 pub mod llvm_value;
 
@@ -172,10 +173,6 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     // ** LLVM setup
     let llvm_context = Context::create();
 
-    // let i32_type = llvm_context.i32_type();
-    // let func_type = i32_type.fn_type(&[i32_type.into()], false);
-    // let func = llvm_module.add_function("main", func_type, None);
-
     // ** Codegen
 
     {
@@ -189,7 +186,6 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
             let bb = llvm_context.append_basic_block(val.clone(), "entry");
 
             llvm_builder.position_at_end(bb);
-            // llvm_builder.build_alloca(ty, name);
 
             bb
         };

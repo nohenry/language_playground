@@ -257,11 +257,15 @@ impl NodeDisplay for LlvmValue<'_> {
 
 impl TreeDisplay for LlvmValue<'_> {
     fn num_children(&self) -> usize {
-        0
+        2
     }
 
     fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
-        None
+        match index {
+            0 => Some(&self.ty),
+            1 => Some(&self.kind),
+            _ => None,
+        }
     }
 }
 
@@ -298,14 +302,15 @@ impl<'a> LlvmValue<'a> {
     }
 
     pub fn llvm_basc_value(&self) -> Option<BasicValueEnum<'a>> {
-        let value = match &self.kind {
-            LlvmValueKind::Integer { llvm_value, .. } => (*llvm_value).into(),
-            LlvmValueKind::Float { llvm_value, .. } => (*llvm_value).into(),
-            LlvmValueKind::Bool { llvm_value, .. } => (*llvm_value).into(),
-            LlvmValueKind::Ref { llvm_value, .. } => (*llvm_value).into(),
-            LlvmValueKind::Tuple(_, llvm_value) => (*llvm_value).into(),
-            LlvmValueKind::StructInitializer { llvm_value, .. } => (*llvm_value).into(),
-            LlvmValueKind::StructInstance { llvm_value, .. } => (*llvm_value).into(),
+        let value = match (&self.kind, &self.inst) {
+            (LlvmValueKind::Integer { llvm_value, .. }, _) => (*llvm_value).into(),
+            (LlvmValueKind::Float { llvm_value, .. }, _) => (*llvm_value).into(),
+            (LlvmValueKind::Bool { llvm_value, .. }, _) => (*llvm_value).into(),
+            (LlvmValueKind::Ref { llvm_value, .. }, _) => (*llvm_value).into(),
+            (LlvmValueKind::Symbol { .. }, Some(inst)) => (*inst).into(),
+            (LlvmValueKind::Tuple(_, llvm_value), _) => (*llvm_value).into(),
+            (LlvmValueKind::StructInitializer { llvm_value, .. }, _) => (*llvm_value).into(),
+            (LlvmValueKind::StructInstance { llvm_value, .. }, _) => (*llvm_value).into(),
             _ => return None,
         };
 
@@ -390,29 +395,49 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
     fn resolve_ref(
         &self,
-    ) -> Option<tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>>> {
-        match (&self.ty, &self.kind) {
+        tp: &Self::Ctx,
+    ) -> Option<Rf<Scope<Self::Type, Self>>> {
+        match (&self.ty, &self.kind, &self.inst) {
             (
                 LlvmType::Ref {
                     base_type: box LlvmType::Ref { .. },
                     ..
                 },
                 LlvmValueKind::Symbol(sym),
+                _,
             ) => {
                 let value = sym.borrow();
                 if let ScopeValue::EvaluationValue(cv) = &value.value {
-                    return cv.resolve_ref();
+                    println!("{}", cv.format());
+                    return cv.resolve_ref(tp);
                 }
                 return Some(sym.clone());
             }
-            (LlvmType::Ref { .. }, LlvmValueKind::Symbol(sym)) => return Some(sym.clone()),
+            (LlvmType::Ref { base_type, .. }, LlvmValueKind::Symbol(sym), Some(inst)) => {
+                unsafe {
+                    tp.builder
+                        .build_load(base_type.llvm_basic_type().unwrap(), *inst, "");
+                }
+                return Some(sym.clone());
+            }
             (
                 LlvmType::Ref { .. },
                 LlvmValueKind::Ref {
                     base, offset: None, ..
                 },
+                Some(inst),
             ) => {
-                return base.resolve_ref();
+                println!("{}", base.format());
+                return base.resolve_ref(tp);
+            }
+            (
+                LlvmType::Ref { .. },
+                LlvmValueKind::Ref {
+                    base, offset: None, ..
+                },
+                _,
+            ) => {
+                return base.resolve_ref(tp);
             }
             (
                 LlvmType::Ref { .. },
@@ -421,8 +446,9 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                     offset: Some(index),
                     ..
                 },
+                _,
             ) => {
-                let base = base.resolve_ref();
+                let base = base.resolve_ref(tp);
                 let Some(base) = base else {
                     return None;
                 };
@@ -438,8 +464,8 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn resolve_ref_value(&self) -> Option<Self> {
-        let Some(sym) = self.resolve_ref() else {
+    fn resolve_ref_value(&self, tp: &Self::Ctx) -> Option<Self> {
+        let Some(sym) = self.resolve_ref(tp) else {
             return None
         };
 
@@ -449,7 +475,15 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
             return None;
         };
 
-        Some(cv.clone())
+        let cv = cv.clone();
+
+        let lv = LlvmValue {
+            kind: cv.kind,
+            ty: cv.ty,
+            inst: cv.inst,
+        };
+
+        Some(lv)
     }
 
     fn string<'b>(str: String, tp: &Self::Ctx) -> Self {
@@ -753,7 +787,29 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         ty: Self::Type,
         tp: &Self::Ctx,
     ) -> Self {
-        todo!()
+        let pty = ty.llvm_ptr_ty(AddressSpace::default());
+
+        let inst = {
+            let sym = sym.borrow();
+            if let ScopeValue::EvaluationValue(val) = &sym.value {
+                if let Some(inst) = val.inst {
+                    Some(inst)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        LlvmValue {
+            ty: LlvmType::Ref {
+                base_type: Box::new(ty),
+                llvm_type: pty,
+            },
+            kind: LlvmValueKind::Symbol(sym.clone()),
+            inst,
+        }
     }
 
     fn intrinsic_storage<'b>(
@@ -771,6 +827,23 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
     fn try_implicit_cast<'b>(&self, ty: &Self::Type, tp: &Self::Ctx) -> Option<Self> {
         match (self, ty) {
+            (
+                LlvmValue {
+                    kind,
+                    // ty,
+                    inst: Some(inst),
+                    ..
+                },
+                LlvmType::Ref { .. },
+            ) => Some(LlvmValue {
+                ty: ty.clone(),
+                kind: LlvmValueKind::Ref {
+                    base: Box::new(self.clone()),
+                    offset: None,
+                    llvm_value: inst.clone(),
+                },
+                inst: Some(inst.clone()),
+            }),
             (
                 LlvmValue {
                     kind: LlvmValueKind::Integer { value, .. },

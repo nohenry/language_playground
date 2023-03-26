@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub trait EvaluationValue:
-    Sized + Clone + Into<Self::Type> + Display + NodeDisplay + TreeDisplay 
+    Sized + Clone + Into<Self::Type> + Display + NodeDisplay + TreeDisplay
 {
     type Type: EvaluationType<Value = Self>;
     type Ctx: EvaluationTypeProvider<Type = Self::Type>;
@@ -31,8 +31,8 @@ pub trait EvaluationValue:
     fn empty<'a>(tp: &Self::Ctx) -> Self;
     fn is_empty(&self) -> bool;
     fn default_for(ty: &Self::Type) -> Self;
-    fn resolve_ref(&self) -> Option<Rf<Scope<Self::Type, Self>>>;
-    fn resolve_ref_value(&self) -> Option<Self>;
+    fn resolve_ref(&self, ctx: &Self::Ctx) -> Option<Rf<Scope<Self::Type, Self>>>;
+    fn resolve_ref_value(&self, ctx: &Self::Ctx) -> Option<Self>;
 
     fn string<'a>(str: String, tp: &Self::Ctx) -> Self;
     fn is_string(&self) -> bool;
@@ -65,7 +65,7 @@ pub trait EvaluationValue:
         parameters: LinkedHashMap<String, Self::Type>,
         return_type: Self::Type,
         node: Rf<Scope<Self::Type, Self>>,
-        tp: &Self::Ctx
+        tp: &Self::Ctx,
     ) -> Self;
     fn is_function(&self) -> bool;
     fn function_body(&self) -> &Statement;
@@ -76,7 +76,7 @@ pub trait EvaluationValue:
         parameters: LinkedHashMap<String, Self::Type>,
         return_type: Self::Type,
         node: Rf<Scope<Self::Type, Self>>,
-        tp: &Self::Ctx
+        tp: &Self::Ctx,
     ) -> Self;
     fn is_native_function(&self) -> bool;
     fn native_function_callback(
@@ -96,13 +96,14 @@ pub trait EvaluationValue:
     fn reference<'a>(left: Self, right: String, right_ty: Self::Type, tp: &Self::Ctx) -> Self;
     fn is_reference(&self) -> bool;
 
-    fn sym_reference<'a>(sym: &Rf<Scope<Self::Type, Self>>, ty: Self::Type, tp: &Self::Ctx) -> Self;
+    fn sym_reference<'a>(sym: &Rf<Scope<Self::Type, Self>>, ty: Self::Type, tp: &Self::Ctx)
+        -> Self;
 
     fn intrinsic_storage<'a>(
         sym: Rf<Scope<Self::Type, Self>>,
         storage: Rf<dyn IntrinsicType + Sync + Send>,
         generics: Vec<Self::Type>,
-        tp: &Self::Ctx
+        tp: &Self::Ctx,
     ) -> Self;
 
     fn try_implicit_cast<'a>(&self, ty: &Self::Type, tp: &Self::Ctx) -> Option<Self>;

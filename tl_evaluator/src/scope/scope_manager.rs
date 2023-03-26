@@ -427,14 +427,16 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> ScopeManage
     }
 }
 
-impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for ScopeManager<T, V> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay
+    for ScopeManager<T, V>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str("Scope Manager")
     }
 }
 
-impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay> TreeDisplay
-    for ScopeManager<T, V>
+impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay>
+    TreeDisplay for ScopeManager<T, V>
 {
     fn num_children(&self) -> usize {
         1

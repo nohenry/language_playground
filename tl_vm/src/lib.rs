@@ -55,11 +55,8 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     {
         let std_module = std_module();
 
-        let code_pass = Evaluator::<Type, VmValue, TypeFirst>::new(
-            symbol_tree.clone(),
-            std_module.clone(),
-            0,
-        );
+        let code_pass =
+            Evaluator::<Type, VmValue, TypeFirst>::new(symbol_tree.clone(), std_module.clone(), 0);
         code_pass.evaluate();
         let code_pass_state = code_pass.finish();
 
@@ -105,8 +102,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
 
     println!("{}", symbol_tree.format());
 
-    let evaluator =
-        Evaluator::<Type, VmValue, EvaluationPass>::new(module, code_pass_state.scope);
+    let evaluator = Evaluator::<Type, VmValue, EvaluationPass>::new(module, code_pass_state.scope);
     let _values = evaluator.evaluate();
 
     println!("{}", symbol_tree.format());

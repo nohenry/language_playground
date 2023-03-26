@@ -282,7 +282,9 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
                 if let Some(sym) = self.scope.find_symbol(tok.as_str()) {
                     let sym = sym.borrow();
                     match &sym.value {
-                        ScopeValue::EvaluationValue(value) if value.is_function() || value.is_native_function() => {
+                        ScopeValue::EvaluationValue(value)
+                            if value.is_function() || value.is_native_function() =>
+                        {
                             self.builder.push_token(
                                 tok,
                                 get_stype_index(SemanticTokenType::FUNCTION),
@@ -496,7 +498,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> SemanticTokenGe
                             ..
                         } => {
                             if !self.verify_generics_match(generics, &types, list.get_range()) {
-                                return T::empty()
+                                return T::empty();
                             }
 
                             // If we have already constructed this struct with the same type arguments, reuse this construction
@@ -505,7 +507,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> SemanticTokenGe
                                     .children
                                     .get(child_construction_name)
                                     .expect("Compiler Bug!");
-                                return T::symbol(construction.clone())
+                                return T::symbol(construction.clone());
                             }
                             panic!("Should Prboably have returned?");
 
@@ -516,14 +518,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> SemanticTokenGe
                             generics,
                         } => {
                             if !self.verify_generics_match(generics, &types, list.get_range()) {
-                                return T::empty()
+                                return T::empty();
                             }
 
                             return T::intrinsic(symrf.clone());
                         }
-                        _ => {
-                            return T::empty()
-                        }
+                        _ => return T::empty(),
                     }
                 };
 

@@ -29,13 +29,9 @@ pub trait Evaluator<P: Pass> {
     type Value<'a>: EvaluationValue<Type = Self::Type<'a>> + 'a;
 }
 
-
-
 // pub struct Evaluator<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>, TP: EvaluationTypeProvider<'a, Type = T>, P: Pass> {
 //     module: Arc<Module>,
 //     pub state: RwLock<EvaluatorState<T, V>>,
 //     pass: PhyyantomData<&'a P>,
 //     pub type_provider: Rc<TP>,
 // }
-
-

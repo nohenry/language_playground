@@ -8,7 +8,10 @@ use inkwell::{
     AddressSpace,
 };
 use linked_hash_map::LinkedHashMap;
-use tl_evaluator::{evaluation_type::EvaluationType, scope::scope::Scope};
+use tl_evaluator::{
+    evaluation_type::EvaluationType,
+    scope::scope::{Scope, ScopeValue},
+};
 use tl_util::{
     format::{NodeDisplay, TreeDisplay},
     Rf,
@@ -16,7 +19,7 @@ use tl_util::{
 
 use crate::llvm_value::LlvmValue;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq)]
 pub enum LlvmType<'a> {
     CoercibleInteger(IntType<'a>),
     CoercibleFloat(FloatType<'a>),
@@ -93,6 +96,80 @@ impl std::hash::Hash for LlvmType<'_> {
     }
 }
 
+impl PartialEq for LlvmType<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Integer {
+                    signed: l_signed,
+                    llvm_type: lty,
+                },
+                Self::Integer {
+                    signed: r_signed,
+                    llvm_type: rty,
+                },
+            ) => lty.get_bit_width() == rty.get_bit_width() && l_signed == r_signed,
+            (Self::Float { .. }, Self::Float { .. }) => {
+                self.get_float_width() == other.get_float_width()
+            }
+            (
+                Self::Function {
+                    parameters: l_parameters,
+                    return_type: l_return_parameters,
+                    ..
+                },
+                Self::Function {
+                    parameters: r_parameters,
+                    return_type: r_return_parameters,
+                    ..
+                },
+            ) => l_parameters == r_parameters && l_return_parameters == r_return_parameters,
+            (Self::Symbol(l0), Self::Symbol(r0)) => l0 == r0,
+            (Self::Tuple { types: l0, .. }, Self::Tuple { types: r0, .. }) => l0 == r0,
+            (
+                Self::StructInstance {
+                    rf: l_rf,
+                    members: l_members,
+                    ..
+                },
+                Self::StructInstance {
+                    rf: r_rf,
+                    members: r_members,
+                    ..
+                },
+            ) => l_rf == r_rf && l_members == r_members,
+
+            (Self::Intrinsic(l), Self::Intrinsic(r)) => l == r,
+            (Self::Intrinsic(l), Self::Symbol(r)) => l == r,
+            (Self::Symbol(l), Self::Intrinsic(r)) => l == r,
+
+            (Self::StructInstance { rf: Some(l_rf), .. }, Self::Symbol(sym)) => l_rf == sym,
+            (Self::Symbol(sym), Self::StructInstance { rf: Some(l_rf), .. }) => sym == l_rf,
+
+            (Self::Symbol(sym), right) | (right, Self::Symbol(sym)) => {
+                let sym = sym.borrow();
+                if let ScopeValue::TypeAlias { ty, .. } = &sym.value {
+                    return &**ty == right;
+                }
+                false
+            }
+
+            (Self::Empty(_), Self::Empty(_)) => true,
+            (Self::Boolean(_), Self::Boolean(_)) => true,
+            // (Self::String, Self::String) => true,
+            (
+                Self::Ref {
+                    base_type: bty_l, ..
+                },
+                Self::Ref {
+                    base_type: bty_r, ..
+                },
+            ) => bty_l == bty_r,
+            _ => false, // _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
 impl Display for LlvmType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self, f)
@@ -135,11 +212,49 @@ impl NodeDisplay for LlvmType<'_> {
 
 impl TreeDisplay for LlvmType<'_> {
     fn num_children(&self) -> usize {
-        0
+        match self {
+            LlvmType::Function { .. } => 2,
+            LlvmType::Tuple{ types, .. } => types.len(),
+            LlvmType::StructInstance { members, .. } => members.len(),
+            LlvmType::StructInitializer { members, .. } => members.len(),
+            LlvmType::Ref { .. } => 1,
+            // Type::Symbol(_) => 1,
+            _ => 0,
+        }
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
-        None
+    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+        match self {
+            LlvmType::Function {
+                parameters,
+                return_type,
+                ..
+            } => match _index {
+                0 => Some(parameters),
+                1 => Some(&**return_type),
+                _ => None,
+            },
+            LlvmType::Tuple { types, .. } => {
+                if let Some(ty) = types.get(_index) {
+                    Some(ty)
+                } else {
+                    None
+                }
+            }
+            LlvmType::StructInstance { .. } => None,
+            // Type::Ref {  } => None,
+            LlvmType::Ref { base_type, .. } => Some(&**base_type),
+
+            _ => None,
+        }
+    }
+
+    fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+        match self {
+            LlvmType::StructInstance { members, .. } => members.child_at_bx(_index),
+            LlvmType::StructInitializer { members, .. } => members.child_at_bx(_index),
+            _ => panic!(),
+        }
     }
 }
 

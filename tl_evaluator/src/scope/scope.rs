@@ -1,11 +1,17 @@
-use std::{collections::HashMap, sync::Arc, hash::Hasher};
+use std::{collections::HashMap, hash::Hasher, sync::Arc};
 
 use crate::evaluation_type::EvaluationType;
 use crate::evaluation_value::EvaluationValue;
 
 use linked_hash_map::LinkedHashMap;
-use tl_core::{ast::{EnclosedList, Param, GenericParameter}, Module};
-use tl_util::{Rf, format::{NodeDisplay, TreeDisplay, GrouperIter, BoxedGrouperIter, BoxedGrouper}};
+use tl_core::{
+    ast::{EnclosedList, GenericParameter, Param},
+    Module,
+};
+use tl_util::{
+    format::{BoxedGrouper, BoxedGrouperIter, GrouperIter, NodeDisplay, TreeDisplay},
+    Rf,
+};
 
 use super::intrinsics::IntrinsicType;
 
@@ -39,7 +45,7 @@ pub enum ScopeValue<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> 
     Root,
 }
 
-impl <T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for ScopeValue<T, V> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for ScopeValue<T, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             // ScopeValue::ConstValue(ConstValue {
@@ -59,7 +65,9 @@ impl <T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay fo
     }
 }
 
-impl <T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay> TreeDisplay for ScopeValue<T, V> {
+impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay>
+    TreeDisplay for ScopeValue<T, V>
+{
     fn num_children(&self) -> usize {
         match self {
             ScopeValue::EvaluationValue(c) => c.num_children(),
@@ -110,7 +118,7 @@ pub struct Scope<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> {
     pub index: usize,
 }
 
-impl <T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Scope<T, V> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Scope<T, V> {
     pub fn root() -> Scope<T, V> {
         Scope {
             name: "".to_string(),
@@ -122,7 +130,12 @@ impl <T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Scope<T, V> {
         }
     }
 
-    pub fn new(parent: Rf<Scope<T, V>>, name: String, value: ScopeValue<T, V>, index: usize) -> Scope<T, V> {
+    pub fn new(
+        parent: Rf<Scope<T, V>>,
+        name: String,
+        value: ScopeValue<T, V>,
+        index: usize,
+    ) -> Scope<T, V> {
         Scope {
             name: name.to_string(),
             value,
@@ -186,13 +199,15 @@ impl <T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Scope<T, V> {
     }
 }
 
-impl <T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for Scope<T, V> {
+impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for Scope<T, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Scope - {} {}", self.index, self.children.len())
     }
 }
 
-impl <T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay> TreeDisplay for Scope<T, V> {
+impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay>
+    TreeDisplay for Scope<T, V>
+{
     fn num_children(&self) -> usize {
         1 + (if !self.children.is_empty() { 1 } else { 0 })
             + (if !self.uses.is_empty() { 1 } else { 0 })

@@ -1,11 +1,7 @@
-
-pub trait Pass {
-
-}
+pub trait Pass {}
 
 pub struct TypeFirst;
 impl Pass for TypeFirst {}
-
 
 pub struct TypeSecond;
 impl Pass for TypeSecond {}

@@ -189,18 +189,13 @@ impl LanguageServer for Backend {
 
         let module = Arc::new(out.0);
 
-        let code_pass = Evaluator::<Type, VmValue, TypeFirst>::new(
-            self.symbol_tree.clone(),
-            module.clone(),
-            1,
-        );
+        let code_pass =
+            Evaluator::<Type, VmValue, TypeFirst>::new(self.symbol_tree.clone(), module.clone(), 1);
         code_pass.evaluate();
         let code_pass_state = code_pass.finish();
 
-        let code_pass = Evaluator::<Type, VmValue, MemberPass>::new_with_state(
-            code_pass_state,
-            module.clone(),
-        );
+        let code_pass =
+            Evaluator::<Type, VmValue, MemberPass>::new_with_state(code_pass_state, module.clone());
         code_pass.evaluate();
         let code_pass_state = code_pass.finish();
 

@@ -1,10 +1,12 @@
-use std::{hash::Hash, fmt::{Display, Debug}};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 use linked_hash_map::LinkedHashMap;
 use tl_util::Rf;
 
-use crate::{scope::scope::Scope, evaluation_value::EvaluationValue};
-
+use crate::{evaluation_value::EvaluationValue, scope::scope::Scope};
 
 pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debug {
     type Value: EvaluationValue<Type = Self>;
@@ -47,7 +49,6 @@ pub trait EvaluationType: Sized + Clone + Hash + PartialEq + Eq + Display + Debu
 
     fn symbol_rf(&self) -> &Rf<Scope<Self, Self::Value>>;
     fn intrinsic_rf(&self) -> &Rf<Scope<Self, Self::Value>>;
-
 }
 
 pub trait EvaluationTypeProvider {
@@ -61,10 +62,15 @@ pub trait EvaluationTypeProvider {
     fn cfloat(&self) -> Self::Type;
     fn bool(&self) -> Self::Type;
     fn function(&self) -> Self::Type;
-    fn symbol(&self, symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>) -> Self::Type;
+    fn symbol(
+        &self,
+        symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>,
+    ) -> Self::Type;
     fn rf(&self, base_type: Self::Type) -> Self::Type;
-    fn intrinsic(&self, symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>) -> Self::Type;
-
+    fn intrinsic(
+        &self,
+        symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>,
+    ) -> Self::Type;
 
     // fn inform_function_decleration(&self);
     fn function_def(

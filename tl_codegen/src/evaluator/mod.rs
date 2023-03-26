@@ -5,21 +5,26 @@ use std::{
 };
 
 use linked_hash_map::LinkedHashMap;
-use tl_core::{ast::{ArgList, ParamaterList, EnclosedList, Param}, Module, token::Range};
+use tl_core::{
+    ast::{ArgList, EnclosedList, Param, ParamaterList},
+    token::Range,
+    Module,
+};
 use tl_evaluator::{
+    error::EvaluationError,
     evaluator::{Evaluator, EvaluatorState},
     pass::{EvaluationPass, MemberPass, Pass, TypeFirst},
     scope::{
         scope::{Scope, ScopeValue},
         scope_manager::ScopeManager,
-    }, error::EvaluationError,
+    },
 };
 use tl_util::Rf;
 
 use crate::{llvm_type::LlvmType, llvm_value::LlvmValue, LlvmContext};
 
-mod statement;
 mod expression;
+mod statement;
 mod types;
 
 pub struct LlvmEvaluator<'a, P: Pass> {
@@ -81,7 +86,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 errors: Vec::new(),
             }),
             pd: PhantomData,
-            context
+            context,
         }
     }
 
@@ -94,7 +99,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
             module,
             state: RwLock::new(state),
             pd: PhantomData,
-            context
+            context,
         }
     }
 }
@@ -133,39 +138,36 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
 
 impl<'a> LlvmEvaluator<'a, EvaluationPass> {
     fn evaluate_args(&self, args: &ArgList, index: usize) -> Vec<LlvmValue<'a>> {
-        // args.iter_items()
-        //     .map(|expr| self.evaluate_expression(expr, index))
-        //     .collect()
-        Vec::new()
+        args.iter_items()
+            .map(|expr| self.evaluate_expression(expr, index))
+            .collect()
     }
 }
 
 impl<'a, P: Pass> LlvmEvaluator<'a, P> {
     pub fn evaluate_params(&self, params: &ParamaterList) -> LinkedHashMap<String, LlvmType<'a>> {
-        todo!()
-        // let iter = params.items.iter_items().filter_map(|f| {
-        //     if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
-        //         Some((ident.as_str().to_string(), self.evaluate_type(ty)))
-        //     } else {
-        //         None
-        //     }
-        // });
-        // LinkedHashMap::from_iter(iter)
+        let iter = params.items.iter_items().filter_map(|f| {
+            if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
+                Some((ident.as_str().to_string(), self.evaluate_type(ty)))
+            } else {
+                None
+            }
+        });
+        LinkedHashMap::from_iter(iter)
     }
 
     pub fn evaluate_struct_members(
         &self,
         members: &EnclosedList<Param>,
     ) -> LinkedHashMap<String, LlvmType<'a>> {
-        todo!()
-        // let iter = members.iter_items().filter_map(|f| {
-        //     if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
-        //         Some((ident.as_str().to_string(), self.evaluate_type(ty)))
-        //     } else {
-        //         None
-        //     }
-        // });
-        // LinkedHashMap::from_iter(iter)
+        let iter = members.iter_items().filter_map(|f| {
+            if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
+                Some((ident.as_str().to_string(), self.evaluate_type(ty)))
+            } else {
+                None
+            }
+        });
+        LinkedHashMap::from_iter(iter)
     }
 
     pub fn evaluate_struct_init(
