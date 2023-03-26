@@ -1,10 +1,9 @@
 #include <stdio.h>
 
 int main() {
-    int i = 6;
-    int j = i + 8;
-    // int *p = &i;
-    // int **pp = &p;
+    double f = 10.45;
 
-    printf("%p %d\n", j, i);
+    float d = (float)f;
+
+    printf("%f %f\n", f, d);
 }

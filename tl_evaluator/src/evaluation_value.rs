@@ -30,34 +30,34 @@ pub trait EvaluationValue:
 
     fn empty<'a>(tp: &Self::Ctx) -> Self;
     fn is_empty(&self) -> bool;
-    fn default_for(ty: &Self::Type) -> Self;
+    fn default_for(ty: &Self::Type, ctx: &Self::Ctx) -> Self;
     fn resolve_ref(&self, ctx: &Self::Ctx) -> Option<Rf<Scope<Self::Type, Self>>>;
     fn resolve_ref_value(&self, ctx: &Self::Ctx) -> Option<Self>;
 
     fn string<'a>(str: String, tp: &Self::Ctx) -> Self;
-    fn is_string(&self) -> bool;
-    fn string_value(&self) -> &str;
+    // fn is_string(&self) -> bool;
+    // fn string_value(&self) -> &str;
 
     fn integer<'a>(value: u64, width: u8, signed: bool, tp: &Self::Ctx) -> Self;
-    fn is_integer(&self) -> bool;
-    fn integer_width(&self) -> u8;
-    fn is_signed(&self) -> bool;
-    fn integer_value(&self) -> u64;
+    // fn is_integer(&self) -> bool;
+    // fn integer_width(&self) -> u8;
+    // fn is_signed(&self) -> bool;
+    // fn integer_value(&self) -> u64;
 
     fn cinteger<'a>(value: u64, tp: &Self::Ctx) -> Self;
-    fn is_cinteger(&self) -> bool;
+    // fn is_cinteger(&self) -> bool;
 
     fn float<'a>(value: f64, width: u8, tp: &Self::Ctx) -> Self;
-    fn is_float(&self) -> bool;
-    fn float_width(&self) -> u8;
-    fn float_value(&self) -> f64;
+    // fn is_float(&self) -> bool;
+    // fn float_width(&self) -> u8;
+    // fn float_value(&self) -> f64;
 
     fn cfloat<'a>(value: f64, tp: &Self::Ctx) -> Self;
-    fn is_cfloat(&self) -> bool;
+    // fn is_cfloat(&self) -> bool;
 
     fn bool<'a>(value: bool, tp: &Self::Ctx) -> Self;
-    fn is_bool(&self) -> bool;
-    fn bool_value(&self) -> bool;
+    // fn is_bool(&self) -> bool;
+    // fn bool_value(&self) -> bool;
 
     fn function<'a>(
         name: &str,
@@ -67,9 +67,9 @@ pub trait EvaluationValue:
         node: Rf<Scope<Self::Type, Self>>,
         tp: &Self::Ctx,
     ) -> Self;
-    fn is_function(&self) -> bool;
-    fn function_body(&self) -> &Statement;
-    fn function_rf(&self) -> &Rf<Scope<Self::Type, Self>>;
+    // fn is_function(&self) -> bool;
+    // fn function_body(&self) -> &Statement;
+    // fn function_rf(&self) -> &Rf<Scope<Self::Type, Self>>;
 
     fn native_function<'a>(
         callback: Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send>,
@@ -78,16 +78,16 @@ pub trait EvaluationValue:
         node: Rf<Scope<Self::Type, Self>>,
         tp: &Self::Ctx,
     ) -> Self;
-    fn is_native_function(&self) -> bool;
-    fn native_function_callback(
-        &self,
-    ) -> &Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send>;
-    fn native_function_rf(&self) -> &Rf<Scope<Self::Type, Self>>;
+    // fn is_native_function(&self) -> bool;
+    // fn native_function_callback(
+    //     &self,
+    // ) -> &Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send>;
+    // fn native_function_rf(&self) -> &Rf<Scope<Self::Type, Self>>;
 
     fn tuple<'a>(values: Vec<Self>, tp: &Self::Ctx) -> Self;
-    fn is_tuple(&self) -> bool;
-    fn tuple_value(self) -> Vec<Self>;
-    fn tuple_value_rf(&self) -> &Vec<Self>;
+    // fn is_tuple(&self) -> bool;
+    // fn tuple_value(self) -> Vec<Self>;
+    // fn tuple_value_rf(&self) -> &Vec<Self>;
 
     /// Creates a reference value with a member access expression.
     ///

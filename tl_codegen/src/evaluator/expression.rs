@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use inkwell::intrinsics::Intrinsic;
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
     ast::{AstNode, Expression, ParsedTemplate, ParsedTemplateString},
@@ -15,7 +16,11 @@ use tl_evaluator::{
 };
 use tl_util::format::TreeDisplay;
 
-use crate::{llvm_type::LlvmType, llvm_value::LlvmValue};
+use crate::{
+    context,
+    llvm_type::LlvmType,
+    llvm_value::{LlvmValue, LlvmValueKind},
+};
 
 use super::LlvmEvaluator;
 
@@ -105,123 +110,145 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                     expr
                 };
 
-                if expr.is_function() {
-                    let ptypes = expr.get_type().function_parameters_rf();
-                    let body = expr.function_body();
-                    let rf = expr.function_rf();
+                match (&expr.ty, &expr.kind) {
+                    // Normal function
+                    (
+                        LlvmType::Function {
+                            parameters,
+                            return_type,
+                            llvm_type,
+                        },
+                        LlvmValueKind::Function {
+                            rf,
+                            body,
+                            entry_block,
+                        },
+                    ) => {
+                        self.wstate().scope.push_scope(rf.clone());
 
-                    self.wstate().scope.push_scope(rf.clone());
-
-                    let has_args: Option<Vec<_>> = args
-                        .into_iter()
-                        .zip(ptypes.into_iter())
-                        .enumerate()
-                        .map(|(i, (arg, (name, ty)))| {
-                            let arg = arg
-                                .try_implicit_cast(&ty, self.context.as_ref())
-                                .unwrap_or(arg);
-
-                            // let arg = if let Some(value) = arg.resolve_ref_value() {
-                            //     LlvmValue {
-                            //         ty: value.ty,
-                            //         kind: arg.kind,
-                            //     }
-                            // } else {
-                            //     arg
-                            // };
-
-                            if arg.get_type() != ty {
-                                self.add_error(EvaluationError {
-                                    kind: EvaluationErrorKind::TypeMismatch(
-                                        arg.into(),
-                                        ty.clone(),
-                                        TypeHint::Parameter,
-                                    ),
-                                    range: raw_args.items.iter_items().nth(i).unwrap().get_range(),
-                                });
-                                return None;
-                            }
-                            self.wstate().scope.insert_value(
-                                &name,
-                                ScopeValue::EvaluationValue(arg),
-                                index,
-                            );
-
-                            Some(())
-                        })
-                        .collect();
-
-                    if has_args.is_none() {
-                        return LlvmValue::empty(self.context.as_ref());
-                    }
-
-                    let return_value = self.evaluate_statement(&body, index);
-
-                    self.wstate().scope.pop_scope();
-
-                    // TODO: verify types here as well
-                    if return_value.is_tuple() {
-                        return_value
-                            .tuple_value()
+                        let has_args: Option<Vec<_>> = args
                             .into_iter()
-                            .last()
-                            .unwrap_or_else(|| LlvmValue::empty(self.context.as_ref()))
-                    } else {
-                        return_value
+                            .zip(parameters.iter())
+                            .enumerate()
+                            .map(|(i, (arg, (name, ty)))| {
+                                let arg = arg
+                                    .try_implicit_cast(&ty, self.context.as_ref())
+                                    .unwrap_or(arg);
+
+                                // let arg = if let Some(value) = arg.resolve_ref_value() {
+                                //     LlvmValue {
+                                //         ty: value.ty,
+                                //         kind: arg.kind,
+                                //     }
+                                // } else {
+                                //     arg
+                                // };
+
+                                if arg.get_type() != ty {
+                                    self.add_error(EvaluationError {
+                                        kind: EvaluationErrorKind::TypeMismatch(
+                                            arg.into(),
+                                            ty.clone(),
+                                            TypeHint::Parameter,
+                                        ),
+                                        range: raw_args
+                                            .items
+                                            .iter_items()
+                                            .nth(i)
+                                            .unwrap()
+                                            .get_range(),
+                                    });
+                                    return None;
+                                }
+                                self.wstate().scope.insert_value(
+                                    &name,
+                                    ScopeValue::EvaluationValue(arg),
+                                    index,
+                                );
+
+                                Some(())
+                            })
+                            .collect();
+
+                        if has_args.is_none() {
+                            return LlvmValue::empty(self.context.as_ref());
+                        }
+
+                        let return_value = self.evaluate_statement(&body, index);
+
+                        self.wstate().scope.pop_scope();
+
+                        // TODO: verify types here as well
+                        match return_value.kind {
+                            LlvmValueKind::Tuple(vals) => vals
+                                .into_iter()
+                                .last()
+                                .unwrap_or_else(|| LlvmValue::empty(self.context.as_ref())),
+                            _ => return_value,
+                        }
                     }
-                } else if expr.is_native_function() {
-                    let ptypes: LinkedHashMap<String, LlvmType<'a>> = expr
-                        .get_type()
-                        .function_parameters_rf()
-                        .map(|(s, t)| (s.clone(), t.clone()))
-                        .collect();
-                    let callback = expr.native_function_callback();
 
-                    let arglen = args.len();
-                    let plen = ptypes.len();
+                    // Native function
+                    (
+                        LlvmType::Function {
+                            parameters,
+                            return_type,
+                            llvm_type,
+                        },
+                        LlvmValueKind::NativeFunction { rf, callback },
+                    ) => {
+                        // let callback = expr.native_function_callback();
 
-                    let has_args: Option<LinkedHashMap<_, _>> = args
-                        .into_iter()
-                        .zip(ptypes.into_iter())
-                        .enumerate()
-                        .map(|(i, (arg, (name, ty)))| {
-                            let arg = arg
-                                .try_implicit_cast(&ty, self.context.as_ref())
-                                .unwrap_or(arg);
+                        let arglen = args.len();
+                        let plen = parameters.len();
 
-                            if arg.get_type() != &ty {
-                                self.add_error(EvaluationError {
-                                    kind: EvaluationErrorKind::TypeMismatch(
-                                        arg.into(),
-                                        ty.clone(),
-                                        TypeHint::Parameter,
-                                    ),
-                                    range: raw_args.items.iter_items().nth(i).unwrap().get_range(),
-                                });
-                                return None;
-                            }
+                        let has_args: Option<LinkedHashMap<_, _>> = args
+                            .into_iter()
+                            .zip(parameters.iter())
+                            .enumerate()
+                            .map(|(i, (arg, (name, ty)))| {
+                                let arg = arg
+                                    .try_implicit_cast(&ty, self.context.as_ref())
+                                    .unwrap_or(arg);
 
-                            Some((name.clone(), arg))
-                        })
-                        .collect();
+                                if arg.get_type() != ty {
+                                    self.add_error(EvaluationError {
+                                        kind: EvaluationErrorKind::TypeMismatch(
+                                            arg.into(),
+                                            ty.clone(),
+                                            TypeHint::Parameter,
+                                        ),
+                                        range: raw_args
+                                            .items
+                                            .iter_items()
+                                            .nth(i)
+                                            .unwrap()
+                                            .get_range(),
+                                    });
+                                    return None;
+                                }
 
-                    if has_args.is_none() {
-                        return LlvmValue::empty(self.context.as_ref());
-                    } else if arglen != plen {
-                        self.add_error(EvaluationError {
-                            kind: EvaluationErrorKind::ArgCountMismatch(arglen as _, plen as _),
-                            range: raw_args.get_range(),
-                        });
-                        return LlvmValue::empty(self.context.as_ref());
+                                Some((name.clone(), arg))
+                            })
+                            .collect();
+
+                        if has_args.is_none() {
+                            return LlvmValue::empty(self.context.as_ref());
+                        } else if arglen != plen {
+                            self.add_error(EvaluationError {
+                                kind: EvaluationErrorKind::ArgCountMismatch(arglen as _, plen as _),
+                                range: raw_args.get_range(),
+                            });
+                            return LlvmValue::empty(self.context.as_ref());
+                        }
+
+                        let return_val = callback(has_args.as_ref().unwrap());
+
+                        // LlvmValue::record_instance(rf.clone());
+
+                        return_val
                     }
-
-                    let return_val = callback(has_args.as_ref().unwrap());
-
-                    // LlvmValue::record_instance(rf.clone());
-
-                    return_val
-                } else {
-                    LlvmValue::empty(self.context.as_ref())
+                    _ => LlvmValue::empty(self.context.as_ref()),
                 }
             }
             _ => LlvmValue::empty(self.context.as_ref()),
@@ -326,223 +353,391 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
             .resolve_ref_value(self.context.as_ref())
             .unwrap_or(right);
 
-        let res = match (&left.ty, &right.ty) {
-            (LlvmType::CoercibleInteger(_), LlvmType::CoercibleInteger(_)) => match op {
-                Operator::Plus => LlvmValue::cinteger(
-                    left.kind.as_integer() + right.kind.as_integer(),
-                    self.context.as_ref(),
-                ),
-                Operator::Minus => LlvmValue::cinteger(
-                    left.kind.as_integer() - right.kind.as_integer(),
-                    self.context.as_ref(),
-                ),
-                Operator::Multiply => LlvmValue::cinteger(
-                    left.kind.as_integer() * right.kind.as_integer(),
-                    self.context.as_ref(),
-                ),
-                Operator::Divide => LlvmValue::cinteger(
-                    left.kind.as_integer() / right.kind.as_integer(),
-                    self.context.as_ref(),
-                ),
-                Operator::Exponent => LlvmValue::cinteger(
-                    left.kind.as_integer().pow(right.kind.as_integer() as _),
-                    self.context.as_ref(),
-                ),
-                _ => LlvmValue::empty(self.context.as_ref()),
-            },
+        let (left, right) = match (left, right) {
             (
-                LlvmType::Integer {
-                    // width,
-                    signed,
-                    llvm_type: ty,
+                left @ LlvmValue {
+                    ty: LlvmType::Integer { .. },
+                    ..
                 },
-                LlvmType::CoercibleInteger(_),
-            )
-            | (
-                LlvmType::CoercibleInteger(_),
-                LlvmType::Integer {
-                    // width,
-                    signed,
-                    llvm_type: ty,
+                right @ LlvmValue {
+                    ty: LlvmType::CoercibleInteger(_),
+                    ..
                 },
             ) => {
-                self.context.builder.build_int_add(
-                    left.llvm_basc_value().unwrap().into_int_value(),
-                    right.llvm_basc_value().unwrap().into_int_value(),
-                    "",
-                );
-                match op {
-                    Operator::Plus => LlvmValue::integer(
-                        left.kind.as_integer() + right.kind.as_integer(),
-                        ty.get_bit_width() as _,
-                        *signed,
-                        self.context.as_ref(),
-                    ),
-                    Operator::Minus => LlvmValue::integer(
-                        left.kind.as_integer() - right.kind.as_integer(),
-                        ty.get_bit_width() as _,
-                        *signed,
-                        self.context.as_ref(),
-                    ),
-                    Operator::Multiply => LlvmValue::integer(
-                        left.kind.as_integer() * right.kind.as_integer(),
-                        ty.get_bit_width() as _,
-                        *signed,
-                        self.context.as_ref(),
-                    ),
-                    Operator::Divide => LlvmValue::integer(
-                        left.kind.as_integer() / right.kind.as_integer(),
-                        ty.get_bit_width() as _,
-                        *signed,
-                        self.context.as_ref(),
-                    ),
-                    Operator::Exponent => LlvmValue::integer(
-                        left.kind.as_integer().pow(right.kind.as_integer() as _),
-                        ty.get_bit_width() as _,
-                        *signed,
-                        self.context.as_ref(),
-                    ),
-                    _ => LlvmValue::empty(self.context.as_ref()),
-                }
+                let right = right
+                    .try_implicit_cast(&left.ty, self.context.as_ref())
+                    .unwrap_or_else(|| right);
+                (left, right)
             }
             (
-                LlvmType::Integer {
-                    signed,
-                    llvm_type: ty,
+                left @ LlvmValue {
+                    ty: LlvmType::CoercibleInteger(_),
+                    ..
                 },
-                LlvmType::Integer {
-                    signed: rs,
-                    llvm_type: rty,
+                right @ LlvmValue {
+                    ty: LlvmType::Integer { .. },
+                    ..
                 },
-            ) if ty.get_bit_width() == rty.get_bit_width() && signed == rs => match op {
-                Operator::Plus => LlvmValue::integer(
-                    left.kind.as_integer() + right.kind.as_integer(),
-                    ty.get_bit_width() as _,
-                    *signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Minus => LlvmValue::integer(
-                    left.kind.as_integer() - right.kind.as_integer(),
-                    ty.get_bit_width() as _,
-                    *signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Multiply => LlvmValue::integer(
-                    left.kind.as_integer() * right.kind.as_integer(),
-                    ty.get_bit_width() as _,
-                    *signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Divide => LlvmValue::integer(
-                    left.kind.as_integer() / right.kind.as_integer(),
-                    ty.get_bit_width() as _,
-                    *signed,
-                    self.context.as_ref(),
-                ),
-                Operator::Exponent => LlvmValue::integer(
-                    left.kind.as_integer().pow(right.kind.as_integer() as _),
-                    ty.get_bit_width() as _,
-                    *signed,
-                    self.context.as_ref(),
-                ),
-                _ => LlvmValue::empty(self.context.as_ref()),
+            ) => {
+                let left = left
+                    .try_implicit_cast(&right.ty, self.context.as_ref())
+                    .unwrap_or_else(|| left);
+                (left, right)
+            }
+            (
+                left @ LlvmValue {
+                    ty: LlvmType::Float { .. },
+                    ..
+                },
+                right @ LlvmValue {
+                    ty: LlvmType::CoercibleFloat(_),
+                    ..
+                },
+            ) => {
+                let right = right
+                    .try_implicit_cast(&left.ty, self.context.as_ref())
+                    .unwrap_or_else(|| right);
+                (left, right)
+            }
+            (
+                left @ LlvmValue {
+                    ty: LlvmType::CoercibleFloat(_),
+                    ..
+                },
+                right @ LlvmValue {
+                    ty: LlvmType::Float { .. },
+                    ..
+                },
+            ) => {
+                let left = left
+                    .try_implicit_cast(&right.ty, self.context.as_ref())
+                    .unwrap_or_else(|| left);
+                (left, right)
+            }
+            (left, right) => {
+                let right = right.try_implicit_cast(&left.ty, self.context.as_ref()).unwrap_or_else(|| right);
+                (left, right)
             },
-            (LlvmType::CoercibleFloat(_), LlvmType::CoercibleFloat(_)) => match op {
-                Operator::Plus => LlvmValue::cfloat(
-                    left.kind.as_float() + right.kind.as_float(),
-                    self.context.as_ref(),
-                ),
-                Operator::Minus => LlvmValue::cfloat(
-                    left.kind.as_float() - right.kind.as_float(),
-                    self.context.as_ref(),
-                ),
-                Operator::Multiply => LlvmValue::cfloat(
-                    left.kind.as_float() * right.kind.as_float(),
-                    self.context.as_ref(),
-                ),
-                Operator::Divide => LlvmValue::cfloat(
-                    left.kind.as_float() / right.kind.as_float(),
-                    self.context.as_ref(),
-                ),
-                Operator::Exponent => LlvmValue::cfloat(
-                    left.kind.as_float().powf(right.kind.as_float()),
-                    self.context.as_ref(),
-                ),
-                _ => LlvmValue::empty(self.context.as_ref()),
-            },
-            (ty @ LlvmType::Float(_), LlvmType::CoercibleFloat(_))
-            | (LlvmType::CoercibleFloat(_), ty @ LlvmType::Float(_)) => match op {
-                Operator::Plus => LlvmValue::float(
-                    left.kind.as_float() + right.kind.as_float(),
-                    ty.get_float_width(),
-                    self.context.as_ref(),
-                ),
-                Operator::Minus => LlvmValue::float(
-                    left.kind.as_float() - right.kind.as_float(),
-                    ty.get_float_width(),
-                    self.context.as_ref(),
-                ),
-                Operator::Multiply => LlvmValue::float(
-                    left.kind.as_float() * right.kind.as_float(),
-                    ty.get_float_width(),
-                    self.context.as_ref(),
-                ),
-                Operator::Divide => LlvmValue::float(
-                    left.kind.as_float() / right.kind.as_float(),
-                    ty.get_float_width(),
-                    self.context.as_ref(),
-                ),
-                Operator::Exponent => LlvmValue::float(
-                    left.kind.as_float().powf(right.kind.as_float()),
-                    ty.get_float_width(),
-                    self.context.as_ref(),
-                ),
-                _ => LlvmValue::empty(self.context.as_ref()),
-            },
-            (lty @ LlvmType::Float(_), rty @ LlvmType::Float(_))
-                if lty.get_float_width() == rty.get_float_width() =>
-            {
-                match op {
-                    Operator::Plus => LlvmValue::float(
-                        left.kind.as_float() + right.kind.as_float(),
-                        lty.get_float_width(),
-                        self.context.as_ref(),
-                    ),
-                    Operator::Minus => LlvmValue::float(
-                        left.kind.as_float() - right.kind.as_float(),
-                        lty.get_float_width(),
-                        self.context.as_ref(),
-                    ),
-                    Operator::Multiply => LlvmValue::float(
-                        left.kind.as_float() * right.kind.as_float(),
-                        lty.get_float_width(),
-                        self.context.as_ref(),
-                    ),
-                    Operator::Divide => LlvmValue::float(
-                        left.kind.as_float() / right.kind.as_float(),
-                        lty.get_float_width(),
-                        self.context.as_ref(),
-                    ),
-                    Operator::Exponent => LlvmValue::float(
-                        left.kind.as_float().powf(right.kind.as_float()),
-                        lty.get_float_width(),
-                        self.context.as_ref(),
-                    ),
-                    _ => LlvmValue::empty(self.context.as_ref()),
-                }
+        };
+
+        let res = match (&left.ty, &right.ty) {
+            (LlvmType::Integer { .. }, LlvmType::Integer { .. })
+            | (LlvmType::CoercibleInteger(_), LlvmType::CoercibleInteger(_)) => {
+                let signed = left.ty.integer_signed();
+
+                let val = match op {
+                    Operator::Plus => Some(self.context.builder.build_int_add(
+                        left.llvm_value.into_int_value(),
+                        right.llvm_value.into_int_value(),
+                        "",
+                    )),
+                    Operator::Minus => Some(self.context.builder.build_int_sub(
+                        left.llvm_value.into_int_value(),
+                        right.llvm_value.into_int_value(),
+                        "",
+                    )),
+                    Operator::Multiply => Some(self.context.builder.build_int_mul(
+                        left.llvm_value.into_int_value(),
+                        right.llvm_value.into_int_value(),
+                        "",
+                    )),
+                    Operator::Divide if signed => Some(self.context.builder.build_int_signed_div(
+                        left.llvm_value.into_int_value(),
+                        right.llvm_value.into_int_value(),
+                        "",
+                    )),
+                    Operator::Divide => Some(self.context.builder.build_int_unsigned_div(
+                        left.llvm_value.into_int_value(),
+                        right.llvm_value.into_int_value(),
+                        "",
+                    )),
+                    Operator::Exponent => {
+                        let powi = Intrinsic::find("llvm.powi");
+                        // if let Some(powi) = powi {
+                        //     powi.get_declaration(&self.context.module, )
+                        // }
+                        // self.context.builder.build_call(function, args, name)
+                        None
+                    }
+                    _ => None,
+                };
+
+                val.map(|val| LlvmValue {
+                    ty: left.ty.clone(),
+                    kind: LlvmValueKind::Integer {},
+                    llvm_value: val.into(),
+                })
+                .unwrap_or_else(|| LlvmValue::empty(self.context.as_ref()))
+            }
+            (LlvmType::Float { .. }, LlvmType::Float { .. })
+            | (LlvmType::CoercibleFloat(_), LlvmType::CoercibleFloat(_)) => {
+                // let signed = left.ty.integer_signed();
+
+                let val = match op {
+                    Operator::Plus => Some(self.context.builder.build_float_add(
+                        left.llvm_value.into_float_value(),
+                        right.llvm_value.into_float_value(),
+                        "",
+                    )),
+                    Operator::Minus => Some(self.context.builder.build_float_sub(
+                        left.llvm_value.into_float_value(),
+                        right.llvm_value.into_float_value(),
+                        "",
+                    )),
+                    Operator::Multiply => Some(self.context.builder.build_float_mul(
+                        left.llvm_value.into_float_value(),
+                        right.llvm_value.into_float_value(),
+                        "",
+                    )),
+                    Operator::Divide => Some(self.context.builder.build_float_div(
+                        left.llvm_value.into_float_value(),
+                        right.llvm_value.into_float_value(),
+                        "",
+                    )),
+                    Operator::Exponent => {
+                        let powi = Intrinsic::find("llvm.powi");
+                        // if let Some(powi) = powi {
+                        //     powi.get_declaration(&self.context.module, )
+                        // }
+                        // self.context.builder.build_call(function, args, name)
+                        None
+                    }
+                    _ => None,
+                };
+
+                val.map(|val| LlvmValue {
+                    ty: left.ty.clone(),
+                    kind: LlvmValueKind::Float {},
+                    llvm_value: val.into(),
+                })
+                .unwrap_or_else(|| LlvmValue::empty(self.context.as_ref()))
             }
             _ => LlvmValue::empty(self.context.as_ref()),
         };
 
-        if res.get_type().is_empty() {
-            self.add_error(EvaluationError {
-                kind: EvaluationErrorKind::BinExpMismatch(op.clone(), left.into(), right.into()),
-                range: Range::from((&raw_left.get_range(), &raw_right.get_range())),
-            });
-            LlvmValue::empty(self.context.as_ref())
-        } else {
-            res
+        // let res = match (&left.ty, &right.ty) {
+        //     (LlvmType::CoercibleInteger(_), LlvmType::CoercibleInteger(_)) => match op {
+        //         Operator::Plus => LlvmValue::cinteger(
+        //             left.kind.as_integer() + right.kind.as_integer(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Minus => LlvmValue::cinteger(
+        //             left.kind.as_integer() - right.kind.as_integer(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Multiply => LlvmValue::cinteger(
+        //             left.kind.as_integer() * right.kind.as_integer(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Divide => LlvmValue::cinteger(
+        //             left.kind.as_integer() / right.kind.as_integer(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Exponent => LlvmValue::cinteger(
+        //             left.kind.as_integer().pow(right.kind.as_integer() as _),
+        //             self.context.as_ref(),
+        //         ),
+        //         _ => LlvmValue::empty(self.context.as_ref()),
+        //     },
+        //     (
+        //         LlvmType::Integer {
+        //             // width,
+        //             signed,
+        //             llvm_type: ty,
+        //         },
+        //         LlvmType::CoercibleInteger(_),
+        //     )
+        //     | (
+        //         LlvmType::CoercibleInteger(_),
+        //         LlvmType::Integer {
+        //             // width,
+        //             signed,
+        //             llvm_type: ty,
+        //         },
+        //     ) => {
+        //         self.context.builder.build_int_add(
+        //             left.llvm_basc_value().unwrap().into_int_value(),
+        //             right.llvm_basc_value().unwrap().into_int_value(),
+        //             "",
+        //         );
+        //         match op {
+        //             Operator::Plus => LlvmValue::integer(
+        //                 left.kind.as_integer() + right.kind.as_integer(),
+        //                 ty.get_bit_width() as _,
+        //                 *signed,
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Minus => LlvmValue::integer(
+        //                 left.kind.as_integer() - right.kind.as_integer(),
+        //                 ty.get_bit_width() as _,
+        //                 *signed,
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Multiply => LlvmValue::integer(
+        //                 left.kind.as_integer() * right.kind.as_integer(),
+        //                 ty.get_bit_width() as _,
+        //                 *signed,
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Divide => LlvmValue::integer(
+        //                 left.kind.as_integer() / right.kind.as_integer(),
+        //                 ty.get_bit_width() as _,
+        //                 *signed,
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Exponent => LlvmValue::integer(
+        //                 left.kind.as_integer().pow(right.kind.as_integer() as _),
+        //                 ty.get_bit_width() as _,
+        //                 *signed,
+        //                 self.context.as_ref(),
+        //             ),
+        //             _ => LlvmValue::empty(self.context.as_ref()),
+        //         }
+        //     }
+        //     (
+        //         LlvmType::Integer {
+        //             signed,
+        //             llvm_type: ty,
+        //         },
+        //         LlvmType::Integer {
+        //             signed: rs,
+        //             llvm_type: rty,
+        //         },
+        //     ) if ty.get_bit_width() == rty.get_bit_width() && signed == rs => match op {
+        //         Operator::Plus => LlvmValue::integer(
+        //             left.kind.as_integer() + right.kind.as_integer(),
+        //             ty.get_bit_width() as _,
+        //             *signed,
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Minus => LlvmValue::integer(
+        //             left.kind.as_integer() - right.kind.as_integer(),
+        //             ty.get_bit_width() as _,
+        //             *signed,
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Multiply => LlvmValue::integer(
+        //             left.kind.as_integer() * right.kind.as_integer(),
+        //             ty.get_bit_width() as _,
+        //             *signed,
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Divide => LlvmValue::integer(
+        //             left.kind.as_integer() / right.kind.as_integer(),
+        //             ty.get_bit_width() as _,
+        //             *signed,
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Exponent => LlvmValue::integer(
+        //             left.kind.as_integer().pow(right.kind.as_integer() as _),
+        //             ty.get_bit_width() as _,
+        //             *signed,
+        //             self.context.as_ref(),
+        //         ),
+        //         _ => LlvmValue::empty(self.context.as_ref()),
+        //     },
+        //     (LlvmType::CoercibleFloat(_), LlvmType::CoercibleFloat(_)) => match op {
+        //         Operator::Plus => LlvmValue::cfloat(
+        //             left.kind.as_float() + right.kind.as_float(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Minus => LlvmValue::cfloat(
+        //             left.kind.as_float() - right.kind.as_float(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Multiply => LlvmValue::cfloat(
+        //             left.kind.as_float() * right.kind.as_float(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Divide => LlvmValue::cfloat(
+        //             left.kind.as_float() / right.kind.as_float(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Exponent => LlvmValue::cfloat(
+        //             left.kind.as_float().powf(right.kind.as_float()),
+        //             self.context.as_ref(),
+        //         ),
+        //         _ => LlvmValue::empty(self.context.as_ref()),
+        //     },
+        //     (ty @ LlvmType::Float(_), LlvmType::CoercibleFloat(_))
+        //     | (LlvmType::CoercibleFloat(_), ty @ LlvmType::Float(_)) => match op {
+        //         Operator::Plus => LlvmValue::float(
+        //             left.kind.as_float() + right.kind.as_float(),
+        //             ty.get_float_width(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Minus => LlvmValue::float(
+        //             left.kind.as_float() - right.kind.as_float(),
+        //             ty.get_float_width(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Multiply => LlvmValue::float(
+        //             left.kind.as_float() * right.kind.as_float(),
+        //             ty.get_float_width(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Divide => LlvmValue::float(
+        //             left.kind.as_float() / right.kind.as_float(),
+        //             ty.get_float_width(),
+        //             self.context.as_ref(),
+        //         ),
+        //         Operator::Exponent => LlvmValue::float(
+        //             left.kind.as_float().powf(right.kind.as_float()),
+        //             ty.get_float_width(),
+        //             self.context.as_ref(),
+        //         ),
+        //         _ => LlvmValue::empty(self.context.as_ref()),
+        //     },
+        //     (lty @ LlvmType::Float(_), rty @ LlvmType::Float(_))
+        //         if lty.get_float_width() == rty.get_float_width() =>
+        //     {
+        //         match op {
+        //             Operator::Plus => LlvmValue::float(
+        //                 left.kind.as_float() + right.kind.as_float(),
+        //                 lty.get_float_width(),
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Minus => LlvmValue::float(
+        //                 left.kind.as_float() - right.kind.as_float(),
+        //                 lty.get_float_width(),
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Multiply => LlvmValue::float(
+        //                 left.kind.as_float() * right.kind.as_float(),
+        //                 lty.get_float_width(),
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Divide => LlvmValue::float(
+        //                 left.kind.as_float() / right.kind.as_float(),
+        //                 lty.get_float_width(),
+        //                 self.context.as_ref(),
+        //             ),
+        //             Operator::Exponent => LlvmValue::float(
+        //                 left.kind.as_float().powf(right.kind.as_float()),
+        //                 lty.get_float_width(),
+        //                 self.context.as_ref(),
+        //             ),
+        //             _ => LlvmValue::empty(self.context.as_ref()),
+        //         }
+        //     }
+        //     _ => LlvmValue::empty(self.context.as_ref()),
+        // };
+
+        match res.get_type() {
+            LlvmType::Empty(_) => {
+                self.add_error(EvaluationError {
+                    kind: EvaluationErrorKind::BinExpMismatch(
+                        op.clone(),
+                        left.into(),
+                        right.into(),
+                    ),
+                    range: Range::from((&raw_left.get_range(), &raw_right.get_range())),
+                });
+                LlvmValue::empty(self.context.as_ref())
+            }
+            _ => res.into(),
         }
+        // LlvmValue::empty(self.context.as_ref())
     }
 }
 

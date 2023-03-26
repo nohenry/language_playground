@@ -36,8 +36,8 @@ use tl_util::{format::TreeDisplay, Rf};
 use crate::evaluator::LlvmEvaluator;
 
 pub mod context;
-// pub mod evaluator;
-pub mod eval;
+pub mod evaluator;
+// pub mod eval;
 pub mod llvm_type;
 pub mod llvm_value;
 

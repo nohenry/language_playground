@@ -100,13 +100,12 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                 let mut mut_sym = sym.borrow_mut();
                 if let ScopeValue::EvaluationValue(value) = &mut mut_sym.value {
-                    if value.is_function() {
-                        value
-                            .get_type_mut()
-                            .set_function_parameters(params.into_iter());
-                        value.get_type_mut().set_function_return(
-                            ty.map(|ty| ty).unwrap_or_else(|| self.context.empty()),
-                        );
+                    match &mut value.ty {
+                        LlvmType::Function { parameters, return_type, .. } => {
+                            *parameters = params;
+                            *return_type = Box::new(ty.map(|ty| ty).unwrap_or_else(|| self.context.empty()));
+                        }
+                        _ => ()
                     }
                 }
             }
@@ -166,14 +165,11 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         }
                     }
                 } else {
-
                     let expr = match (&expr.ty, &ty) {
                         (
                             LlvmType::Ref { base_type: lty, .. },
                             LlvmType::Ref { base_type: rty, .. },
-                        ) if lty == rty => {
-                            expr.clone()
-                        }
+                        ) if lty == rty => expr.clone(),
                         _ => expr
                             .resolve_ref_value(self.context.as_ref())
                             .unwrap_or_else(|| expr),
@@ -201,13 +197,11 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                     if let Some(sym) = scope.scope.find_symbol(ident.as_str()) {
                         let sym = sym.borrow();
                         if let ScopeValue::EvaluationValue(value) = &sym.value {
-                            if let Some(alloc) = value.inst {
-                                self.context.builder.build_store(
-                                    alloc,
-                                    expr.llvm_basc_value().expect("Not a basic value"),
-                                );
-                                expr.inst = Some(alloc);
-                            }
+                            self.context.builder.build_store(
+                                value.llvm_value.into_pointer_value(),
+                                expr.llvm_basc_value().expect("Not a basic value"),
+                            );
+                            expr.llvm_value = value.llvm_value;
                         }
                     }
 
@@ -500,8 +494,9 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                         return;
                     };
 
-                    if !value.is_function() {
-                        return;
+                    match &value.ty {
+                        LlvmType::Function { .. } => (),
+                        _ => return
                     }
 
                     let parameters = value.get_type().function_parameters_rf();
@@ -509,7 +504,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                         .map(|(name, ty)| {
                             (
                                 name.clone(),
-                                ScopeValue::EvaluationValue(LlvmValue::default_for(&ty)),
+                                ScopeValue::EvaluationValue(LlvmValue::default_for(&ty, self.context.as_ref())),
                             )
                         })
                         .collect();
@@ -541,7 +536,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                     ScopeValue::EvaluationValue(LlvmValue {
                         kind: LlvmValueKind::Empty,
                         ty: self.context.empty(),
-                        inst: Some(alloc),
+                        llvm_value: alloc.into(),
                     }),
                     index,
                 );

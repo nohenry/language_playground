@@ -7,7 +7,10 @@ use inkwell::{
     basic_block::BasicBlock,
     module::Linkage,
     types::StructType,
-    values::{BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue, StructValue},
+    values::{
+        AnyValueEnum, BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue,
+        StructValue,
+    },
     AddressSpace,
 };
 use linked_hash_map::LinkedHashMap;
@@ -31,30 +34,30 @@ use crate::{llvm_type::LlvmType, LlvmContext};
 pub enum LlvmValueKind<'a> {
     Empty,
     Integer {
-        value: u64,
-        llvm_value: IntValue<'a>,
+        // value: u64,
+        // llvm_value: IntValue<'a>,
     },
     Float {
-        value: f64,
-        llvm_value: FloatValue<'a>,
+        // value: f64,
+        // llvm_value: FloatValue<'a>,
     },
     String {
-        string: String,
+        // string: String,
     },
     Bool {
-        value: bool,
-        llvm_value: IntValue<'a>,
+        // value: bool,
+        // llvm_value: IntValue<'a>,
     },
     Ref {
         // symbol: Rf<Scope>,
         base: Box<LlvmValue<'a>>,
         offset: Option<String>,
-        llvm_value: PointerValue<'a>,
+        // llvm_value: PointerValue<'a>,
     },
     Function {
         rf: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
         body: Statement,
-        llvm_value: FunctionValue<'a>,
+        // llvm_value: FunctionValue<'a>,
         entry_block: BasicBlock<'a>,
     },
     NativeFunction {
@@ -62,15 +65,15 @@ pub enum LlvmValueKind<'a> {
         callback: Arc<dyn Fn(&LinkedHashMap<String, LlvmValue<'a>>) -> LlvmValue<'a> + Sync + Send>,
     },
     Symbol(Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>),
-    Tuple(Vec<LlvmValue<'a>>, StructValue<'a>),
+    Tuple(Vec<LlvmValue<'a>>),
     StructInitializer {
         members: LinkedHashMap<String, LlvmValue<'a>>,
-        llvm_value: StructValue<'a>,
+        // llvm_value: StructValue<'a>,
     },
     StructInstance {
         rf: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
         members: LinkedHashMap<String, LlvmValue<'a>>,
-        llvm_value: StructValue<'a>,
+        // llvm_value: StructValue<'a>,
     },
     IntrinsicStorage(Rf<dyn IntrinsicType + Sync + Send>, Vec<LlvmType<'a>>),
 }
@@ -79,10 +82,10 @@ impl Display for LlvmValueKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LlvmValueKind::Empty => f.write_str("()"),
-            LlvmValueKind::Bool { value, .. } => write!(f, "{value}"),
-            LlvmValueKind::Integer { value, .. } => write!(f, "{value}"),
-            LlvmValueKind::Float { value, .. } => write!(f, "{value}"),
-            LlvmValueKind::String { string } => write!(f, "{string}"),
+            // LlvmValueKind::Bool { value, .. } => write!(f, "{value}"),
+            // LlvmValueKind::Integer { value, .. } => write!(f, "{value}"),
+            // LlvmValueKind::Float { value, .. } => write!(f, "{value}"),
+            // LlvmValueKind::String { string } => write!(f, "{string}"),
             LlvmValueKind::Ref { base, offset, .. } => {
                 write!(f, "{}", base)?;
                 // if let ScopeValue::ConstValue(cv) = &symbol.borrow().value {
@@ -95,7 +98,7 @@ impl Display for LlvmValueKind<'_> {
             }
             LlvmValueKind::Function { body, .. } => write!(f, "{}", body.format()),
             LlvmValueKind::NativeFunction { .. } => write!(f, "Native Function"),
-            LlvmValueKind::Tuple(list, _) => {
+            LlvmValueKind::Tuple(list) => {
                 let mut iter = list.iter();
                 let Some(item) = iter.next() else {
                     return writeln!(f, "()");
@@ -122,24 +125,25 @@ impl Display for LlvmValueKind<'_> {
             }
             LlvmValueKind::Symbol(_) => f.write_str("Symbol"),
             LlvmValueKind::IntrinsicStorage(_, _) => f.write_str("Intrinsic"),
+            _ => write!(f, "llvm_value"),
         }
     }
 }
 
 impl<'a> LlvmValueKind<'a> {
-    pub fn as_integer(&self) -> u64 {
-        match self {
-            LlvmValueKind::Integer { value, .. } => *value,
-            _ => panic!(),
-        }
-    }
+    // pub fn as_integer(&self) -> u64 {
+    //     match self {
+    //         LlvmValueKind::Integer { value, .. } => *value,
+    //         _ => panic!(),
+    //     }
+    // }
 
-    pub fn as_float(&self) -> f64 {
-        match self {
-            LlvmValueKind::Float { value, .. } => *value,
-            _ => panic!(),
-        }
-    }
+    // pub fn as_float(&self) -> f64 {
+    //     match self {
+    //         LlvmValueKind::Float { value, .. } => *value,
+    //         _ => panic!(),
+    //     }
+    // }
 
     pub fn as_record_instance(
         &self,
@@ -162,14 +166,14 @@ impl NodeDisplay for LlvmValueKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             LlvmValueKind::Empty => write!(f, "Empty"),
-            LlvmValueKind::Integer { value, .. } => write!(f, "Integer: {value}"),
-            LlvmValueKind::Bool { value, .. } => write!(f, "Boolean: {value}"),
-            LlvmValueKind::Float { value, .. } => write!(f, "Float: {value}"),
+            LlvmValueKind::Integer {} => write!(f, "Integer: "),
+            LlvmValueKind::Bool {} => write!(f, "Boolean: "),
+            LlvmValueKind::Float {} => write!(f, "Float: "),
             LlvmValueKind::Ref { .. } => write!(f, "Reference"),
-            LlvmValueKind::String { string } => write!(f, "String: {string}"),
+            LlvmValueKind::String {} => write!(f, "String: "),
             LlvmValueKind::Function { .. } => write!(f, "Function"),
             LlvmValueKind::NativeFunction { .. } => write!(f, "Native Function"),
-            LlvmValueKind::Tuple(_, _) => write!(f, "Tuple"),
+            LlvmValueKind::Tuple(_) => write!(f, "Tuple"),
             LlvmValueKind::StructInitializer { .. } => write!(f, "Struct Initializer"),
             LlvmValueKind::StructInstance { .. } => write!(f, "Record Instance"),
             LlvmValueKind::Symbol(_) => write!(f, "Symbol"),
@@ -182,7 +186,7 @@ impl TreeDisplay for LlvmValueKind<'_> {
     fn num_children(&self) -> usize {
         match self {
             LlvmValueKind::Function { .. } => 1,
-            LlvmValueKind::Tuple(list, _) => list.len(),
+            LlvmValueKind::Tuple(list) => list.len(),
             LlvmValueKind::StructInitializer { members, .. } => members.len(),
             LlvmValueKind::StructInstance { members, .. } => members.len(),
             LlvmValueKind::Ref {
@@ -200,7 +204,7 @@ impl TreeDisplay for LlvmValueKind<'_> {
                 0 => Some(body),
                 _ => None,
             },
-            LlvmValueKind::Tuple(tu, _) => {
+            LlvmValueKind::Tuple(tu) => {
                 if let Some(val) = tu.get(index) {
                     Some(val)
                 } else {
@@ -232,8 +236,7 @@ impl TreeDisplay for LlvmValueKind<'_> {
 pub struct LlvmValue<'a> {
     pub ty: LlvmType<'a>,
     pub kind: LlvmValueKind<'a>,
-    pub inst: Option<PointerValue<'a>>,
-    // llvm_value: inkwell::values::AnyValueEnum<'a>,
+    pub llvm_value: AnyValueEnum<'a>,
 }
 
 impl Display for LlvmValue<'_> {
@@ -292,29 +295,120 @@ impl<'a> LlvmValue<'a> {
                 kind: LlvmValueKind::Function {
                     rf: node,
                     body,
-                    llvm_value: val,
+                    // llvm_value: val,
                     entry_block: bb,
                 },
-                inst: None,
+                llvm_value: val.into(),
             },
             bb,
         )
     }
 
     pub fn llvm_basc_value(&self) -> Option<BasicValueEnum<'a>> {
-        let value = match (&self.kind, &self.inst) {
-            (LlvmValueKind::Integer { llvm_value, .. }, _) => (*llvm_value).into(),
-            (LlvmValueKind::Float { llvm_value, .. }, _) => (*llvm_value).into(),
-            (LlvmValueKind::Bool { llvm_value, .. }, _) => (*llvm_value).into(),
-            (LlvmValueKind::Ref { llvm_value, .. }, _) => (*llvm_value).into(),
-            (LlvmValueKind::Symbol { .. }, Some(inst)) => (*inst).into(),
-            (LlvmValueKind::Tuple(_, llvm_value), _) => (*llvm_value).into(),
-            (LlvmValueKind::StructInitializer { llvm_value, .. }, _) => (*llvm_value).into(),
-            (LlvmValueKind::StructInstance { llvm_value, .. }, _) => (*llvm_value).into(),
-            _ => return None,
-        };
+        self.llvm_value.try_into().ok()
+        // let value = match (&self.kind, &self.inst) {
+        //     (LlvmValueKind::Integer { llvm_value, .. }, _) => (*llvm_value).into(),
+        //     (LlvmValueKind::Float { llvm_value, .. }, _) => (*llvm_value).into(),
+        //     (LlvmValueKind::Bool { llvm_value, .. }, _) => (*llvm_value).into(),
+        //     (LlvmValueKind::Ref { llvm_value, .. }, _) => (*llvm_value).into(),
+        //     (LlvmValueKind::Symbol { .. }, Some(inst)) => (*inst).into(),
+        //     (LlvmValueKind::Tuple(_, llvm_value), _) => (*llvm_value).into(),
+        //     (LlvmValueKind::StructInitializer { llvm_value, .. }, _) => (*llvm_value).into(),
+        //     (LlvmValueKind::StructInstance { llvm_value, .. }, _) => (*llvm_value).into(),
+        //     _ => return None,
+        // };
 
-        Some(value)
+        // Some(value)
+    }
+
+    fn deref_rf(
+        &self,
+        tp: &LlvmContext<'a>,
+        ld: Option<PointerValue<'a>>,
+    ) -> Option<(Rf<Scope<LlvmType<'a>, Self>>, BasicValueEnum<'a>)> {
+        match (&self.ty, &self.kind) {
+            (
+                LlvmType::Ref {
+                    base_type: box LlvmType::Ref { .. },
+                    ..
+                },
+                LlvmValueKind::Symbol(sym),
+            ) => {
+                let value = sym.borrow();
+                if let ScopeValue::EvaluationValue(cv) = &value.value {
+                    println!("{}", cv.format());
+
+                    let ptr = tp.builder.build_load(
+                        cv.ty.llvm_basic_type().unwrap(),
+                        cv.llvm_value.into_pointer_value(),
+                        // base_type.llvm_basic_type().unwrap(),
+                        // self.inst.into_pointer_value(),
+                        "",
+                    );
+
+                    return cv.deref_rf(tp, Some(ptr.into_pointer_value()));
+                }
+                return None;
+            }
+            (LlvmType::Ref { base_type, .. }, LlvmValueKind::Symbol(sym)) => {
+                let ptr = if let Some(ld) = ld {
+                    tp.builder
+                        .build_load(base_type.llvm_basic_type().unwrap(), ld, "")
+                } else {
+                    tp.builder.build_load(
+                        base_type.llvm_basic_type().unwrap(),
+                        self.llvm_value.into_pointer_value(),
+                        "",
+                    )
+                };
+
+                // let val = LlvmValue {
+                //     ty: base_type.clone(),
+                //     kind:
+                //     inst: ptr.into()
+                // };
+                return Some((sym.clone(), ptr));
+            }
+            (
+                LlvmType::Ref { base_type, .. },
+                LlvmValueKind::Ref {
+                    base, offset: None, ..
+                },
+            ) => {
+                // let ptr = tp.builder.build_load(
+                //     base_type.llvm_basic_type().unwrap(),
+                //     // self.inst.into_pointer_value(),
+                //     ld.unwrap(),
+                //     // cv.inst.into_pointer_value(),
+                //     "",
+                // );
+                // return base.deref_rf(tp, Some(ptr.into_pointer_value()));
+                return base.deref_rf(tp, ld);
+            }
+            (
+                LlvmType::Ref { .. },
+                LlvmValueKind::Ref {
+                    base,
+                    offset: Some(index),
+                    ..
+                },
+            ) => {
+                let base = base.resolve_ref(tp);
+                let Some(base) = base else {
+                    return None;
+                };
+
+                let base = base.borrow();
+                let Some(child) = base.children.get(index) else {
+                    return None
+                };
+
+                // return Some(child.clone());
+                todo!("Not implemented");
+                return None;
+            }
+            _ => None,
+        }
     }
 }
 
@@ -361,7 +455,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         LlvmValue {
             ty: tp.empty(),
             kind: LlvmValueKind::Empty,
-            inst: None,
+            llvm_value: tp.context.bool_type().const_zero().into(),
         }
     }
 
@@ -372,39 +466,39 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         }
     }
 
-    fn default_for(ty: &Self::Type) -> Self {
-        let kind = match ty {
-            LlvmType::Empty(_) => LlvmValueKind::Empty,
-            LlvmType::Integer { llvm_type, .. } => LlvmValueKind::Integer {
-                value: 0,
-                llvm_value: llvm_type.const_zero(),
+    fn default_for(ty: &Self::Type, ctx: &Self::Ctx) -> Self {
+        match ty {
+            LlvmType::Empty(llvm_type) => LlvmValue {
+                ty: ty.clone(),
+                kind: LlvmValueKind::Empty,
+                llvm_value: ctx.context.bool_type().const_zero().into(),
             },
-            LlvmType::Float(llvm_type) => LlvmValueKind::Float {
-                value: 0.0,
-                llvm_value: llvm_type.const_zero(),
+            LlvmType::Integer { llvm_type, .. } => LlvmValue {
+                ty: ty.clone(),
+                kind: LlvmValueKind::Integer {},
+                llvm_value: llvm_type.const_zero().into(),
             },
-            _ => LlvmValueKind::Empty,
-        };
-
-        LlvmValue {
-            ty: ty.clone(),
-            kind,
-            inst: None,
+            LlvmType::Float(llvm_type) => LlvmValue {
+                ty: ty.clone(),
+                kind: LlvmValueKind::Float {},
+                llvm_value: llvm_type.const_zero().into(),
+            },
+            _ => LlvmValue {
+                ty: ty.clone(),
+                kind: LlvmValueKind::Empty,
+                llvm_value: ctx.context.bool_type().const_zero().into(),
+            },
         }
     }
 
-    fn resolve_ref(
-        &self,
-        tp: &Self::Ctx,
-    ) -> Option<Rf<Scope<Self::Type, Self>>> {
-        match (&self.ty, &self.kind, &self.inst) {
+    fn resolve_ref(&self, tp: &Self::Ctx) -> Option<Rf<Scope<Self::Type, Self>>> {
+        match (&self.ty, &self.kind) {
             (
                 LlvmType::Ref {
                     base_type: box LlvmType::Ref { .. },
                     ..
                 },
                 LlvmValueKind::Symbol(sym),
-                _,
             ) => {
                 let value = sym.borrow();
                 if let ScopeValue::EvaluationValue(cv) = &value.value {
@@ -413,10 +507,13 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 }
                 return Some(sym.clone());
             }
-            (LlvmType::Ref { base_type, .. }, LlvmValueKind::Symbol(sym), Some(inst)) => {
+            (LlvmType::Ref { base_type, .. }, LlvmValueKind::Symbol(sym)) => {
                 unsafe {
-                    tp.builder
-                        .build_load(base_type.llvm_basic_type().unwrap(), *inst, "");
+                    // tp.builder.build_load(
+                    //     base_type.llvm_basic_type().unwrap(),
+                    //     self.inst.into_pointer_value(),
+                    //     "",
+                    // );
                 }
                 return Some(sym.clone());
             }
@@ -425,17 +522,6 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 LlvmValueKind::Ref {
                     base, offset: None, ..
                 },
-                Some(inst),
-            ) => {
-                println!("{}", base.format());
-                return base.resolve_ref(tp);
-            }
-            (
-                LlvmType::Ref { .. },
-                LlvmValueKind::Ref {
-                    base, offset: None, ..
-                },
-                _,
             ) => {
                 return base.resolve_ref(tp);
             }
@@ -446,7 +532,6 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                     offset: Some(index),
                     ..
                 },
-                _,
             ) => {
                 let base = base.resolve_ref(tp);
                 let Some(base) = base else {
@@ -465,7 +550,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
     }
 
     fn resolve_ref_value(&self, tp: &Self::Ctx) -> Option<Self> {
-        let Some(sym) = self.resolve_ref(tp) else {
+        let Some((sym, ptr)) = self.deref_rf(tp, None) else {
             return None
         };
 
@@ -480,7 +565,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         let lv = LlvmValue {
             kind: cv.kind,
             ty: cv.ty,
-            inst: cv.inst,
+            llvm_value: ptr.into(),
         };
 
         Some(lv)
@@ -490,13 +575,13 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         todo!()
     }
 
-    fn is_string(&self) -> bool {
-        todo!()
-    }
+    // fn is_string(&self) -> bool {
+    //     todo!()
+    // }
 
-    fn string_value(&self) -> &str {
-        todo!()
-    }
+    // fn string_value(&self) -> &str {
+    //     todo!()
+    // }
 
     fn integer<'b>(value: u64, width: u8, signed: bool, tp: &Self::Ctx) -> Self {
         let ty = tp.integer(width, signed);
@@ -508,35 +593,32 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
         LlvmValue {
             ty,
-            kind: LlvmValueKind::Integer {
-                value,
-                llvm_value: val,
-            },
-            inst: None,
+            kind: LlvmValueKind::Integer {},
+            llvm_value: val.into(),
         }
     }
 
-    fn is_integer(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::Integer { .. } => true,
-            _ => false,
-        }
-    }
+    // fn is_integer(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::Integer { .. } => true,
+    //         _ => false,
+    //     }
+    // }
 
-    fn integer_width(&self) -> u8 {
-        self.get_type().integer_width()
-    }
+    // fn integer_width(&self) -> u8 {
+    //     self.get_type().integer_width()
+    // }
 
-    fn is_signed(&self) -> bool {
-        self.get_type().integer_signed()
-    }
+    // fn is_signed(&self) -> bool {
+    //     self.get_type().integer_signed()
+    // }
 
-    fn integer_value(&self) -> u64 {
-        match &self.kind {
-            LlvmValueKind::Integer { value, .. } => *value,
-            _ => 0,
-        }
-    }
+    // fn integer_value(&self) -> u64 {
+    //     match &self.kind {
+    //         LlvmValueKind::Integer { value, .. } => *value,
+    //         _ => 0,
+    //     }
+    // }
 
     fn cinteger<'b>(value: u64, tp: &Self::Ctx) -> Self {
         let ty = tp.cinteger();
@@ -548,20 +630,17 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
         LlvmValue {
             ty,
-            kind: LlvmValueKind::Integer {
-                value,
-                llvm_value: val.into(),
-            },
-            inst: None,
+            kind: LlvmValueKind::Integer {},
+            llvm_value: val.into(),
         }
     }
 
-    fn is_cinteger(&self) -> bool {
-        match &self.ty {
-            LlvmType::CoercibleInteger(_) => true,
-            _ => false,
-        }
-    }
+    // fn is_cinteger(&self) -> bool {
+    //     match &self.ty {
+    //         LlvmType::CoercibleInteger(_) => true,
+    //         _ => false,
+    //     }
+    // }
 
     fn float<'b>(value: f64, width: u8, tp: &Self::Ctx) -> Self {
         let ty = tp.float(width);
@@ -569,31 +648,28 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
         LlvmValue {
             ty,
-            kind: LlvmValueKind::Float {
-                value,
-                llvm_value: val.into(),
-            },
-            inst: None,
+            kind: LlvmValueKind::Float {},
+            llvm_value: val.into(),
         }
     }
 
-    fn is_float(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::Integer { .. } => true,
-            _ => false,
-        }
-    }
+    // fn is_float(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::Integer { .. } => true,
+    //         _ => false,
+    //     }
+    // }
 
-    fn float_width(&self) -> u8 {
-        self.ty.get_float_width()
-    }
+    // fn float_width(&self) -> u8 {
+    //     self.ty.get_float_width()
+    // }
 
-    fn float_value(&self) -> f64 {
-        match &self.kind {
-            LlvmValueKind::Float { value, .. } => *value,
-            _ => 0.0,
-        }
-    }
+    // fn float_value(&self) -> f64 {
+    //     match &self.kind {
+    //         LlvmValueKind::Float { value, .. } => *value,
+    //         _ => 0.0,
+    //     }
+    // }
 
     fn cfloat<'b>(value: f64, tp: &Self::Ctx) -> Self {
         let ty = tp.cfloat();
@@ -601,20 +677,17 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
         LlvmValue {
             ty,
-            kind: LlvmValueKind::Float {
-                value,
-                llvm_value: val.into(),
-            },
-            inst: None,
+            kind: LlvmValueKind::Float {},
+            llvm_value: val.into(),
         }
     }
 
-    fn is_cfloat(&self) -> bool {
-        match &self.ty {
-            LlvmType::CoercibleFloat(_) => true,
-            _ => false,
-        }
-    }
+    // fn is_cfloat(&self) -> bool {
+    //     match &self.ty {
+    //         LlvmType::CoercibleFloat(_) => true,
+    //         _ => false,
+    //     }
+    // }
 
     fn bool<'b>(value: bool, tp: &Self::Ctx) -> Self {
         let ty = tp.bool();
@@ -626,27 +699,24 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
 
         LlvmValue {
             ty,
-            kind: LlvmValueKind::Bool {
-                value,
-                llvm_value: val.into(),
-            },
-            inst: None,
+            kind: LlvmValueKind::Bool {},
+            llvm_value: val.into(),
         }
     }
 
-    fn is_bool(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::Bool { .. } => true,
-            _ => false,
-        }
-    }
+    // fn is_bool(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::Bool { .. } => true,
+    //         _ => false,
+    //     }
+    // }
 
-    fn bool_value(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::Bool { value, .. } => *value,
-            _ => false,
-        }
-    }
+    // fn bool_value(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::Bool { value, .. } => *value,
+    //         _ => false,
+    //     }
+    // }
 
     fn function<'b>(
         name: &str,
@@ -670,33 +740,33 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
             kind: LlvmValueKind::Function {
                 rf: node,
                 body,
-                llvm_value: val,
+                // llvm_value: val,
                 entry_block: bb,
             },
-            inst: None,
+            llvm_value: val.into(),
         }
     }
 
-    fn is_function(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::Function { .. } => true,
-            _ => false,
-        }
-    }
+    // fn is_function(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::Function { .. } => true,
+    //         _ => false,
+    //     }
+    // }
 
-    fn function_body(&self) -> &tl_core::ast::Statement {
-        match &self.kind {
-            LlvmValueKind::Function { body, .. } => body,
-            _ => panic!("Expected to be function!"),
-        }
-    }
+    // fn function_body(&self) -> &tl_core::ast::Statement {
+    //     match &self.kind {
+    //         LlvmValueKind::Function { body, .. } => body,
+    //         _ => panic!("Expected to be function!"),
+    //     }
+    // }
 
-    fn function_rf(&self) -> &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>> {
-        match &self.kind {
-            LlvmValueKind::Function { rf, .. } => rf,
-            _ => panic!("Expected to be function!"),
-        }
-    }
+    // fn function_rf(&self) -> &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>> {
+    //     match &self.kind {
+    //         LlvmValueKind::Function { rf, .. } => rf,
+    //         _ => panic!("Expected to be function!"),
+    //     }
+    // }
 
     fn native_function<'b>(
         callback: std::sync::Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send>,
@@ -708,55 +778,55 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         todo!()
     }
 
-    fn is_native_function(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::NativeFunction { .. } => true,
-            _ => false,
-        }
-    }
+    // fn is_native_function(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::NativeFunction { .. } => true,
+    //         _ => false,
+    //     }
+    // }
 
-    fn native_function_callback(
-        &self,
-    ) -> &std::sync::Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send> {
-        match &self.kind {
-            LlvmValueKind::NativeFunction { callback, .. } => callback,
-            _ => panic!("Expected to be native function!"),
-        }
-    }
+    // fn native_function_callback(
+    //     &self,
+    // ) -> &std::sync::Arc<dyn Fn(&LinkedHashMap<String, Self>) -> Self + Sync + Send> {
+    //     match &self.kind {
+    //         LlvmValueKind::NativeFunction { callback, .. } => callback,
+    //         _ => panic!("Expected to be native function!"),
+    //     }
+    // }
 
-    fn native_function_rf(
-        &self,
-    ) -> &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>> {
-        match &self.kind {
-            LlvmValueKind::NativeFunction { rf, .. } => rf,
-            _ => panic!("Expected to be native function!"),
-        }
-    }
+    // fn native_function_rf(
+    //     &self,
+    // ) -> &tl_util::Rf<tl_evaluator::scope::scope::Scope<Self::Type, Self>> {
+    //     match &self.kind {
+    //         LlvmValueKind::NativeFunction { rf, .. } => rf,
+    //         _ => panic!("Expected to be native function!"),
+    //     }
+    // }
 
     fn tuple<'b>(values: Vec<Self>, tp: &Self::Ctx) -> Self {
         todo!()
     }
 
-    fn is_tuple(&self) -> bool {
-        match &self.kind {
-            LlvmValueKind::Tuple(_, _) => true,
-            _ => false,
-        }
-    }
+    // fn is_tuple(&self) -> bool {
+    //     match &self.kind {
+    //         LlvmValueKind::Tuple(_, _) => true,
+    //         _ => false,
+    //     }
+    // }
 
-    fn tuple_value(self) -> Vec<Self> {
-        match self.kind {
-            LlvmValueKind::Tuple(s, _) => s,
-            _ => panic!("Expected to be tuple!"),
-        }
-    }
+    // fn tuple_value(self) -> Vec<Self> {
+    //     match self.kind {
+    //         LlvmValueKind::Tuple(s, _) => s,
+    //         _ => panic!("Expected to be tuple!"),
+    //     }
+    // }
 
-    fn tuple_value_rf(&self) -> &Vec<Self> {
-        match &self.kind {
-            LlvmValueKind::Tuple(s, _) => s,
-            _ => panic!("Expected to be tuple!"),
-        }
-    }
+    // fn tuple_value_rf(&self) -> &Vec<Self> {
+    //     match &self.kind {
+    //         LlvmValueKind::Tuple(s, _) => s,
+    //         _ => panic!("Expected to be tuple!"),
+    //     }
+    // }
 
     fn reference<'b>(left: Self, right: String, right_ty: Self::Type, tp: &Self::Ctx) -> Self {
         let rtype = right_ty.llvm_ptr_ty(AddressSpace::default());
@@ -792,13 +862,9 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         let inst = {
             let sym = sym.borrow();
             if let ScopeValue::EvaluationValue(val) = &sym.value {
-                if let Some(inst) = val.inst {
-                    Some(inst)
-                } else {
-                    None
-                }
+                val.llvm_value
             } else {
-                None
+                tp.context.bool_type().const_zero().into()
             }
         };
 
@@ -808,7 +874,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 llvm_type: pty,
             },
             kind: LlvmValueKind::Symbol(sym.clone()),
-            inst,
+            llvm_value: inst,
         }
     }
 
@@ -821,7 +887,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
         LlvmValue {
             kind: LlvmValueKind::IntrinsicStorage(storage, generics),
             ty: LlvmType::Intrinsic(sym),
-            inst: None,
+            llvm_value: tp.context.bool_type().const_zero().into(),
         }
     }
 
@@ -831,7 +897,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 LlvmValue {
                     kind,
                     // ty,
-                    inst: Some(inst),
+                    llvm_value: inst,
                     ..
                 },
                 LlvmType::Ref { .. },
@@ -840,31 +906,71 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
                 kind: LlvmValueKind::Ref {
                     base: Box::new(self.clone()),
                     offset: None,
-                    llvm_value: inst.clone(),
                 },
-                inst: Some(inst.clone()),
+                llvm_value: inst.clone(),
             }),
             (
                 LlvmValue {
-                    kind: LlvmValueKind::Integer { value, .. },
-                    ty: LlvmType::CoercibleInteger(_),
+                    kind: LlvmValueKind::Integer {},
+                    ty: LlvmType::CoercibleInteger(ity),
+                    llvm_value: inst,
                     ..
                 },
                 LlvmType::Integer { signed, llvm_type },
-            ) => Some(LlvmValue::integer(
-                *value,
-                llvm_type.get_bit_width() as _,
-                *signed,
-                tp,
-            )),
+            ) => {
+                // tp.builder.build
+                let val = if *signed {
+                    tp.builder.build_int_s_extend_or_bit_cast(
+                        (*inst).into_int_value(),
+                        *llvm_type,
+                        "",
+                    )
+                } else {
+                    tp.builder.build_int_z_extend_or_bit_cast(
+                        (*inst).into_int_value(),
+                        *llvm_type,
+                        "",
+                    )
+                };
+
+                Some(LlvmValue {
+                    kind: LlvmValueKind::Integer {},
+                    ty: ty.clone(),
+                    llvm_value: val.into(),
+                })
+                // Some(LlvmValue::integer(
+                //     *value,
+                //     llvm_type.get_bit_width() as _,
+                //     *signed,
+                //     tp,
+                // ))
+            }
             (
                 LlvmValue {
-                    kind: LlvmValueKind::Float { value, .. },
-                    ty: LlvmType::CoercibleFloat(_),
-                    ..
+                    kind: LlvmValueKind::Float { .. },
+                    ty: LlvmType::CoercibleFloat(_) | LlvmType::Float(_),
+                    llvm_value: inst,
                 },
                 LlvmType::Float(f),
-            ) => Some(LlvmValue::float(*value, ty.get_float_width(), tp)),
+            ) => {
+                let val = if self.ty.get_float_width(tp) > ty.get_float_width(tp) {
+                    tp.builder
+                        .build_float_trunc((*inst).into_float_value(), *f, "")
+                        .into()
+                } else if self.ty.get_float_width(tp) < ty.get_float_width(tp) {
+                    tp.builder
+                        .build_float_ext((*inst).into_float_value(), *f, "")
+                        .into()
+                } else {
+                    inst.clone()
+                };
+
+                Some(LlvmValue {
+                    ty: ty.clone(),
+                    kind: LlvmValueKind::Float {},
+                    llvm_value: val,
+                })
+            }
             (_, LlvmType::Symbol(sym)) => {
                 let sym = sym.borrow();
                 if let ScopeValue::TypeAlias { ty, .. } = &sym.value {

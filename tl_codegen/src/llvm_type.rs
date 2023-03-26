@@ -17,7 +17,7 @@ use tl_util::{
     Rf,
 };
 
-use crate::llvm_value::LlvmValue;
+use crate::{llvm_value::LlvmValue, LlvmContext};
 
 #[derive(Clone, Eq)]
 pub enum LlvmType<'a> {
@@ -109,8 +109,9 @@ impl PartialEq for LlvmType<'_> {
                     llvm_type: rty,
                 },
             ) => lty.get_bit_width() == rty.get_bit_width() && l_signed == r_signed,
-            (Self::Float { .. }, Self::Float { .. }) => {
-                self.get_float_width() == other.get_float_width()
+            (Self::Float(lty), Self::Float(rty)) => {
+                lty == rty
+                // self.get_float_width() == other.get_float_width()
             }
             (
                 Self::Function {
@@ -214,7 +215,7 @@ impl TreeDisplay for LlvmType<'_> {
     fn num_children(&self) -> usize {
         match self {
             LlvmType::Function { .. } => 2,
-            LlvmType::Tuple{ types, .. } => types.len(),
+            LlvmType::Tuple { types, .. } => types.len(),
             LlvmType::StructInstance { members, .. } => members.len(),
             LlvmType::StructInitializer { members, .. } => members.len(),
             LlvmType::Ref { .. } => 1,
@@ -353,7 +354,7 @@ impl<'a> EvaluationType for LlvmType<'a> {
     }
 
     fn float_width(&self) -> u8 {
-        self.get_float_width()
+        0
     }
 
     fn function_parameters(self) -> impl Iterator<Item = (String, Self)> {
@@ -490,9 +491,21 @@ impl<'a> LlvmType<'a> {
         Some(ty)
     }
 
-    pub fn get_float_width(&self) -> u8 {
+    pub fn get_float_width(&self, ctx: &LlvmContext<'a>) -> u8 {
         match self {
-            Self::Float(f) => 64,
+            Self::Float(f) | Self::CoercibleFloat(f) => {
+                if f == &ctx.context.f128_type() {
+                    128
+                } else if f == &ctx.context.f64_type() {
+                    64
+                } else if f == &ctx.context.f32_type() {
+                    32
+                } else if f == &ctx.context.f16_type() {
+                    16
+                } else {
+                    0
+                }
+            }
             _ => 0,
         }
     }
