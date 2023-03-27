@@ -389,15 +389,23 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 }) = &func.value
                 {
                     match (return_type.as_ref(), expr) {
+                        // In the case of only return (no expression)
                         (LlvmType::Empty(_), None) => {
-                            todo!()
+                            // Only jump to return branch
+                            if let Some(return_block) = state.return_block {
+                                self.context.builder.build_unconditional_branch(return_block);
+                            }
                         }
+                        // In the case of return with an expression
                         (ty, Some(expr)) => {
+                            // Evaluate and cast expression;
                             let expr = self.evaluate_expression(expr, index);
+                            let expr = expr.resolve_ref_value(self.context.as_ref()).unwrap_or_else(|| expr);
                             let expr = expr
                                 .try_implicit_cast(ty, self.context.as_ref())
                                 .unwrap_or_else(|| expr);
 
+                            // store the expression in the return storage
                             if let Some(return_storage) = state.return_storage {
                                 self.context.builder.build_store(
                                     return_storage,
@@ -405,8 +413,13 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                                         .expect("Unable to get LlvmValue as BasicValue"),
                                 );
                             }
+
+                            // finally jump to return block
+                            if let Some(return_block) = state.return_block {
+                                self.context.builder.build_unconditional_branch(return_block);
+                            }
                         }
-                        _ => todo!(),
+                        _ => todo!("Throw error"),
                     }
                 }
             }
