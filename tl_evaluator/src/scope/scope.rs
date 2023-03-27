@@ -197,6 +197,15 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Scope<T, V> {
         }
         None
     }
+
+    pub fn get_mangled_name(&self) -> String {
+        if let Some(parent) = &self.parent {
+            let sym = parent.borrow();
+            format!("{}_{}", sym.get_mangled_name(), self.name)
+        } else {
+            "".to_string()
+        }
+    }
 }
 
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for Scope<T, V> {

@@ -6,6 +6,9 @@ f32 @fp = f
 
 f64 sum = fp + ff
 
-fn poop() {
+fn poop() -> i32 {
+    i32 i = 90
+
+    return i
 
 }

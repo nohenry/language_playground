@@ -6,6 +6,13 @@ target triple = "arm64-apple-macosx12.0.0"
 @.str = private unnamed_addr constant [7 x i8] c"%f %f\0A\00", align 1
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
+define i32 @calc(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  ret i32 0
+}
+
+; Function Attrs: noinline nounwind optnone ssp uwtable
 define i32 @main() #0 {
   %1 = alloca double, align 8
   %2 = alloca float, align 4

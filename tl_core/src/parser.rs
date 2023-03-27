@@ -87,6 +87,15 @@ impl Parser {
                     return Some(us);
                 }
             }
+            Some(Token::Ident(s)) if s == "return" => {
+                let tok = self.tokens.next().unwrap();
+                let expr = self.parse_expression();
+
+                return Some(Statement::Return {
+                    ret_token: tok.clone(),
+                    expr,
+                });
+            }
             Some(Token::Ident(s)) if s == "type" => {
                 let ty_tok = self.tokens.next().unwrap();
                 let symb = self.expect(Token::Ident(String::new())).unwrap();

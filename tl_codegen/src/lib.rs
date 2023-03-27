@@ -15,11 +15,12 @@ use inkwell::{
     basic_block::BasicBlock,
     context::Context,
     types::{AnyType, AnyTypeEnum},
+    values::PointerValue,
     AddressSpace,
 };
 use linked_hash_map::LinkedHashMap;
 use llvm_type::LlvmType;
-use llvm_value::LlvmValue;
+use llvm_value::{LlvmValue, LlvmValueKind};
 use tl_core::{
     ast::{PunctuationList, Statement},
     Module,
@@ -46,8 +47,25 @@ const LINE_ENDING: &str = "\r\n";
 #[cfg(not(windows))]
 const LINE_ENDING: &str = "\n";
 
+#[derive(Clone)]
 pub struct LlvmContextState<'a> {
     current_block: BasicBlock<'a>,
+    current_function: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
+    return_storage: Option<PointerValue<'a>>, // (alloca instance, dirtied)
+    /// "dirtied" meaning if a return statement was found
+    return_dirtied: bool,
+    return_block: Option<BasicBlock<'a>>
+}
+
+impl<'a> LlvmContextState<'a> {
+    pub fn replace(&mut self, state: LlvmContextState<'a>) -> LlvmContextState<'a> {
+        std::mem::replace(self, state)
+        // let temp = *self;
+
+        // *self = state;
+
+        // temp
+    }
 }
 
 pub struct LlvmContext<'a> {
@@ -180,21 +198,40 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         let llvm_builder = llvm_context.create_builder();
         let symbol_tree = Rf::new(Scope::<LlvmType, LlvmValue>::root());
 
-        let bb = {
+        let (bb, fn_node) = {
+            let cp = Scope::new(
+                symbol_tree.clone(),
+                "main".to_string(),
+                ScopeValue::EvaluationValue(LlvmValue {
+                    kind: LlvmValueKind::Empty,
+                    ty: LlvmType::Empty(llvm_context.void_type()),
+                    llvm_value: llvm_context.bool_type().const_zero().into(),
+                }),
+                0,
+            );
+            let mut t = symbol_tree.borrow_mut();
+            let fn_node = t.insert_node(cp);
+
             let ty = llvm_context.void_type().fn_type(&[], false);
             let val = llvm_module.add_function("main", ty, None);
             let bb = llvm_context.append_basic_block(val.clone(), "entry");
 
             llvm_builder.position_at_end(bb);
 
-            bb
+            (bb, fn_node)
         };
 
         let context = Rc::new(LlvmContext {
             context: &llvm_context,
             module: llvm_module,
             builder: llvm_builder,
-            state: RwLock::new(LlvmContextState { current_block: bb }),
+            state: RwLock::new(LlvmContextState {
+                current_block: bb,
+                current_function: fn_node,
+                return_storage: None,
+                return_dirtied: false,
+                return_block: None
+            }),
         });
 
         {

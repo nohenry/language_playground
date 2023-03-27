@@ -15,6 +15,7 @@ use tl_util::{format::TreeDisplay, Rf};
 use crate::{
     llvm_type::LlvmType,
     llvm_value::{LlvmValue, LlvmValueKind},
+    LlvmContextState,
 };
 
 use super::LlvmEvaluator;
@@ -90,24 +91,167 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 ident,
                 parameters,
                 return_type,
-                body: Some(_),
+                body: Some(body),
                 ..
             } => {
                 let params = self.evaluate_params(parameters);
                 let ty = return_type.as_ref().map(|ty| self.evaluate_type(ty));
 
+                // Cloning references for later
                 let sym = self.wstate().scope.find_symbol(ident.as_str()).unwrap();
+                let new_sym = sym.clone();
+                let new_state_sym = sym.clone();
 
-                let mut mut_sym = sym.borrow_mut();
-                if let ScopeValue::EvaluationValue(value) = &mut mut_sym.value {
+                let (ret_ty, func) = {
+                    let mut mut_sym = sym.borrow_mut();
+
+                    let ScopeValue::EvaluationValue(value) = &mut mut_sym.value else {
+                        return LlvmValue::empty(self.context.as_ref());
+                    };
+
+                    // Update parameter and return types that were evaluated above
                     match &mut value.ty {
-                        LlvmType::Function { parameters, return_type, .. } => {
+                        LlvmType::Function {
+                            parameters,
+                            return_type,
+                            ..
+                        } => {
                             *parameters = params;
-                            *return_type = Box::new(ty.map(|ty| ty).unwrap_or_else(|| self.context.empty()));
+                            *return_type =
+                                Box::new(ty.map(|ty| ty).unwrap_or_else(|| self.context.empty()));
                         }
-                        _ => ()
+                        _ => (),
+                    }
+
+                    (
+                        value.ty.function_return().clone(),
+                        value.llvm_value.into_function_value(),
+                    )
+                };
+
+                // Make function's scope accessible when evluating body
+                self.wstate().scope.push_scope(new_sym);
+
+                let current_block = func
+                    .get_first_basic_block()
+                    .expect("Unable to get function's first basic block! (compiler bug)");
+                self.context.builder.position_at_end(current_block);
+
+                let return_block = Some(self.context.context.append_basic_block(func, "ret_block"));
+
+                // If return is non void, create a variable to store return value
+                let return_storage = match ret_ty {
+                    LlvmType::Empty(_) => None,
+                    _ => Some(
+                        self.context
+                            .builder
+                            .build_alloca(ret_ty.llvm_basic_type().unwrap(), "_ret_val"),
+                    ),
+                };
+
+                // Build the new context for the function
+                let new_state = LlvmContextState {
+                    current_block,
+                    current_function: new_state_sym,
+                    return_storage,
+                    return_dirtied: false,
+                    return_block,
+                };
+                let state = self.context.wstate().replace(new_state);
+
+                let return_value = self.evaluate_statement(body, 0);
+
+                match (return_value, ret_ty) {
+                    // Case for void or, no return type
+                    (_, LlvmType::Empty(_)) => {
+                        let state = self.context.rstate();
+                        if state.return_dirtied {
+                            // If return statements are used, jump to return block and return
+
+                            self.context
+                                .builder
+                                .build_unconditional_branch(state.return_block.unwrap());
+                            self.context.builder.build_return(None);
+                        } else {
+                            // If no return statements are used, remove the return block and return
+
+                            state
+                                .return_block
+                                .unwrap()
+                                .remove_from_function()
+                                .expect("Unable to remove return block from function");
+                            self.context.builder.build_return(None);
+                        }
+                    }
+                    // Case for return is last statement in body
+                    (_, return_type) if body.get_last().is_return() => {
+                        let state = self.context.rstate();
+
+                        self.context
+                            .builder
+                            .build_unconditional_branch(state.return_block.unwrap());
+
+                        self.context
+                            .builder
+                            .build_return(Some(&state.return_storage.unwrap()));
+                    }
+                    // Case for return type
+                    (value, return_type) => {
+                        let value = value
+                            .resolve_ref_value(self.context.as_ref())
+                            .unwrap_or_else(|| value);
+                        let value = value
+                            .try_implicit_cast(&return_type, self.context.as_ref())
+                            .unwrap_or_else(|| value);
+
+                        if value.get_type() == &return_type {
+                            let state = self.context.rstate();
+
+                            if state.return_dirtied {
+                                // If return statements are used, jump to return block and return the return storage
+
+                                self.context
+                                    .builder
+                                    .build_unconditional_branch(state.return_block.unwrap());
+
+                                self.context
+                                    .builder
+                                    .build_return(Some(&state.return_storage.unwrap()));
+                            } else {
+                                // If no return statements are used, remove the return block, remove the return storage, and try to return the statements value
+
+                                state
+                                    .return_block
+                                    .unwrap()
+                                    .remove_from_function()
+                                    .expect("Unable to remove return block from function");
+
+                                state
+                                    .return_storage
+                                    .unwrap()
+                                    .as_instruction()
+                                    .expect("Unable to get return storage as instruction")
+                                    .remove_from_basic_block();
+
+                                let val = value.llvm_basc_value().unwrap();
+                                self.context.builder.build_return(Some(&val));
+                            }
+                        } else {
+                            self.add_error(EvaluationError {
+                                kind: EvaluationErrorKind::TypeMismatch(
+                                    value.into(),
+                                    return_type,
+                                    TypeHint::ReturnParameter,
+                                ),
+                                range: body.get_last().get_range(),
+                            });
+                        }
                     }
                 }
+
+                self.context.builder.position_at_end(state.current_block);
+                let _ = self.context.wstate().replace(state);
+                self.wstate().scope.pop_scope();
             }
             // Variable decleration
             Statement::Decleration {
@@ -229,8 +373,47 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                     return LlvmValue::tuple(values, self.context.as_ref());
                 }
             }
+            Statement::Return { expr, .. } => {
+                let mut state = self.context.wstate();
+                state.return_dirtied = true;
+                let func = state.current_function.borrow();
+
+                if let ScopeValue::EvaluationValue(LlvmValue {
+                    ty:
+                        LlvmType::Function {
+                            parameters,
+                            return_type,
+                            llvm_type,
+                        },
+                    ..
+                }) = &func.value
+                {
+                    match (return_type.as_ref(), expr) {
+                        (LlvmType::Empty(_), None) => {
+                            todo!()
+                        }
+                        (ty, Some(expr)) => {
+                            let expr = self.evaluate_expression(expr, index);
+                            let expr = expr
+                                .try_implicit_cast(ty, self.context.as_ref())
+                                .unwrap_or_else(|| expr);
+
+                            if let Some(return_storage) = state.return_storage {
+                                self.context.builder.build_store(
+                                    return_storage,
+                                    expr.llvm_basc_value()
+                                        .expect("Unable to get LlvmValue as BasicValue"),
+                                );
+                            }
+                        }
+                        _ => todo!(),
+                    }
+                }
+            }
             Statement::Block(list) => {
-                if list.num_children() == 1 {
+                if list.num_children() == 0 {
+                    return LlvmValue::empty(self.context.as_ref());
+                } else if list.num_children() == 1 {
                     let item = list
                         .iter_items()
                         .next()
@@ -242,7 +425,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         .enumerate()
                         .map(|(index, stmt)| self.evaluate_statement(stmt, index))
                         .collect();
-                    return LlvmValue::tuple(values, self.context.as_ref());
+                    return values.into_iter().rev().next().unwrap();
                 }
             }
             _ => (),
@@ -349,7 +532,6 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
                     .map(|ty| self.evaluate_type(ty))
                     .unwrap_or(self.context.empty());
 
-                // self.type_provider.inform_function_decleration();
                 let function = LlvmValue::gen_function(
                     ident.as_str(),
                     Statement::clone(body),
@@ -489,7 +671,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 let Some(rf) = self.rstate().scope.find_symbol(ident.as_str()) else {
                         return;
                     };
-                let (pvals, _) = {
+                let (pvals, ret_ty, func) = {
                     let ScopeValue::EvaluationValue(value) = &rf.borrow().value else {
                         return;
                     };
@@ -508,15 +690,38 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                             )
                         })
                         .collect();
+                    let return_type = value.get_type().function_return();
 
-                    (pvals, return_type.clone())
+                    (pvals, return_type.clone(), value.llvm_value.into_function_value())
                 };
 
+                // Build the new context for the function
+                let current_block = func.get_first_basic_block().expect("Unable to get function's first basic block! (compiler bug)");
+                let new_state = LlvmContextState {
+                    current_block,
+                    current_function: rf.clone(),
+                    return_storage: None,
+                    return_dirtied: false,
+                    return_block: None,
+                };
+
+                // Push the function scope so we have access to locals when evaluating
                 self.wstate().scope.push_scope(rf);
 
                 for (name, ty) in pvals {
                     self.wstate().scope.update_value(&name, ty, index);
                 }
+
+                self.context
+                    .builder
+                    .position_at_end(current_block);
+
+                let state = self.context.wstate().replace(new_state);
+
+                self.evaluate_statement(body, 0);
+
+                self.context.builder.position_at_end(state.current_block);
+                let _ = self.context.wstate().replace(state);
 
                 self.wstate().scope.pop_scope();
             }
@@ -540,6 +745,22 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                     }),
                     index,
                 );
+            },
+            Statement::Block(list) => {
+                if list.num_children() == 0 {
+                } else if list.num_children() == 1 {
+                    let item = list
+                        .iter_items()
+                        .next()
+                        .expect("Value should have been present. This is probably a rustc bug");
+                    self.evaluate_statement(item, 0);
+                } else {
+                    let values: Vec<_> = list
+                        .iter_items()
+                        .enumerate()
+                        .map(|(index, stmt)| self.evaluate_statement(stmt, index))
+                        .collect();
+                }
             }
             _ => (),
         }

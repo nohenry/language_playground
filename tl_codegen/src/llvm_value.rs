@@ -281,8 +281,13 @@ impl<'a> LlvmValue<'a> {
         node: tl_util::Rf<tl_evaluator::scope::scope::Scope<LlvmType<'a>, Self>>,
         tp: &<Self as EvaluationValue>::Ctx,
     ) -> (Self, BasicBlock<'a>) {
+        let mang = {
+            let sym = node.borrow();
+            sym.get_mangled_name()
+        };
+
         let ty = return_type.llvm_fn_type(&[]).unwrap();
-        let val = tp.module.add_function(name, ty, None);
+        let val = tp.module.add_function(&mang, ty, None);
         let bb = tp.context.append_basic_block(val.clone(), "entry");
 
         (

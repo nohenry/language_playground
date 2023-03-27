@@ -1056,6 +1056,26 @@ pub enum Statement {
         ty: Option<Type>,
         body: Option<EnclosedList<Statement>>,
     },
+    Return {
+        ret_token: SpannedToken,
+        expr: Option<Expression>,
+    },
+}
+
+impl Statement {
+    pub fn get_last(&self) -> &Statement {
+        match self {
+            Statement::Block(list) => list.items.last().unwrap(),
+            stmt => stmt,
+        }
+    }
+
+    pub fn is_return(&self) -> bool {
+        match self {
+            Statement::Return { .. } => true,
+            _ => false
+        }
+    }
 }
 
 impl AstNode for Statement {
@@ -1106,6 +1126,11 @@ impl AstNode for Statement {
                 generics: Some(body),
                 ..
             } => Range::from((*impl_tok.span(), &body.get_range())),
+            Self::Return {
+                ret_token,
+                expr: Some(expr),
+            } => Range::from((*ret_token.span(), &expr.get_range())),
+            Self::Return { ret_token, .. } => Range::from(ret_token.span()),
             _ => Range::default(),
         }
     }
@@ -1126,6 +1151,7 @@ impl NodeDisplay for Statement {
             Self::List(_) => f.write_str("List"),
             Self::Block(_) => f.write_str("Block"),
             Self::Impl { .. } => f.write_str("Impl"),
+            Self::Return { .. } => f.write_str("Return"),
         }
     }
 }
@@ -1155,6 +1181,8 @@ impl TreeDisplay for Statement {
             Self::Function { .. } => 2,
             Self::Block(b) => b.num_children(),
             Self::Impl { generics, ty, .. } => addup!(generics, ty) + 1,
+            Self::Return { expr: Some(_), .. } => 1,
+            Self::Return { .. } => 0,
         }
     }
 
@@ -1248,6 +1276,9 @@ impl TreeDisplay for Statement {
                 let _ = switchon!(index, generics, ty, body);
                 None
             }
+            Self::Return {
+                expr: Some(expr), ..
+            } => Some(expr),
             _ => None,
         }
     }
