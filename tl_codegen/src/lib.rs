@@ -54,7 +54,7 @@ pub struct LlvmContextState<'a> {
     return_storage: Option<PointerValue<'a>>, // (alloca instance, dirtied)
     /// "dirtied" meaning if a return statement was found
     return_dirtied: bool,
-    return_block: Option<BasicBlock<'a>>
+    return_block: Option<BasicBlock<'a>>,
 }
 
 impl<'a> LlvmContextState<'a> {
@@ -230,7 +230,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
                 current_function: fn_node,
                 return_storage: None,
                 return_dirtied: false,
-                return_block: None
+                return_block: None,
             }),
         });
 
@@ -272,7 +272,9 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
             }
         }
 
+
         let path = Path::new("output.bc");
+        println!("{}", context.module.print_to_string().to_string());
         context.module.write_bitcode_to_path(path);
     }
 }

@@ -415,9 +415,11 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 (left, right)
             }
             (left, right) => {
-                let right = right.try_implicit_cast(&left.ty, self.context.as_ref()).unwrap_or_else(|| right);
+                let right = right
+                    .try_implicit_cast(&left.ty, self.context.as_ref())
+                    .unwrap_or_else(|| right);
                 (left, right)
-            },
+            }
         };
 
         let res = match (&left.ty, &right.ty) {

@@ -6,7 +6,7 @@ use std::{
 use inkwell::{
     basic_block::BasicBlock,
     module::Linkage,
-    types::StructType,
+    types::{BasicMetadataTypeEnum, StructType},
     values::{
         AnyValueEnum, BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue,
         StructValue,
@@ -274,7 +274,6 @@ impl TreeDisplay for LlvmValue<'_> {
 
 impl<'a> LlvmValue<'a> {
     pub fn gen_function<'b>(
-        name: &str,
         body: tl_core::ast::Statement,
         parameters: LinkedHashMap<String, LlvmType<'a>>,
         return_type: <Self as EvaluationValue>::Type,
@@ -286,7 +285,13 @@ impl<'a> LlvmValue<'a> {
             sym.get_mangled_name()
         };
 
-        let ty = return_type.llvm_fn_type(&[]).unwrap();
+        let llvm_parameters: Vec<BasicMetadataTypeEnum> = parameters
+            .values()
+            .filter_map(|p| p.llvm_type())
+            .filter_map(|lty| lty.try_into().ok())
+            .collect();
+
+        let ty = return_type.llvm_fn_type(&llvm_parameters).unwrap();
         let val = tp.module.add_function(&mang, ty, None);
         let bb = tp.context.append_basic_block(val.clone(), "entry");
 

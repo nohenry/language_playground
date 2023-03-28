@@ -1073,7 +1073,7 @@ impl Statement {
     pub fn is_return(&self) -> bool {
         match self {
             Statement::Return { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 }

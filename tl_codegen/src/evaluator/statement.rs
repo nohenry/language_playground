@@ -171,6 +171,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                             self.context
                                 .builder
                                 .build_unconditional_branch(state.return_block.unwrap());
+                            self.context.builder.position_at_end(state.return_block.unwrap());
                             self.context.builder.build_return(None);
                         } else {
                             // If no return statements are used, remove the return block and return
@@ -187,9 +188,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                     (_, return_type) if body.get_last().is_return() => {
                         let state = self.context.rstate();
 
-                        self.context
-                            .builder
-                            .build_unconditional_branch(state.return_block.unwrap());
+                        self.context.builder.position_at_end(state.return_block.unwrap());
 
                         self.context
                             .builder
@@ -214,6 +213,8 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                                     .builder
                                     .build_unconditional_branch(state.return_block.unwrap());
 
+                                self.context.builder.position_at_end(state.return_block.unwrap());
+
                                 self.context
                                     .builder
                                     .build_return(Some(&state.return_storage.unwrap()));
@@ -232,6 +233,8 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                                     .as_instruction()
                                     .expect("Unable to get return storage as instruction")
                                     .remove_from_basic_block();
+
+                                self.context.builder.position_at_end(state.return_block.unwrap());
 
                                 let val = value.llvm_basc_value().unwrap();
                                 self.context.builder.build_return(Some(&val));
@@ -393,14 +396,18 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         (LlvmType::Empty(_), None) => {
                             // Only jump to return branch
                             if let Some(return_block) = state.return_block {
-                                self.context.builder.build_unconditional_branch(return_block);
+                                self.context
+                                    .builder
+                                    .build_unconditional_branch(return_block);
                             }
                         }
                         // In the case of return with an expression
                         (ty, Some(expr)) => {
                             // Evaluate and cast expression;
                             let expr = self.evaluate_expression(expr, index);
-                            let expr = expr.resolve_ref_value(self.context.as_ref()).unwrap_or_else(|| expr);
+                            let expr = expr
+                                .resolve_ref_value(self.context.as_ref())
+                                .unwrap_or_else(|| expr);
                             let expr = expr
                                 .try_implicit_cast(ty, self.context.as_ref())
                                 .unwrap_or_else(|| expr);
@@ -416,7 +423,9 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                             // finally jump to return block
                             if let Some(return_block) = state.return_block {
-                                self.context.builder.build_unconditional_branch(return_block);
+                                self.context
+                                    .builder
+                                    .build_unconditional_branch(return_block);
                             }
                         }
                         _ => todo!("Throw error"),
@@ -533,30 +542,10 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
                 body: Some(body),
                 ..
             } => {
+                // Insert empty function stub. the function needs to reference itself later
                 let sym = self.wstate().scope.insert_value(
                     ident.as_str(),
                     ScopeValue::EvaluationValue(LlvmValue::empty(self.context.as_ref())),
-                    index,
-                );
-
-                let eparameters = self.evaluate_params(parameters);
-                let ereturn = return_type
-                    .as_ref()
-                    .map(|ty| self.evaluate_type(ty))
-                    .unwrap_or(self.context.empty());
-
-                let function = LlvmValue::gen_function(
-                    ident.as_str(),
-                    Statement::clone(body),
-                    eparameters,
-                    ereturn,
-                    sym,
-                    self.context.as_ref(),
-                );
-
-                self.wstate().scope.update_value(
-                    ident.as_str(),
-                    ScopeValue::EvaluationValue(function.0),
                     index,
                 );
             }
@@ -680,36 +669,53 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 body: Some(body),
                 ..
             } => {
-                // return;
                 let Some(rf) = self.rstate().scope.find_symbol(ident.as_str()) else {
-                        return;
-                    };
-                let (pvals, ret_ty, func) = {
-                    let ScopeValue::EvaluationValue(value) = &rf.borrow().value else {
-                        return;
-                    };
-
-                    match &value.ty {
-                        LlvmType::Function { .. } => (),
-                        _ => return
-                    }
-
-                    let parameters = value.get_type().function_parameters_rf();
-                    let pvals: Vec<_> = parameters
-                        .map(|(name, ty)| {
-                            (
-                                name.clone(),
-                                ScopeValue::EvaluationValue(LlvmValue::default_for(&ty, self.context.as_ref())),
-                            )
-                        })
-                        .collect();
-                    let return_type = value.get_type().function_return();
-
-                    (pvals, return_type.clone(), value.llvm_value.into_function_value())
+                    return;
                 };
 
+                let eparameters = self.evaluate_params(parameters);
+                let ereturn = return_type
+                    .as_ref()
+                    .map(|ty| self.evaluate_type(ty))
+                    .unwrap_or(self.context.empty());
+
+                let function = LlvmValue::gen_function(
+                    Statement::clone(body),
+                    eparameters,
+                    ereturn,
+                    rf.clone(),
+                    self.context.as_ref(),
+                );
+
+                let llvm_func = function.0.llvm_value.into_function_value();
+                let function_params = function.0.ty.function_parameters_rf();
+
+                // let (pvals, ret_ty, func) = {
+                //     let ScopeValue::EvaluationValue(value) = &rf.borrow().value else {
+                //         return;
+                //     };
+
+                //     match &value.ty {
+                //         LlvmType::Function { .. } => (),
+                //         _ => return
+                //     }
+
+                //     let parameters = value.get_type().function_parameters_rf();
+                //     let pvals: Vec<_> = parameters
+                //         .map(|(name, ty)| {
+                //             (
+                //                 name.clone(),
+                //                 ScopeValue::EvaluationValue(LlvmValue::default_for(&ty, self.context.as_ref())),
+                //             )
+                //         })
+                //         .collect();
+                //     let return_type = value.get_type().function_return();
+
+                //     (pvals, return_type.clone(), value.llvm_value.into_function_value())
+                // };
+
                 // Build the new context for the function
-                let current_block = func.get_first_basic_block().expect("Unable to get function's first basic block! (compiler bug)");
+                let current_block = llvm_func.get_first_basic_block().expect("Unable to get function's first basic block! (compiler bug)");
                 let new_state = LlvmContextState {
                     current_block,
                     current_function: rf.clone(),
@@ -721,13 +727,21 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 // Push the function scope so we have access to locals when evaluating
                 self.wstate().scope.push_scope(rf);
 
-                for (name, ty) in pvals {
-                    self.wstate().scope.update_value(&name, ty, index);
-                }
-
                 self.context
                     .builder
                     .position_at_end(current_block);
+
+                for (llvm_value, (name, ty)) in llvm_func.get_param_iter().zip(function_params) {
+
+
+                    self.wstate().scope.insert_value(name, ScopeValue::EvaluationValue(LlvmValue {
+                        kind:  LlvmValueKind::Empty,
+                        ty: ty.clone(),
+                        llvm_value: llvm_value.into()
+                    }), index);
+                }
+
+               
 
                 let state = self.context.wstate().replace(new_state);
 
@@ -737,6 +751,13 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 let _ = self.context.wstate().replace(state);
 
                 self.wstate().scope.pop_scope();
+
+
+                self.wstate().scope.update_value(
+                    ident.as_str(),
+                    ScopeValue::EvaluationValue(function.0),
+                    index,
+                );
             }
             Statement::Decleration {
                 ty,
