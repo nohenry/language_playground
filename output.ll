@@ -19,13 +19,17 @@ entry:
   store double %5, ptr %sum, align 8
 }
 
-define i32 @_mymod_poop(i32 %0) {
+define i32 @_mymod_poop(i32 %0, i32 %1) {
 entry:
+  %_param = alloca i32, align 4
+  %_param1 = alloca i32, align 4
   %i = alloca i32, align 4
   %_ret_val = alloca i32, align 4
+  store i32 %0, ptr %_param, align 4
+  store i32 %1, ptr %_param1, align 4
   store i32 90, ptr %i, align 4
-  %1 = load i32, ptr %i, align 4
-  store i32 %1, ptr %_ret_val, align 4
+  %2 = load i32, ptr %i, align 4
+  store i32 %2, ptr %_ret_val, align 4
   br label %ret_block
 
 ret_block:                                        ; preds = %entry
