@@ -1,6 +1,10 @@
 use core::fmt;
+use std::fmt::Debug;
 
-use tl_util::format::{NodeDisplay, TreeDisplay};
+use tl_util::{
+    format::{AsTree, NodeDisplay, TreeDisplay},
+    macros::{AstNode, FormatNode},
+};
 
 use crate::token::{Range, SpannedToken, Token, Unit};
 
@@ -25,16 +29,22 @@ macro_rules! addup {
 }
 
 macro_rules! switchon {
-    ($index:expr, $($e:expr),*) => {{
+    ($index:expr, $($e:expr),* $(,)?) => {{
         let mut ind = 0;
-        $(if let Some(v) = $e {
-            if $index == ind {
+        switchon!{ @parse $index, ind, $($e),*,}
+    }};
+    (@parse $index:expr, $ind:expr, $e:expr, $($es:expr),* $(,)?) => {
+        if let Some(v) = $e {
+            if $index == $ind {
                 return Some(v)
             }
-            ind += 1;
-        })*
-        ind
-    }};
+            $ind += 1;
+        }
+        switchon!{@parse $index, $ind, $($es),*,}
+    };
+    (@parse $index:expr,$ind:expr,$(,)?) => {
+        $ind
+    };
 }
 
 impl AstNode for SpannedToken {
@@ -428,11 +438,20 @@ pub enum Type {
         width: u8,
         token: SpannedToken,
     },
+    Fixed {
+        width: u8,
+        decimals: u8,
+        token: SpannedToken,
+    },
     Boolean(SpannedToken),
-    Char(SpannedToken),
+    Char {
+        width: u8,
+        token: SpannedToken,
+    },
     Ident(SpannedToken),
     Ref {
         ref_token: SpannedToken,
+        mutable: bool,
         base_type: Option<Box<Type>>,
     },
     Array(EnclosedPunctuationList<Type>),
@@ -484,18 +503,29 @@ impl PartialEq for Type {
                 },
             ) => l_width == r_width,
             (Self::Boolean(_l0), Self::Boolean(_r0)) => true,
-            (Self::Char(_l0), Self::Char(_r0)) => true,
+            (
+                Self::Char {
+                    width: _l_width,
+                    token: _l_token,
+                },
+                Self::Char {
+                    width: _r_width,
+                    token: _r_token,
+                },
+            ) => _r_width == _l_width,
             (Self::Ident(l0), Self::Ident(r0)) => l0.as_str() == r0.as_str(),
             (
                 Self::Ref {
                     ref_token: _l_ref_token,
+                    mutable: _l_mutable,
                     base_type: Some(l_base_type),
                 },
                 Self::Ref {
                     ref_token: _r_ref_token,
+                    mutable: _r_mutable,
                     base_type: Some(r_base_type),
                 },
-            ) => l_base_type == r_base_type,
+            ) => _l_mutable == _r_mutable && l_base_type == r_base_type,
             (Self::Array(l0), Self::Array(r0)) => l0 == r0,
             (Self::Union(l0), Self::Union(r0)) => l0 == r0,
             (Self::Tuple(l0), Self::Tuple(r0)) => l0 == r0,
@@ -560,8 +590,9 @@ impl AstNode for Type {
         match self {
             Self::Integer { token, .. } => token.span().into(),
             Self::Float { token, .. } => token.span().into(),
+            Self::Fixed { token, .. } => token.span().into(),
             Self::Boolean(tok) => tok.span().into(),
-            Self::Char(tok) => tok.span().into(),
+            Self::Char { token, .. } => token.span().into(),
             Self::Ident(ident) => ident.span().into(),
             Self::Array(a) => a.get_range(),
             Self::Union(a) => a.get_range(),
@@ -593,6 +624,7 @@ impl AstNode for Type {
             Self::Ref {
                 ref_token,
                 base_type: Some(base_type),
+                ..
             } => Range::from((&base_type.get_range(), &ref_token.get_range())),
             Self::Ref { ref_token, .. } => ref_token.get_range(),
             Self::Struct(s) => s.get_range(),
@@ -603,19 +635,20 @@ impl AstNode for Type {
 impl NodeDisplay for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Float { width, .. } => write!(f, "f{width}"),
+            Self::Float { width, .. } => write!(f, "float{width}"),
+            Self::Fixed { width, decimals, .. } => write!(f, "fixed{width}<{decimals}>"),
             Self::Integer {
                 width,
                 signed: true,
                 ..
-            } => write!(f, "i{width}"),
+            } => write!(f, "int{width}"),
             Self::Integer {
                 width,
                 signed: false,
                 ..
-            } => write!(f, "u{width}"),
+            } => write!(f, "uint{width}"),
             Self::Boolean(_) => f.write_str("bool"),
-            Self::Char(_) => f.write_str("char"),
+            Self::Char{width, ..} => write!(f, "char{width}"),
             Self::Ident(ident) => f.write_str(ident.as_str()),
             Self::Array(_a) => {
                 f.write_str("Array")
@@ -713,9 +746,10 @@ impl NodeDisplay for Type {
             }
             Self::Ref {
                 ref_token: _,
+                mutable,
                 base_type: _,
             } => {
-                f.write_str("Reference")
+                write!(f, "Reference {}", if *mutable { "mut" } else { "" })
 
                 // if let Some(base_type) = &base_type {
                 //     base_type.fmt(f)?;
@@ -1020,16 +1054,53 @@ impl TreeDisplay for Expression {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, FormatNode, AstNode)]
+
+pub enum FunctionBody {
+    Block(SpannedToken, SpannedToken, Option<SpannedToken>),
+    Expression {
+        arrow: SpannedToken,
+        expression: Option<Box<Expression>>,
+    },
+}
+
+// impl AstNode for FunctionBody {
+//     fn get_range(&self) -> Range {
+//         match self {
+//             FunctionBody::Block(stmt) => stmt.get_range(),
+//             FunctionBody::Expression { arrow, expression } => {
+//                 Range::from((arrow.span(), expression.get_range()))
+//             }
+//         }
+//     }
+// }
+
+// impl NodeDisplay for FunctionBody {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         match self {
+//             FunctionBody::Block()
+//         }
+//     }
+// }
+
+#[derive(Clone, FormatNode, AstNode)]
+#[ignore_all(type = SpannedToken)]
 pub enum Statement {
     Expression(Expression),
-    Decleration {
+    Declaration {
         ty: Type,
+        #[keep_item]
         ident: SpannedToken,
         eq: SpannedToken,
         expr: Option<Expression>,
     },
-    UseStatement {
+    Class {
+        token: SpannedToken,
+        ident: SpannedToken,
+        generic: Option<EnclosedPunctuationList<GenericParameter>>,
+        body: EnclosedList<Statement>,
+    },
+    ImportStatement {
         token: Option<SpannedToken>,
         args: PunctuationList<SpannedToken>,
     },
@@ -1043,11 +1114,11 @@ pub enum Statement {
         ty: Box<Type>,
     },
     Function {
-        fn_tok: SpannedToken,
+        return_type: Type,
         ident: SpannedToken,
+        generic: Option<EnclosedPunctuationList<GenericParameter>>,
         parameters: ParamaterList,
         arrow: Option<SpannedToken>,
-        return_type: Option<Type>,
         body: Option<Box<Statement>>,
     },
     Impl {
@@ -1060,6 +1131,7 @@ pub enum Statement {
         ret_token: SpannedToken,
         expr: Option<Expression>,
     },
+    Modifer(ModiferStatement),
 }
 
 impl Statement {
@@ -1078,215 +1150,298 @@ impl Statement {
     }
 }
 
-impl AstNode for Statement {
-    fn get_range(&self) -> Range {
-        match self {
-            Self::Expression(e) => e.get_range(),
-            Self::UseStatement {
-                token: Some(token),
-                args,
-            } => match args.iter().last() {
-                Some((_, Some(tok))) => Range::from((*token.span(), *tok.span())),
-                Some((tok, _)) => Range::from((*token.span(), *tok.span())),
-                _ => Range::from(*token.span()),
-            },
-            Self::Decleration {
-                ty,
-                expr: Some(expr),
-                ..
-            } => Range::from((&ty.get_range(), &expr.get_range())),
-            Self::Decleration { ty, ident, .. } => Range::from((&ty.get_range(), *ident.span())),
-            Self::List(list) => list.get_range(),
-            Self::Function {
-                fn_tok,
-                body: Some(body),
-                ..
-            } => Range::from((*fn_tok.span(), &body.get_range())),
-            Self::Function {
-                fn_tok,
-                return_type: Some(ty),
-                ..
-            } => Range::from((*fn_tok.span(), &ty.get_range())),
-            Self::Function {
-                fn_tok, parameters, ..
-            } => Range::from((*fn_tok.span(), &parameters.get_range())),
-            Self::Block(b) => b.get_range(),
-            Self::Impl {
-                impl_tok,
-                body: Some(body),
-                ..
-            } => Range::from((*impl_tok.span(), &body.get_range())),
-            Self::Impl {
-                impl_tok,
-                ty: Some(body),
-                ..
-            } => Range::from((*impl_tok.span(), &body.get_range())),
-            Self::Impl {
-                impl_tok,
-                generics: Some(body),
-                ..
-            } => Range::from((*impl_tok.span(), &body.get_range())),
-            Self::Return {
-                ret_token,
-                expr: Some(expr),
-            } => Range::from((*ret_token.span(), &expr.get_range())),
-            Self::Return { ret_token, .. } => Range::from(ret_token.span()),
-            _ => Range::default(),
-        }
-    }
+// impl AstNode for Statement {
+//     fn get_range(&self) -> Range {
+//         match self {
+//             Self::Expression(e) => e.get_range(),
+//             Self::ImportStatement {
+//                 token: Some(token),
+//                 args,
+//             } => match args.iter().last() {
+//                 Some((_, Some(tok))) => Range::from((*token.span(), *tok.span())),
+//                 Some((tok, _)) => Range::from((*token.span(), *tok.span())),
+//                 _ => Range::from(*token.span()),
+//             },
+//             Self::Declaration {
+//                 ty,
+//                 expr: Some(expr),
+//                 ..
+//             } => Range::from((&ty.get_range(), &expr.get_range())),
+//             Self::Declaration { ty, ident, .. } => Range::from((&ty.get_range(), *ident.span())),
+//             Self::List(list) => list.get_range(),
+//             Self::Function {
+//                 return_type: ret,
+//                 body: Some(body),
+//                 ..
+//             } => Range::from((&ret.get_range(), &body.get_range())),
+//             // Self::Function {
+//             //     fn_tok,
+//             //     return_type: Some(ty),
+//             //     ..
+//             // } => Range::from((*fn_tok.span(), &ty.get_range())),
+//             // Self::Function {
+//             //     fn_tok, parameters, ..
+//             // } => Range::from((*fn_tok.span(), &parameters.get_range())),
+//             Self::Block(b) => b.get_range(),
+//             Self::Impl {
+//                 impl_tok,
+//                 body: Some(body),
+//                 ..
+//             } => Range::from((*impl_tok.span(), &body.get_range())),
+//             Self::Impl {
+//                 impl_tok,
+//                 ty: Some(body),
+//                 ..
+//             } => Range::from((*impl_tok.span(), &body.get_range())),
+//             Self::Impl {
+//                 impl_tok,
+//                 generics: Some(body),
+//                 ..
+//             } => Range::from((*impl_tok.span(), &body.get_range())),
+//             Self::Return {
+//                 ret_token,
+//                 expr: Some(expr),
+//             } => Range::from((*ret_token.span(), &expr.get_range())),
+//             Self::Return { ret_token, .. } => Range::from(ret_token.span()),
+//             Self::Modifer(modif) => modif.get_range(),
+//             _ => Range::default(),
+//         }
+//     }
+// }
+
+// impl NodeDisplay for Statement {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         match self {
+//             Self::Declaration { .. } => f.write_str("Declaration"),
+//             Self::Class { .. } => f.write_str("Class"),
+//             Self::Expression(_) => f.write_str("Expression"),
+//             Self::Function { .. } => f.write_str("Function"),
+//             Self::ImportStatement { .. } => f.write_str("Use"),
+//             Self::TypeAlias {
+//                 ty: box Type::Struct(_),
+//                 ..
+//             } => f.write_str("Struct"),
+//             Self::TypeAlias { .. } => f.write_str("TypeAlias"),
+//             Self::List(_) => f.write_str("List"),
+//             Self::Block(_) => f.write_str("Block"),
+//             Self::Impl { .. } => f.write_str("Impl"),
+//             Self::Return { .. } => f.write_str("Return"),
+//             Self::Modifer(_) => f.write_str("Modifier"),
+//         }
+//     }
+// }
+
+// impl TreeDisplay for Statement {
+//     fn num_children(&self) -> usize {
+//         match self {
+//             Self::Declaration { expr: None, .. } => 2,
+//             Self::Declaration { .. } => 3,
+//             Self::Class {
+//                 token,
+//                 ident,
+//                 generic,
+//                 body,
+//             } => addup!(generic) + 3,
+//             Self::ImportStatement { token, args } => addup!(token) + args.num_children(),
+//             Self::Expression(_) => 1,
+//             Self::List(list) => list.num_children(),
+//             Self::TypeAlias {
+//                 generic: Some(_), ..
+//             } => 3,
+//             Self::TypeAlias { .. } => 2,
+//             Self::Function {
+//                 body: Some(_),
+//                 return_type: Some(_),
+//                 ..
+//             } => 4,
+//             Self::Function {
+//                 return_type: Some(_),
+//                 ..
+//             } => 3,
+//             Self::Function { body: Some(_), .. } => 3,
+//             Self::Function { .. } => 2,
+//             Self::Block(b) => b.num_children(),
+//             Self::Impl { generics, ty, .. } => addup!(generics, ty) + 1,
+//             Self::Return { expr: Some(_), .. } => 1,
+//             Self::Return { .. } => 0,
+//             Self::Modifer(_) => 1,
+//         }
+//     }
+
+//     fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+//         match self {
+//             Self::Declaration {
+//                 ty,
+//                 ident,
+//                 expr: Some(expr),
+//                 ..
+//             } => match index {
+//                 0 => Some(ty),
+//                 1 => Some(ident),
+//                 2 => Some(expr),
+//                 _ => None,
+//             },
+//             Self::Class {
+//                 token,
+//                 ident,
+//                 generic,
+//                 body,
+//             } => {
+//                 let ind = switchon!(index, Some(token), Some(ident), generic, Some(body));
+
+//                 // Some(body)
+//                 None
+//             }
+//             Self::Declaration { ty, ident, .. } => match index {
+//                 0 => Some(ty),
+//                 1 => Some(ident),
+//                 _ => None,
+//             },
+//             Self::ImportStatement { token, args } => {
+//                 let ind = switchon!(index, token);
+//                 args.child_at(index - ind)
+//             }
+//             Self::Expression(e) => Some(e),
+//             Self::List(list) => list.child_at(index),
+
+//             Self::TypeAlias {
+//                 ident,
+//                 generic: Some(_),
+//                 ..
+//             } if index == 0 => Some(ident),
+//             Self::TypeAlias {
+//                 generic: Some(gen), ..
+//             } if index == 1 => Some(gen),
+//             Self::TypeAlias {
+//                 generic: Some(_),
+//                 ty,
+//                 ..
+//             } if index == 2 => Some(&**ty),
+
+//             Self::TypeAlias { ident, .. } if index == 0 => Some(ident),
+//             Self::TypeAlias { ty, .. } if index == 1 => Some(&**ty),
+//             Self::Function {
+//                 ident,
+//                 parameters,
+//                 return_type: Some(return_type),
+//                 body: Some(body),
+//                 ..
+//             } => match index {
+//                 0 => Some(ident),
+//                 1 => Some(parameters),
+//                 2 => Some(return_type),
+//                 3 => Some(&**body),
+//                 _ => None,
+//             },
+//             Self::Function {
+//                 ident,
+//                 parameters,
+//                 body: Some(body),
+//                 ..
+//             } => match index {
+//                 0 => Some(ident),
+//                 1 => Some(parameters),
+//                 2 => Some(&**body),
+//                 _ => None,
+//             },
+//             Self::Function {
+//                 ident,
+//                 parameters,
+//                 return_type: Some(return_type),
+//                 ..
+//             } => match index {
+//                 0 => Some(ident),
+//                 1 => Some(parameters),
+//                 2 => Some(return_type),
+//                 _ => None,
+//             },
+//             Self::Function {
+//                 ident, parameters, ..
+//             } => match index {
+//                 0 => Some(ident),
+//                 1 => Some(parameters),
+//                 _ => None,
+//             },
+//             Self::Block(b) => b.child_at(index),
+//             Self::Impl {
+//                 generics, ty, body, ..
+//             } => {
+//                 let _ = switchon!(index, generics, ty, body);
+//                 None
+//             }
+//             Self::Return {
+//                 expr: Some(expr), ..
+//             } => Some(expr),
+//             Self::Modifer(modif) => Some(modif),
+//             _ => None,
+//         }
+//     }
+
+//     fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+//         match self {
+//             Self::Expression(e) => e.child_at_bx(index),
+//             _ => panic!(),
+//         }
+//     }
+// }
+
+#[derive(Clone, Debug)]
+pub enum Modifer {
+    Public,
+    Protected,
+    Unique,
+    Const,
 }
 
-impl NodeDisplay for Statement {
+impl NodeDisplay for Modifer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::Decleration { .. } => f.write_str("Decleration"),
-            Self::Expression(_) => f.write_str("Expression"),
-            Self::Function { .. } => f.write_str("Function"),
-            Self::UseStatement { .. } => f.write_str("Use"),
-            Self::TypeAlias {
-                ty: box Type::Struct(_),
-                ..
-            } => f.write_str("Struct"),
-            Self::TypeAlias { .. } => f.write_str("TypeAlias"),
-            Self::List(_) => f.write_str("List"),
-            Self::Block(_) => f.write_str("Block"),
-            Self::Impl { .. } => f.write_str("Impl"),
-            Self::Return { .. } => f.write_str("Return"),
+        Debug::fmt(self, f)
+    }
+}
+
+impl TreeDisplay for Modifer {
+    fn num_children(&self) -> usize {
+        0
+    }
+
+    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+        None
+    }
+}
+
+#[derive(Clone)]
+pub struct ModiferStatement {
+    pub modifier: Modifer,
+    pub modifier_token: SpannedToken,
+    pub statement: Option<Box<Statement>>,
+}
+
+impl AstNode for ModiferStatement {
+    fn get_range(&self) -> Range {
+        if let Some(stmt) = &self.statement {
+            Range::from((*self.modifier_token.span(), &stmt.get_range()))
+        } else {
+            self.modifier_token.get_range()
         }
     }
 }
 
-impl TreeDisplay for Statement {
+impl NodeDisplay for ModiferStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("Modifier")
+    }
+}
+
+impl TreeDisplay for ModiferStatement {
     fn num_children(&self) -> usize {
-        match self {
-            Self::Decleration { expr: None, .. } => 2,
-            Self::Decleration { .. } => 3,
-            Self::UseStatement { token, args } => addup!(token) + args.num_children(),
-            Self::Expression(_) => 1,
-            Self::List(list) => list.num_children(),
-            Self::TypeAlias {
-                generic: Some(_), ..
-            } => 3,
-            Self::TypeAlias { .. } => 2,
-            Self::Function {
-                body: Some(_),
-                return_type: Some(_),
-                ..
-            } => 4,
-            Self::Function {
-                return_type: Some(_),
-                ..
-            } => 3,
-            Self::Function { body: Some(_), .. } => 3,
-            Self::Function { .. } => 2,
-            Self::Block(b) => b.num_children(),
-            Self::Impl { generics, ty, .. } => addup!(generics, ty) + 1,
-            Self::Return { expr: Some(_), .. } => 1,
-            Self::Return { .. } => 0,
-        }
+        2
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
-        match self {
-            Self::Decleration {
-                ty,
-                ident,
-                expr: Some(expr),
-                ..
-            } => match index {
-                0 => Some(ty),
-                1 => Some(ident),
-                2 => Some(expr),
-                _ => None,
-            },
-            Self::Decleration { ty, ident, .. } => match index {
-                0 => Some(ty),
-                1 => Some(ident),
-                _ => None,
-            },
-            Self::UseStatement { token, args } => {
-                let ind = switchon!(index, token);
-                args.child_at(index - ind)
-            }
-            Self::Expression(e) => Some(e),
-            Self::List(list) => list.child_at(index),
-
-            Self::TypeAlias {
-                ident,
-                generic: Some(_),
-                ..
-            } if index == 0 => Some(ident),
-            Self::TypeAlias {
-                generic: Some(gen), ..
-            } if index == 1 => Some(gen),
-            Self::TypeAlias {
-                generic: Some(_),
-                ty,
-                ..
-            } if index == 2 => Some(&**ty),
-
-            Self::TypeAlias { ident, .. } if index == 0 => Some(ident),
-            Self::TypeAlias { ty, .. } if index == 1 => Some(&**ty),
-            Self::Function {
-                ident,
-                parameters,
-                return_type: Some(return_type),
-                body: Some(body),
-                ..
-            } => match index {
-                0 => Some(ident),
-                1 => Some(parameters),
-                2 => Some(return_type),
-                3 => Some(&**body),
-                _ => None,
-            },
-            Self::Function {
-                ident,
-                parameters,
-                body: Some(body),
-                ..
-            } => match index {
-                0 => Some(ident),
-                1 => Some(parameters),
-                2 => Some(&**body),
-                _ => None,
-            },
-            Self::Function {
-                ident,
-                parameters,
-                return_type: Some(return_type),
-                ..
-            } => match index {
-                0 => Some(ident),
-                1 => Some(parameters),
-                2 => Some(return_type),
-                _ => None,
-            },
-            Self::Function {
-                ident, parameters, ..
-            } => match index {
-                0 => Some(ident),
-                1 => Some(parameters),
-                _ => None,
-            },
-            Self::Block(b) => b.child_at(index),
-            Self::Impl {
-                generics, ty, body, ..
-            } => {
-                let _ = switchon!(index, generics, ty, body);
-                None
-            }
-            Self::Return {
-                expr: Some(expr), ..
-            } => Some(expr),
+    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+        match index {
+            0 => Some(&self.modifier),
+            1 => self.statement.map_tree(),
             _ => None,
-        }
-    }
-
-    fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
-        match self {
-            Self::Expression(e) => e.child_at_bx(index),
-            _ => panic!(),
         }
     }
 }

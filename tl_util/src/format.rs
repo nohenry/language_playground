@@ -601,3 +601,28 @@ where
         <T as NodeDisplay>::fmt(&self.lock().unwrap(), f)
     }
 }
+
+pub trait AsTree {
+    fn as_tree(&self) -> &dyn TreeDisplay;
+    fn map_tree(&self) -> Option<&dyn TreeDisplay> { None }
+}
+
+impl <T> AsTree for Option<Box<T>> where T: TreeDisplay {
+    fn as_tree(&self) -> &dyn TreeDisplay {
+        self.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f).unwrap()
+    }
+
+    fn map_tree(&self) -> Option<&dyn TreeDisplay> {
+        self.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f)
+    }
+}
+
+// impl <T> AsTree for Option<T> where T: TreeDisplay {
+//     fn as_tree(&self) -> &dyn TreeDisplay {
+//         self.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f).unwrap()
+//     }
+
+//     fn map_tree(&self) -> Option<&dyn TreeDisplay> {
+//         self.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f)
+//     }
+// }

@@ -13,12 +13,55 @@ impl Lexer {
         let mut tokens: Vec<SpannedToken> = Vec::new();
         let mut string = false;
 
-        while start_index < input.len() && end_index <= input.len() {
-            let sub_str = &input[start_index..end_index];
-            let next = input.chars().nth(end_index);
+        let mut line_comment = false;
+        let mut block_comment = false;
 
-            if let Some(token) = self.try_lex(sub_str, next, string) {
+        let input_len = input.len();
+
+        while start_index < input_len && end_index <= input_len {
+            // let ustart_index = input.char_indices().map(|(i, _)| i).nth(start_index).unwrap();
+            // let uend_index = input.char_indices().map(|(i, _)| i).nth(end_index).unwrap();
+
+            let sub_str = &input[start_index..(input.ceil_char_boundary(end_index))];
+            // let sub_str = unsafe { input.get_unchecked(start_index..end_index) };
+            // let sub_str = get_utf8_slice(input, start_index, end_index).expect("Unable to slice unicode string!");
+
+            // let next =
+            let next = if string {
+                None
+            } else {
+                // input.chars().nth(end_index)
+                if end_index + 1 <= input.len() {
+                    let end = input.ceil_char_boundary(end_index + 1);
+                    if end <= input.len() {
+                        input[input.floor_char_boundary(end_index)..end]
+                            .chars()
+                            .next()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            };
+
+            if let (Some(token), lex_length) = self.try_lex(sub_str, next, string) {
                 match token {
+                    Token::Operator(Operator::BlockCommentClose) if block_comment => block_comment = false,
+                    Token::Newline if line_comment => {
+                        if end_index + 1 < input_len && &input[start_index..end_index + 1] == "\r\n"
+                        {
+                            start_index += 1;
+                        }
+
+                        line_num += 1;
+                        position = 0;
+
+                        line_comment = false
+                    }
+                    _ if block_comment || line_comment => (),
+                    Token::Operator(Operator::BlockCommentOpen) => block_comment = true,
+                    Token::Operator(Operator::LineComment) => line_comment = true,
                     Token::Operator(Operator::Quote) => string = true,
                     Token::String => {
                         let tok = self.parse_template(
@@ -37,11 +80,9 @@ impl Lexer {
                     }
                     Token::Whitespace => position += 1,
                     Token::Newline => {
-                        let _ce = end_index - 1;
-                        if end_index + 1 < input.len()
-                            && &input[start_index..end_index + 1] == "\r\n"
+                        if end_index + 1 < input_len && &input[start_index..end_index + 1] == "\r\n"
                         {
-                            end_index += 1;
+                            start_index += 1;
                         }
 
                         line_num += 1;
@@ -62,25 +103,33 @@ impl Lexer {
                         position += (end_index - start_index) as u32;
                     }
                     token => {
+                        let length = lex_length.unwrap_or(end_index - start_index) as u32;
                         let token = SpannedToken::new(
                             token,
                             Span {
                                 line_num,
                                 position,
-                                length: (end_index - start_index) as u32,
+                                length,
                                 token_index: tokens.len() as u32,
                             },
                         );
 
                         tokens.push(token);
-                        position += (end_index - start_index) as u32;
+                        position += length;
+
+                        start_index += length as usize;
+                        end_index = start_index + 1;
+
+                        continue;
                     }
                 }
 
-                start_index = end_index;
+                start_index += sub_str.len();
                 end_index = start_index + 1;
             } else {
-                end_index += 1;
+                // println!("{}", input[end_index-1..end_index].len());
+                end_index += (sub_str.len() - sub_str.chars().count()) + 1;
+                // end_index += 1;
             }
         }
 
@@ -97,91 +146,131 @@ impl Lexer {
         tokens
     }
 
-    pub fn try_lex(&self, input: &str, next: Option<char>, string: bool) -> Option<Token> {
+    pub fn try_lex(
+        &self,
+        input: &str,
+        next: Option<char>,
+        string: bool,
+    ) -> (Option<Token>, Option<usize>) {
         if string {
-            if let Some('"') = input.chars().last() {
-                return Some(Token::String);
+            if let Some('\'') = input.chars().last() {
+                return (Some(Token::String), None);
             }
 
-            return None;
+            return (None, None);
         }
 
         if input.len() == 1 {
             // match single character symbols
             match input.chars().next() {
-                Some('[') => return Some(Token::Operator(Operator::OpenSquare)),
-                Some(']') => return Some(Token::Operator(Operator::CloseSquare)),
-                Some('(') => return Some(Token::Operator(Operator::OpenParen)),
-                Some(')') => return Some(Token::Operator(Operator::CloseParen)),
-                Some('{') => return Some(Token::Operator(Operator::OpenBrace)),
-                Some('}') => return Some(Token::Operator(Operator::CloseBrace)),
-                Some('<') => return Some(Token::Operator(Operator::OpenAngle)),
-                Some('>') => return Some(Token::Operator(Operator::CloseAngle)),
+                Some('[') => return (Some(Token::Operator(Operator::OpenSquare)), None),
+                Some(']') => return (Some(Token::Operator(Operator::CloseSquare)), None),
+                Some('(') => return (Some(Token::Operator(Operator::OpenParen)), None),
+                Some(')') => return (Some(Token::Operator(Operator::CloseParen)), None),
+                Some('{') => return (Some(Token::Operator(Operator::OpenBrace)), None),
+                Some('}') => return (Some(Token::Operator(Operator::CloseBrace)), None),
+                Some('<') => return (Some(Token::Operator(Operator::OpenAngle)), None),
+                Some('>') => return (Some(Token::Operator(Operator::CloseAngle)), None),
 
-                Some(':') => return Some(Token::Operator(Operator::Colon)),
-                Some('.') => return Some(Token::Operator(Operator::Dot)),
-                Some(',') => return Some(Token::Operator(Operator::Comma)),
+                Some(':') => return (Some(Token::Operator(Operator::Colon)), None),
+                Some('.') => match next {
+                    Some('.') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Dot)), None),
+                },
+                Some(',') => return (Some(Token::Operator(Operator::Comma)), None),
 
-                Some('+') => return Some(Token::Operator(Operator::Plus)),
+                Some('+') => return (Some(Token::Operator(Operator::Plus)), None),
                 Some('-') => match next {
-                    Some('>') => return None,
-                    _ => return Some(Token::Operator(Operator::Minus)),
+                    Some('>') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Minus)), None),
                 },
                 Some('*') => match next {
-                    Some('*') => return None,
-                    _ => return Some(Token::Operator(Operator::Multiply)),
+                    Some('*') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Multiply)), None),
                 },
                 Some('|') => match next {
-                    Some('|') => return None,
-                    _ => return Some(Token::Operator(Operator::Pipe)),
+                    Some('|') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Pipe)), None),
                 },
                 Some('&') => match next {
-                    Some('&') => return None,
-                    _ => return Some(Token::Operator(Operator::Ampersand)),
+                    Some('&') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Ampersand)), None),
                 },
-                Some('/') => return Some(Token::Operator(Operator::Divide)),
+                Some('/') => match next {
+                    Some('/') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Divide)), None),
+                },
 
-                Some('!') => return Some(Token::Operator(Operator::Exclamation)),
-                Some('@') => return Some(Token::Operator(Operator::At)),
-                Some('#') => return Some(Token::Operator(Operator::Pound)),
-                Some('$') => return Some(Token::Operator(Operator::Dollar)),
-                Some('%') => return Some(Token::Operator(Operator::Percent)),
-                Some('^') => return Some(Token::Operator(Operator::Carot)),
-                Some(';') => return Some(Token::Operator(Operator::SemiColon)),
-                Some('~') => return Some(Token::Operator(Operator::Tilde)),
-                Some('`') => return Some(Token::Operator(Operator::BackTick)),
-                Some('\'') => return Some(Token::Operator(Operator::SingleQuote)),
-                Some('"') => return Some(Token::Operator(Operator::Quote)),
-                Some('?') => return Some(Token::Operator(Operator::Question)),
+                Some('!') => return (Some(Token::Operator(Operator::Exclamation)), None),
+                Some('@') => return (Some(Token::Operator(Operator::At)), None),
+                Some('#') => return (Some(Token::Operator(Operator::Pound)), None),
+                Some('$') => return (Some(Token::Operator(Operator::Dollar)), None),
+                Some('%') => return (Some(Token::Operator(Operator::Percent)), None),
+                Some('^') => return (Some(Token::Operator(Operator::Carot)), None),
+                Some(';') => return (Some(Token::Operator(Operator::SemiColon)), None),
+                Some('~') => return (Some(Token::Operator(Operator::Tilde)), None),
+                Some('`') => return (Some(Token::Operator(Operator::BackTick)), None),
+                // Some('\'') => return (Some(Token::Operator(Operator::SingleQuote)), None),
+                Some('\'') => return (Some(Token::Operator(Operator::Quote)), None),
+                Some('?') => return (Some(Token::Operator(Operator::Question)), None),
 
-                Some('=') => return Some(Token::Operator(Operator::Equals)),
+                Some('=') => return (Some(Token::Operator(Operator::Equals)), None),
 
-                Some('\r' | '\n') => return Some(Token::Newline),
-                Some(c) if c.is_whitespace() => return Some(Token::Whitespace),
+                Some('\r' | '\n') => return (Some(Token::Newline), None),
+                Some(c) if c.is_whitespace() => return (Some(Token::Whitespace), None),
                 _ => (),
             }
         }
 
-        match (input.chars().next(), input.chars().nth(1)) {
-            (Some('*'), Some('*')) => return Some(Token::Operator(Operator::Exponent)),
-            (Some('|'), Some('|')) => return Some(Token::Operator(Operator::Or)),
-            (Some('&'), Some('&')) => return Some(Token::Operator(Operator::And)),
-            (Some('-'), Some('>')) => return Some(Token::Operator(Operator::Arrow)),
+        let mut chars = input.chars();
+
+        match (chars.next(), chars.next(), chars.next()) {
+            (Some('*'), Some('*'), _) => return (Some(Token::Operator(Operator::Exponent)), None),
+            (Some('|'), Some('|'), _) => return (Some(Token::Operator(Operator::Or)), None),
+            (Some('&'), Some('&'), _) => return (Some(Token::Operator(Operator::And)), None),
+            (Some('-'), Some('>'), _) => return (Some(Token::Operator(Operator::Arrow)), None),
+
+            (Some('/'), Some('/'), _) => {
+                return (Some(Token::Operator(Operator::LineComment)), None)
+            }
+            (Some('/'), Some('*'), _) => {
+                return (Some(Token::Operator(Operator::BlockCommentOpen)), None)
+            }
+            (Some('*'), Some('/'), _) => {
+                return (Some(Token::Operator(Operator::BlockCommentClose)), None)
+            }
+
+            (Some('.'), Some('.'), Some('.')) => {
+                return (Some(Token::Operator(Operator::TripleDot)), None)
+            }
+            (Some('.'), Some('.'), Some('=')) => {
+                return (Some(Token::Operator(Operator::TripleDot)), None)
+            }
+            (Some('.'), Some('.'), _) => match next {
+                Some('.' | '=') => return (None, None),
+                _ => return (Some(Token::Operator(Operator::DoubleDot)), None),
+            },
             _ => (),
         }
 
         let del = next.map(|c| !(c.is_numeric() || c == '.')).unwrap_or(true);
 
-        let cnt = input
+        let count = input
             .chars()
             .fold(0u8, |acc, c| if c == '.' { 1 + acc } else { acc });
-        if !input.chars().any(|c| !(c.is_numeric() || c == '.')) && cnt <= 1 && del {
-            if cnt == 1 {
+
+        if count == 1 && next == Some('.') {
+            let val = input[..input.len() - 1].parse().unwrap_or(0.0f64);
+            return (Some(Token::Float(val)), None);
+        }
+
+        if !input.chars().any(|c| !(c.is_numeric() || c == '.')) && count <= 1 && del {
+            if count == 1 {
                 let val = input.parse().unwrap_or(0.0f64);
-                return Some(Token::Float(val));
+                return (Some(Token::Float(val)), None);
             } else {
                 let val = input.parse().unwrap_or(0u64);
-                return Some(Token::Integer(val));
+                return (Some(Token::Integer(val)), None);
             }
         }
 
@@ -199,10 +288,10 @@ impl Lexer {
             & !input.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
             && del
         {
-            return Some(Token::Ident(input.to_string()));
+            return (Some(Token::Ident(input.to_string())), None);
         }
 
-        None
+        (None, None)
     }
 
     pub fn parse_template(
@@ -220,7 +309,7 @@ impl Lexer {
         let mut toks = Vec::new();
         let sindex = position + 1;
 
-        for i in 0..input.len() {
+        for i in 0..input.chars().count() {
             let c = input.chars().nth(i).unwrap();
 
             if c == '}' {
@@ -324,4 +413,14 @@ impl Lexer {
 pub enum Template {
     String(SpannedToken),
     Template(Vec<SpannedToken>, SpannedToken, SpannedToken),
+}
+
+fn get_utf8_slice(string: &str, start: usize, end: usize) -> Option<&str> {
+    assert!(end >= start);
+    string.char_indices().nth(start).and_then(|(start_pos, _)| {
+        string[start_pos..]
+            .char_indices()
+            .nth(end - start - 1)
+            .map(|(end_pos, _)| &string[start_pos..end_pos])
+    })
 }

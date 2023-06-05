@@ -16,6 +16,9 @@ pub enum Operator {
     CloseAngle,
 
     Dot,
+    DoubleDot,
+    DoubleDotEqual,
+    TripleDot,
     Colon,
     Comma,
     Arrow,
@@ -43,6 +46,10 @@ pub enum Operator {
     SingleQuote,
     Question,
 
+    LineComment,
+    BlockCommentOpen,
+    BlockCommentClose,
+
     Equals,
 }
 
@@ -59,6 +66,9 @@ impl Operator {
             Self::CloseAngle => ">",
 
             Self::Dot => ".",
+            Self::DoubleDot => "..",
+            Self::DoubleDotEqual => "..=",
+            Self::TripleDot => "...",
             Self::Colon => ":",
             Self::Comma => ",",
             Self::Arrow => "->",
@@ -85,6 +95,10 @@ impl Operator {
             Self::SingleQuote => "'",
             Self::Quote => "\"",
             Self::Question => "?",
+
+            Self::LineComment => "//",
+            Self::BlockCommentOpen => "/*",
+            Self::BlockCommentClose => "*/",
 
             Self::Equals => "=",
         }

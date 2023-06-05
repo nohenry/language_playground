@@ -1,25 +1,188 @@
-use std.io 
-use std.mem
+import fs
 
-type Potato <T, U> {
-    T a
-    U b
+int j = 4 
+let i = 5
+
+int8 j8 = 4
+int16 j16 = 4
+int32 j32 = 4
+int64 j64 = 4
+iptr jptr = 4
+
+uint j = 4
+uint8 j8 = 4
+uint16 j16 = 4
+uint32 j32 = 4
+uint64 j64 = 4
+uptr jptr = 4
+
+bool b = false
+
+float f = 4.5
+float32 f32 = 4.5
+float64 f64 = 4.5
+float128 f128 = 4.5
+
+fixed fx = 5.3
+fixed32 fx32 = 5.3
+fixed64 fx64 = 5.3
+fixed128 fx64 = 5.3
+
+fixed<2> fx32 = 5.35
+fixed<8> fx32 = 5.98732038
+
+char c = '😂'
+char c1 = 'é'
+char8 c8 = 'a'
+
+str coolString = 'Now this is a cool unicde string 🔥'
+str8 boringString = 'Poor old ascii'
+
+int[5] is = [1, 2, 3, 4, 5]
+int[50] oneToFiveButThenZero = [1, 2, 3, 4, 5, ...0]
+int[50] oneToFifty = [1, 2, 3, 4, 5, ...(6..=50)]
+int[100] newArr = [...oneToFiveButThenZero, ...oneToFifty]
+
+int[] slice = newArr[..]
+int[] slice5 = newArr[..5]
+
+uint? huh = 5
+uint? huh2 = none
+
+uint val = huh2 or 0
+
+uint& valPtr = &val
+uint* mutValPtr = &val
+
+uint newVal = *valPtr
+
+uint readOnly => 5
+uint& valPtrThatCantBeReset => &val
+
+for val in &newArr {
+    val += 4
 }
 
-type TestImplStruct {
-    u32 a
+let value = for val in &newArr { val += 5 }
+
+int index = 0
+// value == index
+let value = while index < 5 { 
+    index++
 }
 
-impl TestImplStruct {
-    fn work() {
-        print("{self.a}")
+let even = match j {
+    0 => true,
+    1 => false,
+    2 => true,
+    3 => false,
+    4 => true,
+    _ => j % 2 
+}
+
+let huhVal = match huh {
+    val => val,
+    none => 0,
+}
+
+int runCode(bool b) {
+    if b {
+        0
+    } else {
+        1
     }
 }
 
-TestImplStruct test = {
-    a: 987 
+int factorial(int n) => match n {
+    1 => 1,
+    n => factorial(n - 1) * n
 }
 
-TestImplStruct.work(test)
+int(bool) func = (bool b) => {
+    if b {
+        return 0
+    } else {
+        return 1
+    }
+}
 
-Slice val = alloc()
+func = (bool b) => {
+    if b: 0 else: 1
+}
+
+func = (bool b) => if b: 0 else: 1
+
+class Human {
+    String name = "fdsfdf"
+    int age = 60
+}
+
+class Data {
+    public const int SIZE = 50
+    public int[] data = [0: SIZE]
+
+    // private
+    unique int instances = 0
+
+    public unique create(int[50] data) {
+        for [src, dst] in [data, &self.data] {
+            *src = dst
+        }
+
+        Data.instances += 1
+    }
+
+    public unique destroy() {
+        Data.instances -= 1
+    }
+}
+
+public class UserData<T>: Data {
+    inner_data: T => {
+        get {
+            inner_data
+        }
+        set { value in
+            inner_data = value
+        } 
+    }
+
+    getOnly: int => 5
+    
+    getOnlyValue: int => {
+        getOnlyValue * 2
+    }
+    
+    setImplicitGet: int => { value in
+        this = value
+    }
+
+    T? calculateData(int value, bool returnValue = true) {
+        if returnValue && value > 5 {
+            return inner_data
+        } else {
+            none
+        }
+    }
+}
+
+interface Write {
+    public uint write(Buffer* buffer)
+}
+
+public closed class File: Write {
+    const int READ_COUNT = 2048
+    int fd
+
+    public uint write(Buffer *buffer) {
+        let amount = 0
+
+        // uint? read(int fd, uint8[], uint count) { /* */ }
+        while let count = io.syscall.read(fd, buffer.asSlice(), File.READ_COUNT) {
+            amount += count
+        }
+
+        amount
+    }
+}
+

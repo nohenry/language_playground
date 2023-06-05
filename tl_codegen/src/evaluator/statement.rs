@@ -264,8 +264,8 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 let _ = self.context.wstate().replace(state);
                 self.wstate().scope.pop_scope();
             }
-            // Variable decleration
-            Statement::Decleration {
+            // Variable declaration
+            Statement::Declaration {
                 ty,
                 ident,
                 expr: Some(raw_expr),
@@ -473,7 +473,7 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
-            // Struct decleration
+            // Struct declaration
             Statement::TypeAlias {
                 ident,
                 generic,
@@ -557,8 +557,8 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
                     index,
                 );
             }
-            Statement::Decleration { ident, .. } => {}
-            Statement::UseStatement { args, .. } => {
+            Statement::Declaration { ident, .. } => {}
+            Statement::ImportStatement { args, .. } => {
                 let path = args
                     .iter_items()
                     .map(|sym| sym.as_str().to_string())
@@ -579,7 +579,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
-            // Struct decleration
+            // Struct declaration
             Statement::TypeAlias {
                 ident,
                 generic,
@@ -765,7 +765,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                     index,
                 );
             }
-            Statement::Decleration {
+            Statement::Declaration {
                 ty,
                 ident,
                 ..

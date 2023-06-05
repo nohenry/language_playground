@@ -129,7 +129,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
                     self.recurse(l, i);
                 }
             }
-            Statement::Decleration {
+            Statement::Declaration {
                 ty, ident, expr, ..
             } => {
                 self.recurse_type(ty);
@@ -146,7 +146,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
                 }
             }
             Statement::Expression(e) => self.recurse_expression(e),
-            Statement::UseStatement { token, args } => {
+            Statement::ImportStatement { token, args } => {
                 if let Some(token) = token {
                     self.builder
                         .push_token(token, get_stype_index_from_str("keyword"), 0)

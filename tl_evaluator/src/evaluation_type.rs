@@ -72,7 +72,7 @@ pub trait EvaluationTypeProvider {
         symbol: Rf<Scope<Self::Type, <Self::Type as EvaluationType>::Value>>,
     ) -> Self::Type;
 
-    // fn inform_function_decleration(&self);
+    // fn inform_function_declaration(&self);
     fn function_def(
         &self,
         body: tl_core::ast::Statement,

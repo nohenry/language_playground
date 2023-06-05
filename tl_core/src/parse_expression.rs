@@ -122,41 +122,6 @@ impl Parser {
         )
     }
 
-    pub fn parse_function(&self) -> Option<Statement> {
-        let fn_tok = match self.tokens.peek() {
-            Some(Token::Ident(i)) if i == "fn" => self.tokens.next(),
-            _ => None,
-        }?;
-
-        let ident = match self.tokens.peek() {
-            Some(Token::Ident(_)) => self.tokens.next(),
-            _ => None,
-        }?;
-
-        let parameters = self.parse_parameters().unwrap();
-
-        let (arrow, return_type) =
-            if let Some(Token::Operator(Operator::Arrow)) = self.tokens.peek() {
-                let arrow = self.tokens.next().unwrap().clone();
-                // let return_parameters = self.parse_parameters();
-                let return_type = self.parse_type();
-
-                (Some(arrow), return_type)
-            } else {
-                (None, None)
-            };
-
-        let body = self.parse_statement().map(|bd| Box::new(bd));
-
-        Some(Statement::Function {
-            fn_tok: fn_tok.clone(),
-            ident: ident.clone(),
-            parameters,
-            arrow,
-            return_type,
-            body,
-        })
-    }
 
     pub fn parse_function_body(
         &self,

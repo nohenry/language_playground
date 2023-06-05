@@ -1,6 +1,10 @@
 #![feature(trait_upcasting)]
 #![feature(iter_intersperse)]
 #![feature(box_patterns)]
+#![feature(round_char_boundary)]
+#![feature(trace_macros)]
+
+// trace_macros!(true);
 
 use ast::{EnclosedList, Expression, Param, ParamaterList, Statement, Type};
 use lexer::Lexer;
@@ -27,9 +31,9 @@ impl Module {
     pub fn parse_str(input: &str, mod_name: &str) -> (Module, Vec<ParseError>) {
         let lexer = Lexer {};
         let tokens = lexer.lex(input);
-        // for p in &tokens {
-        //     println!("{p:#?}");
-        // }
+        for p in &tokens {
+            println!("{p:#?}");
+        }
 
         let parser = Parser::new(tokens);
         let parsed = parser.parse().unwrap();
@@ -431,7 +435,7 @@ impl<U: Clone> ModuleDescender<U> {
             None
         };
         match node {
-            Statement::Decleration {
+            Statement::Declaration {
                 expr: Some(expr), ..
             } => self.descend_expression(expr),
             Statement::Expression(e) => self.descend_expression(e),
@@ -522,7 +526,7 @@ impl<U: Clone> MutModuleDescender<U> {
                 None
             };
             match node {
-                Statement::Decleration {
+                Statement::Declaration {
                     expr: Some(expr), ..
                 } => self.descend_expression(expr),
                 Statement::Expression(e) => self.descend_expression(e),
@@ -533,7 +537,7 @@ impl<U: Clone> MutModuleDescender<U> {
             }
         } else {
             match node {
-                Statement::Decleration {
+                Statement::Declaration {
                     expr: Some(expr), ..
                 } => self.descend_expression(expr),
                 Statement::Expression(e) => self.descend_expression(e),

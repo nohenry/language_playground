@@ -23,7 +23,7 @@ impl Backend {
         _span: &Span,
     ) -> Option<Vec<CompletionItem>> {
         match item {
-            Statement::UseStatement { args, .. } => {
+            Statement::ImportStatement { args, .. } => {
                 if let Some((_, Some(SpannedToken(_, Token::Operator(Operator::Dot))))) =
                     args.iter().last()
                 {

@@ -109,7 +109,7 @@ impl<'a,
                     }
                 }
             }
-            Statement::Decleration {
+            Statement::Declaration {
                 ty,
                 ident,
                 expr: Some(raw_expr),
@@ -238,7 +238,7 @@ impl<'a,
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
-            // Struct decleration
+            // Struct declaration
             Statement::TypeAlias {
                 ident,
                 generic,
@@ -327,7 +327,7 @@ impl<'a,
                     .map(|ty| self.evaluate_type(ty))
                     .unwrap_or(self.type_provider.empty());
 
-                // self.type_provider.inform_function_decleration();
+                // self.type_provider.inform_function_declaration();
                 let function = self.type_provider.function_def(
                     Statement::clone(body),
                     eparameters,
@@ -341,7 +341,7 @@ impl<'a,
                     index,
                 );
             }
-            Statement::Decleration { ident, .. } => {
+            Statement::Declaration { ident, .. } => {
                 self.wstate().scope.insert_value(
                     ident.as_str(),
                     ScopeValue::EvaluationValue(V::empty(self.type_provider.as_ref())),
@@ -374,7 +374,7 @@ impl<'a,
 
     pub fn evaluate_statement(&self, statement: &Statement, index: usize) {
         match statement {
-            // Struct decleration
+            // Struct declaration
             Statement::TypeAlias {
                 ident,
                 generic,

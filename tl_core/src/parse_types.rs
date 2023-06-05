@@ -6,24 +6,6 @@ use crate::{
 };
 
 impl Parser {
-    pub fn parse_struct(&self) -> Option<Type> {
-        let open = self.expect_operator(Operator::OpenBrace);
-
-        let list = self.parse_list(|| self.parse_parameter().map(|f| (f, true)));
-
-        let close = self.expect_operator(Operator::CloseBrace);
-
-        if let (Some(open), Some(list), Some(close)) = (open, list, close) {
-            Some(Type::Struct(EnclosedList {
-                open: open.clone(),
-                items: list,
-                close: close.clone(),
-            }))
-        } else {
-            None
-        }
-    }
-
     pub fn parse_type(&self) -> Option<Type> {
         let mut ty = self.parse_type_primary();
 
@@ -41,8 +23,14 @@ impl Parser {
 
         let ty = loop {
             ty = match self.tokens.peek() {
-                Some(Token::Operator(Operator::At)) => Some(Type::Ref {
+                Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
                     ref_token: self.tokens.next().unwrap().clone(),
+                    mutable: false,
+                    base_type: ty.map(Box::new),
+                }),
+                Some(Token::Operator(Operator::Multiply)) => Some(Type::Ref {
+                    ref_token: self.tokens.next().unwrap().clone(),
+                    mutable: true,
                     base_type: ty.map(Box::new),
                 }),
                 Some(Token::Operator(Operator::Question)) => Some(Type::Option {
@@ -102,56 +90,83 @@ impl Parser {
             }
 
             Some(Token::Ident(id)) => match id.as_str() {
-                "i8" => Some(Type::Integer {
+                "int" => Some(Type::Integer {
+                    width: 32,
+                    signed: true,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "int8" => Some(Type::Integer {
                     width: 8,
                     signed: true,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "i16" => Some(Type::Integer {
+                "int16" => Some(Type::Integer {
                     width: 16,
                     signed: true,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "i32" => Some(Type::Integer {
+                "int32" => Some(Type::Integer {
                     width: 32,
                     signed: true,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "i64" => Some(Type::Integer {
+                "int64" => Some(Type::Integer {
                     width: 64,
                     signed: true,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "u8" => Some(Type::Integer {
+                "uint" => Some(Type::Integer {
+                    width: 32,
+                    signed: false,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "uint8" => Some(Type::Integer {
                     width: 8,
                     signed: false,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "u16" => Some(Type::Integer {
+                "uint16" => Some(Type::Integer {
                     width: 16,
                     signed: false,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "u32" => Some(Type::Integer {
+                "uint32" => Some(Type::Integer {
                     width: 32,
                     signed: false,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "u64" => Some(Type::Integer {
+                "uint64" => Some(Type::Integer {
                     width: 64,
                     signed: false,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "f32" => Some(Type::Float {
+                "float32" | "float" => Some(Type::Float {
                     width: 32,
                     token: self.tokens.next().unwrap().clone(),
                 }),
-                "f64" => Some(Type::Float {
+                "float64" => Some(Type::Float {
                     width: 64,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "fixed32" | "fixed" => Some(Type::Fixed {
+                    width: 32,
+                    decimals: 16,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "fixed64" => Some(Type::Fixed {
+                    width: 64,
+                    decimals: 32,
                     token: self.tokens.next().unwrap().clone(),
                 }),
                 "bool" => Some(Type::Boolean(self.tokens.next().unwrap().clone())),
-                "char" => Some(Type::Char(self.tokens.next().unwrap().clone())),
+                "char" => Some(Type::Char {
+                    width: 32,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "char8" => Some(Type::Char {
+                    width: 8,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
                 _ => Some(Type::Ident(self.tokens.next().unwrap().clone())),
             },
             Some(_) => {

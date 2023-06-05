@@ -2,8 +2,8 @@ use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     ast::{
-        ArgList, AstNode, EnclosedList, EnclosedPunctuationList, Param, ParamaterList,
-        PunctuationList, Statement,
+        ArgList, AstNode, EnclosedList, EnclosedPunctuationList, Modifer, ModiferStatement, Param,
+        ParamaterList, PunctuationList, Statement, Type,
     },
     error::{ParseError, ParseErrorKind},
     token::{Operator, Range, SpannedToken, Token, TokenIndex, TokenStream},
@@ -76,14 +76,13 @@ impl Parser {
     }
 
     pub fn parse_statement(&self) -> Option<Statement> {
+        if let Some(modifer) = self.parse_modifier(Self::parse_statement) {
+            return Some(Statement::Modifer(modifer));
+        }
+
         match self.tokens.peek() {
-            Some(Token::Ident(s)) if s == "use" => {
-                if let Some(us) = self.parse_use() {
-                    return Some(us);
-                }
-            }
-            Some(Token::Ident(s)) if s == "impl" => {
-                if let Some(us) = self.parse_impl() {
+            Some(Token::Ident(s)) if s == "import" => {
+                if let Some(us) = self.parse_import() {
                     return Some(us);
                 }
             }
@@ -95,6 +94,11 @@ impl Parser {
                     ret_token: tok.clone(),
                     expr,
                 });
+            }
+            Some(Token::Ident(s)) if s == "class" => {
+                if let Some(strct) = self.parse_class_declaration() {
+                    return Some(strct);
+                }
             }
             Some(Token::Ident(s)) if s == "type" => {
                 let ty_tok = self.tokens.next().unwrap();
@@ -108,15 +112,6 @@ impl Parser {
                 };
 
                 if let Some(Token::Operator(Operator::OpenBrace)) = self.tokens.peek() {
-                    if let Some(strct) = self.parse_struct() {
-                        return Some(Statement::TypeAlias {
-                            ty_tok: ty_tok.clone(),
-                            ident: symb.clone(),
-                            generic,
-                            eq: None,
-                            ty: Box::new(strct),
-                        });
-                    }
                 } else {
                     if let Some(us) = self.parse_type() {
                         let eq = self.expect_operator(Operator::Equals).unwrap();
@@ -130,11 +125,8 @@ impl Parser {
                     }
                 }
             }
-            Some(Token::Ident(id)) if id.as_str() == "fn" => {
-                return self.parse_function();
-            }
             Some(Token::Ident(_)) => {
-                if let Some(decl) = restore!(self, self.parse_variable_decleration()) {
+                if let Some(decl) = restore!(self, self.parse_variable_or_function_declaration()) {
                     return Some(decl);
                 }
             }
@@ -159,7 +151,34 @@ impl Parser {
         None
     }
 
-    pub fn parse_variable_decleration(&self) -> Option<Statement> {
+    pub fn parse_modifier(
+        &self,
+        f: impl Fn(&Parser) -> Option<Statement>,
+    ) -> Option<ModiferStatement> {
+        match self.tokens.peek() {
+            Some(Token::Ident(modifier)) => {
+                let modifier = match modifier.as_str() {
+                    "public" => Modifer::Public,
+                    "protected" => Modifer::Protected,
+                    "const" => Modifer::Const,
+                    "unique" => Modifer::Unique,
+                    _ => return None,
+                };
+                let token = self.tokens.next().unwrap();
+
+                let statement = f(self);
+
+                Some(ModiferStatement {
+                    modifier,
+                    modifier_token: token.clone(),
+                    statement: statement.map(|f| Box::new(f)),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn parse_variable_or_function_declaration(&self) -> Option<Statement> {
         let ty = self.parse_type();
         let ident = match self.tokens.peek() {
             Some(Token::Ident(_)) => self.tokens.next(),
@@ -167,14 +186,14 @@ impl Parser {
         };
 
         if let (Some(ty), Some(ident)) = (ty, ident) {
-            let Some(eq) = self.expect_operator(Operator::Equals).cloned() else {
-                self.tokens.back();
-                return None;
+            let eq = match self.tokens.peek() {
+                Some(Token::Operator(Operator::Equals)) => self.tokens.next().cloned().unwrap(),
+                _ => return self.parse_function_declaration(ty, ident.clone()),
             };
 
             let expr = self.parse_expression();
 
-            return Some(Statement::Decleration {
+            return Some(Statement::Declaration {
                 ty,
                 ident: ident.clone(),
                 eq,
@@ -184,7 +203,57 @@ impl Parser {
         None
     }
 
-    // pub fn parse_decleration(&self) -> Option<Statement> {
+    pub fn parse_function_declaration(&self, ty: Type, ident: SpannedToken) -> Option<Statement> {
+        let parameters = self.parse_parameters().unwrap();
+
+        let arrow = if let Some(Token::Operator(Operator::Arrow)) = self.tokens.peek() {
+            let arrow = self.tokens.next().unwrap().clone();
+
+            Some(arrow)
+        } else {
+            None
+        };
+
+        let body = self.parse_statement().map(|bd| Box::new(bd));
+
+        Some(Statement::Function {
+            // fn_tok: fn_tok.clone(),
+            generic: None,
+            ident,
+            parameters,
+            arrow,
+            return_type: ty,
+            body,
+        })
+    }
+
+    pub fn parse_class_declaration(&self) -> Option<Statement> {
+        let token = self.tokens.next()?;
+        let ident = self.tokens.next()?;
+
+        let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek() {
+            self.parse_generic_parameters()
+        } else {
+            None
+        };
+
+        let body = self.parse_enclosed_list(Operator::OpenBrace, Operator::CloseBrace, || {
+            self.parse_statement().map(|f| (f, true))
+        });
+
+        if let Some(body) = body {
+            Some(Statement::Class {
+                token: token.clone(),
+                ident: ident.clone(),
+                generic,
+                body,
+            })
+        } else {
+            None
+        }
+    }
+
+    // pub fn parse_declaration(&self) -> Option<Statement> {
     //     let ident = match self.tokens.next() {
     //         Some(tok @ SpannedToken(_, Token::Ident(_))) => tok.clone(),
     //         _ => {
@@ -198,7 +267,7 @@ impl Parser {
     //     };
     //     let expr = self.parse_expression(0);
 
-    //     Some(Statement::Decleration { ident, colon, expr })
+    //     Some(Statement::Declaration { ident, colon, expr })
     // }
 
     pub fn parse_impl(&self) -> Option<Statement> {
@@ -228,7 +297,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_use(&self) -> Option<Statement> {
+    pub fn parse_import(&self) -> Option<Statement> {
         let token = self.tokens.next();
         let mut args = PunctuationList::default();
         let mut last_line = token.map(|l| l.span().line_num);
@@ -252,7 +321,7 @@ impl Parser {
                 _ => break,
             }
         }
-        Some(Statement::UseStatement {
+        Some(Statement::ImportStatement {
             token: token.cloned(),
             args,
         })
@@ -588,5 +657,14 @@ impl Parser {
         }
 
         None
+    }
+
+    pub(crate) fn expect_ident(&self) -> Option<&SpannedToken> {
+        self.ignore_ws();
+        let Some(Token::Ident(_)) = self.tokens.peek() else {
+            return None;
+        };
+
+        self.tokens.next()
     }
 }

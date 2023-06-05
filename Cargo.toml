@@ -1,4 +1,4 @@
 [workspace]
-members = ["tl_core", "tl_util", "tl_compiler", "tl_codegen", "tl_vm", "tl_evaluator", "tl_lsp/lsp_server"]
+members = ["tl_core", "tl_util", "tl_compiler", "tl_codegen", "tl_vm", "tl_evaluator", "tl_macro", "tl_lsp/lsp_server"]
 resolver = "2"
 
