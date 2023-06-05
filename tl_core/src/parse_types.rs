@@ -1,5 +1,5 @@
 use crate::{
-    ast::{EnclosedList, EnclosedPunctuationList, GenericParameter, Type},
+    ast::{EnclosedPunctuationList, GenericParameter, Type},
     parser::Parser,
     restore,
     token::{Operator, Token},

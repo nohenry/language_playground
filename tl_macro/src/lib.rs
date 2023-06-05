@@ -7,8 +7,7 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
     parse_macro_input,
     punctuated::Punctuated,
-    token::Token,
-    Attribute, Data, DeriveInput, Field, Fields, GenericArgument, ReturnType, Type,
+    Attribute, Data, DeriveInput, Fields, GenericArgument, ReturnType, Type,
 };
 
 fn has_attr<'a>(attrs: &'a Vec<Attribute>, st: &[&str]) -> Option<&'a Attribute> {
@@ -240,8 +239,6 @@ pub fn mcr(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
         syn::parse::<Type>(proc_macro::TokenStream::from_str("Option<Box<(i32, bool)>>").unwrap())
             .unwrap();
 
-    println!("Result {}", types_match(&p, &s));
-
     tokens
 }
 
@@ -262,8 +259,6 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let (ignore_all, ignore_types) = has_attr(&input.attrs, &["ignore_all"])
                 .map(|attr| attr_args(attr))
                 .unwrap_or((HashSet::new(), HashSet::new()));
-
-            println!("{:?} {:?}", ignore_all, ignore_types);
 
             for variant in &node.variants {
                 let name = &variant.ident;
@@ -306,7 +301,6 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
                             if ignore_types.contains(&field.ty)
                                 && has_attr(&field.attrs, &["keep_item"]).is_none()
                             {
-                                println!("COnitnierusio {:?}", field_name);
                                 continue;
                             }
 
@@ -454,7 +448,7 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
             quote::quote! {
 
                 impl NodeDisplay for #ident {
-                    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
                         match self {
                             #tokens
                             _ => Ok(())
@@ -463,21 +457,21 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 }
 
                 impl TreeDisplay for #ident {
-                    fn num_children(&self) -> usize {
+                    fn num_children(&self, _cfg: &Config) -> usize {
                         match self {
                             #num_childs
                             _ => 0
                         }
                     }
 
-                    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+                    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
                         match self {
                             #childs
                             _ => None
                         }
                     }
 
-                    fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+                    fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'b> {
                         match self {
                             #boxed_childs
                             _ => panic!("Unexpected index for enum!")
@@ -489,186 +483,232 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
         _ => panic!("Unexpected type"),
     };
 
-    // println!("{:?}", input);
-
     tokens.into_token_stream().into()
 }
 
-#[proc_macro_derive(AstNode)]
+fn derive_ast_node_helper(
+    ident: &syn::Ident,
+    fields: &Fields,
+    enum_field: Option<&syn::Ident>,
+) -> TokenStream {
+    let mut output = TokenStream::new();
+    match &fields {
+        Fields::Unnamed(fields) => {
+            let mut generate = |left: i32,
+                                mut right: i32,
+                                left_name: &TokenStream,
+                                stream: &TokenStream| {
+                while left <= right && right >= 0 {
+                    let right_field = &fields.unnamed[right as usize];
+                    if has_attr(&right_field.attrs, &["skip_item"]).is_some() {
+                        right -= 1;
+                        continue;
+                    }
+
+                    let ignore_rights: String = (right as usize..fields.unnamed.len() - 1)
+                        .map(|_| "_")
+                        .intersperse(",")
+                        .collect();
+
+                    let right_name = TokenStream::from_str(&format!("_a{}", right)).unwrap();
+
+                    let mut out = stream.clone();
+
+                    if left != right {
+                        if is_optional(&fields.unnamed[right as usize].ty) {
+                            out.extend(quote::quote! { Some(#right_name) });
+                        } else {
+                            out.extend(right_name.clone());
+                        }
+                    }
+
+                    if ignore_rights.len() > 0 {
+                        if left != right {
+                            out.extend(quote::quote!(,));
+                        }
+                        out.extend(TokenStream::from_str(&ignore_rights));
+                    }
+
+                    if let Some(enum_field) = enum_field {
+                        output.extend(quote::quote! {
+                            #ident::#enum_field (#out) => Range::from((&#left_name.get_range(), &#right_name.get_range())),
+                        });
+                    } else {
+                        output.extend(quote::quote! {
+                            #ident (#out) => Range::from((&#left_name.get_range(), &#right_name.get_range())),
+                        });
+                    }
+
+                    if is_optional(&fields.unnamed[right as usize].ty) {
+                        right -= 1
+                    } else {
+                        break;
+                    }
+                }
+            };
+
+            let mut left = 0;
+            let right = fields.unnamed.len() as i32 - 1;
+
+            while left < fields.unnamed.len() as i32 {
+                let left_field = &fields.unnamed[left as usize];
+
+                if has_attr(&left_field.attrs, &["skip_item"]).is_some() {
+                    left += 1;
+                    continue;
+                }
+
+                let left_name = TokenStream::from_str(&format!("_a{}", left)).unwrap();
+
+                let mut inner_names = TokenStream::new();
+                let ignore_lefts: String =
+                    (0..left as usize).map(|_| "_").intersperse(",").collect();
+
+                if ignore_lefts.len() > 0 {
+                    inner_names.extend(TokenStream::from_str(&ignore_lefts));
+                    inner_names.extend(quote::quote!(,));
+                }
+
+                if is_optional(&left_field.ty) {
+                    inner_names.extend(quote::quote! { Some(#left_name) });
+                } else {
+                    inner_names.extend(left_name.clone());
+                }
+
+                inner_names.extend(quote::quote!(,..,));
+
+                generate(left, right, &left_name, &inner_names);
+
+                if is_optional(&left_field.ty) {
+                    left += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+        Fields::Unit => {
+            if let Some(enum_field) = enum_field {
+                output.extend(quote::quote! {
+                    #ident::#enum_field => Range::default(),
+                });
+            } else {
+                output.extend(quote::quote! {
+                    #ident => Range::default(),
+                });
+            }
+        }
+        Fields::Named(fields) => {
+            let mut generate = |left: i32,
+                                mut right: i32,
+                                left_name: &TokenStream,
+                                stream: &TokenStream| {
+                while left <= right && right >= 0 {
+                    let mut out = stream.clone();
+
+                    let right_field = &fields.named[right as usize];
+
+                    if has_attr(&right_field.attrs, &["skip_item"]).is_some() {
+                        right -= 1;
+                        continue;
+                    }
+
+                    let right_name = right_field.ident.clone().unwrap().to_token_stream();
+
+                    if left != right {
+                        if is_optional(&right_field.ty) {
+                            out.extend(quote::quote! { #right_name: Some(#right_name) });
+                        } else {
+                            out.extend(right_name.clone());
+                        }
+                        out.extend(quote::quote! {,});
+                    }
+
+                    if let Some(enum_field) = enum_field {
+                        output.extend(quote::quote! {
+                                        #ident::#enum_field { #out .. } => Range::from((&#left_name.get_range(), &#right_name.get_range())),
+                                    });
+                    } else {
+                        output.extend(quote::quote! {
+                                        #ident { #out .. } => Range::from((&#left_name.get_range(), &#right_name.get_range())),
+                                    });
+                    }
+
+                    if is_optional(&right_field.ty) {
+                        right -= 1
+                    } else {
+                        break;
+                    }
+                }
+            };
+
+            let mut left = 0;
+            let right = fields.named.len() as i32 - 1;
+
+            while left < fields.named.len() as i32 {
+                let left_field = &fields.named[left as usize];
+
+                if has_attr(&left_field.attrs, &["skip_item"]).is_some() {
+                    left += 1;
+                    continue;
+                }
+
+                let left_name = left_field.ident.clone().unwrap().to_token_stream();
+
+                let mut inner_names = TokenStream::new();
+
+                if is_optional(&left_field.ty) {
+                    inner_names.extend(quote::quote! { #left_name: Some(#left_name) });
+                } else {
+                    inner_names.extend(left_name.clone());
+                }
+
+                inner_names.extend(quote::quote! {,});
+
+                generate(left, right, &left_name, &inner_names);
+
+                if is_optional(&left_field.ty) {
+                    left += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+    };
+
+    output
+}
+
+#[proc_macro_derive(AstNode, attributes(skip_item))]
 pub fn derive_ast_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(tokens as DeriveInput);
 
     let ident = input.ident;
 
     let tokens = match &input.data {
+        Data::Struct(node) => {
+            let mut num_childs = TokenStream::new();
+            num_childs.extend(derive_ast_node_helper(&ident, &node.fields, None));
+
+            quote::quote! {
+                impl AstNode for #ident {
+                    fn get_range(&self) -> Range {
+                        match self {
+                            #num_childs
+                        }
+                    }
+                }
+            }
+        }
+
         Data::Enum(node) => {
-            // let variants = node.variants.
-            let mut tokens = TokenStream::new();
             let mut num_childs = TokenStream::new();
 
             for variant in &node.variants {
                 let name = &variant.ident;
-
-                let fields_in_variant = match &variant.fields {
-                    Fields::Unnamed(_) => quote::quote! { (..) },
-                    Fields::Unit => quote::quote! {},
-                    Fields::Named(_) => quote::quote! { {..} },
-                };
-
-                match &variant.fields {
-                    Fields::Unnamed(fields) => {
-                        let mut generate =
-                            |left: i32,
-                             mut right: i32,
-                             left_name: &TokenStream,
-                             stream: &TokenStream| {
-                                while left <= right && right >= 0 {
-                                    let mut out = stream.clone();
-
-                                    let ignore_rights: String = (right as usize
-                                        ..fields.unnamed.len() - 1)
-                                        .map(|_| "_")
-                                        .intersperse(",")
-                                        .collect();
-
-                                    let right_name =
-                                        TokenStream::from_str(&format!("_a{}", right)).unwrap();
-
-                                    if left != right {
-                                        if is_optional(&fields.unnamed[right as usize].ty) {
-                                            out.extend(quote::quote! { Some(#right_name) });
-                                        } else {
-                                            out.extend(right_name.clone());
-                                        }
-                                    }
-
-                                    if ignore_rights.len() > 0 {
-                                        if left != right {
-                                            out.extend(quote::quote!(,));
-                                        }
-                                        out.extend(TokenStream::from_str(&ignore_rights));
-                                    }
-
-                                    num_childs.extend(quote::quote! {
-                                        #ident::#name (#out) => Range::from((&#left_name.get_range(), &#right_name.get_range())), 
-                                    });
-
-                                    if is_optional(&fields.unnamed[right as usize].ty) {
-                                        right -= 1
-                                    } else {
-                                        break;
-                                    }
-                                }
-                            };
-
-                        let mut left = 0;
-                        let right = fields.unnamed.len() as i32 - 1;
-
-                        while left < fields.unnamed.len() as i32 {
-                            let left_name = TokenStream::from_str(&format!("_a{}", left)).unwrap();
-
-                            let left_field = &fields.unnamed[left as usize];
-
-                            let mut inner_names = TokenStream::new();
-                            let ignore_lefts: String =
-                                (0..left as usize).map(|_| "_").intersperse(",").collect();
-
-                            if ignore_lefts.len() > 0 {
-                                inner_names.extend(TokenStream::from_str(&ignore_lefts));
-                                inner_names.extend(quote::quote!(,));
-                            }
-
-                            if is_optional(&left_field.ty) {
-                                inner_names.extend(quote::quote! { Some(#left_name) });
-                            } else {
-                                inner_names.extend(left_name.clone());
-                            }
-
-                            inner_names.extend(quote::quote!(,..,));
-
-                            generate(left, right, &left_name, &inner_names);
-
-                            if is_optional(&left_field.ty) {
-                                left += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                    Fields::Unit => num_childs.extend(quote::quote! {
-                        #ident::#name => Range::default(),
-                    }),
-                    Fields::Named(fields) => {
-                         let mut generate =
-                            |left: i32,
-                             mut right: i32,
-                             left_name: &TokenStream,
-                             stream: &TokenStream| {
-                                while left <= right && right >= 0 {
-                                    let mut out = stream.clone();
-
-                                    let right_field = &fields.named[right as usize];
-                                    let right_name = right_field.ident.clone().unwrap().to_token_stream();
-
-                                    if left != right {
-                                        if is_optional(&right_field.ty) {
-                                            out.extend(quote::quote! { #right_name: Some(#right_name) });
-                                        } else {
-                                            out.extend(right_name.clone());
-                                        }
-                                        out.extend(quote::quote! {,});
-                                    }
-                                    println!("{} {} {:?}", left, right, out.to_string());
-
-                                    num_childs.extend(quote::quote! {
-                                        #ident::#name { #out .. } => Range::from((&#left_name.get_range(), &#right_name.get_range())), 
-                                    });
-
-                                    if is_optional(&right_field.ty) {
-                                        right -= 1
-                                    } else {
-                                        break;
-                                    }
-                                }
-                            };
-
-                        let mut left = 0;
-                        let right = fields.named.len() as i32 - 1;
-
-                        while left < fields.named.len() as i32 {
-                            let left_field = &fields.named[left as usize];
-                            let left_name = left_field.ident.clone().unwrap().to_token_stream();
-
-                            let mut inner_names = TokenStream::new();
-
-                            if is_optional(&left_field.ty) {
-                                inner_names.extend(quote::quote! { #left_name: Some(#left_name) });
-                            } else {
-                                inner_names.extend(left_name.clone());
-                            }
-
-                            inner_names.extend(quote::quote! {,});
-
-                            generate(left, right, &left_name, &inner_names);
-
-                            if is_optional(&left_field.ty) {
-                                left += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                };
-
-                let string = name.to_string();
-
-                tokens.extend(quote::quote! {
-                    #ident::#name #fields_in_variant => write!(f, #string),
-                })
+                num_childs.extend(derive_ast_node_helper(&ident, &variant.fields, Some(name)));
             }
 
             quote::quote! {
-
                 impl AstNode for #ident {
                     fn get_range(&self) -> Range {
                         match self {

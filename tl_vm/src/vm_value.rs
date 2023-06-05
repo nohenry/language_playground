@@ -159,7 +159,7 @@ impl NodeDisplay for VmValueKind {
 }
 
 impl TreeDisplay for VmValueKind {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match self {
             VmValueKind::Function { .. } => 1,
             VmValueKind::Tuple(list) => list.len(),
@@ -174,7 +174,7 @@ impl TreeDisplay for VmValueKind {
         }
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match self {
             VmValueKind::Function { body, .. } => match index {
                 0 => Some(body),
@@ -197,10 +197,10 @@ impl TreeDisplay for VmValueKind {
         }
     }
 
-    fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
-            VmValueKind::StructInstance { members, .. } => members.child_at_bx(index),
-            VmValueKind::StructInitializer { members } => members.child_at_bx(index),
+            VmValueKind::StructInstance { members, .. } => members.child_at_bx(index, cfg),
+            VmValueKind::StructInitializer { members } => members.child_at_bx(index, cfg),
             VmValueKind::Symbol(sym) => Box::new(sym.borrow()),
             // ConstValueKind::Ref { base, offset } => Box::new(base),
             _ => panic!(),
@@ -227,11 +227,11 @@ impl NodeDisplay for VmValue {
 }
 
 impl TreeDisplay for VmValue {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         2
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match index {
             0 => Some(&self.ty),
             1 => Some(&self.kind),

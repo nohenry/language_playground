@@ -414,13 +414,3 @@ pub enum Template {
     String(SpannedToken),
     Template(Vec<SpannedToken>, SpannedToken, SpannedToken),
 }
-
-fn get_utf8_slice(string: &str, start: usize, end: usize) -> Option<&str> {
-    assert!(end >= start);
-    string.char_indices().nth(start).and_then(|(start_pos, _)| {
-        string[start_pos..]
-            .char_indices()
-            .nth(end - start - 1)
-            .map(|(end_pos, _)| &string[start_pos..end_pos])
-    })
-}

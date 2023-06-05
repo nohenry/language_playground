@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::RwLock};
 
-use tl_util::format::{NodeDisplay, TreeDisplay};
+use tl_util::format::{Config, FormatType, NodeDisplay, TreeDisplay};
 
 use crate::lexer::Template;
 
@@ -137,7 +137,7 @@ pub enum Token {
 }
 
 impl NodeDisplay for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config) -> std::fmt::Result {
         match self {
             Self::Ident(s) => f.write_str(s),
             Self::Operator(o) => f.write_str(o.as_str()),
@@ -247,18 +247,22 @@ impl SpannedToken {
 }
 
 impl NodeDisplay for SpannedToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config) -> std::fmt::Result {
         write!(f, "Token: ",)?;
-        self.1.fmt(f)
+        self.1.fmt(f, _cfg)
     }
 }
 
 impl TreeDisplay for SpannedToken {
-    fn num_children(&self) -> usize {
-        1
+    fn num_children(&self, _cfg: &Config) -> usize {
+        if let FormatType::Display = _cfg.format_type {
+            0
+        } else {
+            1
+        }
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         Some(&self.0)
     }
 }
@@ -337,21 +341,32 @@ impl PartialOrd for Span {
 }
 
 impl NodeDisplay for Span {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Span line: {}, character: {}, {} long, token: {}",
-            self.line_num, self.position, self.length, self.token_index
-        )
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cfg: &Config) -> std::fmt::Result {
+        match &cfg.format_type {
+            FormatType::Debug => {
+                write!(
+                    f,
+                    "Span line: {}, character: {}, {} long, token: {}",
+                    self.line_num, self.position, self.length, self.token_index
+                )
+            }
+            FormatType::Display => {
+                write!(
+                    f,
+                    "Span line: {}, character: {}, {} long, token: {}",
+                    self.line_num, self.position, self.length, self.token_index
+                )
+            }
+        }
     }
 }
 
 impl TreeDisplay for Span {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         0
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         panic!()
     }
 }
@@ -437,17 +452,17 @@ impl From<Span> for Range {
 }
 
 impl NodeDisplay for Range {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config) -> std::fmt::Result {
         write!(f, "Range")
     }
 }
 
 impl TreeDisplay for Range {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         2
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         match index {
             0 => Some(&self.start),
             1 => Some(&self.end),

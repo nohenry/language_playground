@@ -438,15 +438,15 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay
 impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay>
     TreeDisplay for ScopeManager<T, V>
 {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         1
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         None
     }
 
-    fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match _index {
             0 => Box::new(self.module.borrow()),
             1 => Box::new(BoxedGrouperIter(

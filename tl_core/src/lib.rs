@@ -12,7 +12,7 @@ use linked_hash_map::LinkedHashMap;
 use log::{Log, SetLoggerError};
 use parser::Parser;
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay},
+    format::{NodeDisplay, TreeDisplay, Config},
     Rf,
 };
 
@@ -240,7 +240,7 @@ pub struct Symbol {
 }
 
 impl NodeDisplay for Symbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         match &self.kind {
             SymbolKind::Root => f.write_str("Root"),
             SymbolKind::Record { .. } => write!(f, "Record `{}`", self.name),
@@ -254,7 +254,7 @@ impl NodeDisplay for Symbol {
 }
 
 impl TreeDisplay for Symbol {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match &self.kind {
             SymbolKind::Parameter { .. } => 1,
             SymbolKind::ReturnParameter { .. } => 1,
@@ -262,7 +262,7 @@ impl TreeDisplay for Symbol {
         }
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         match &self.kind {
             SymbolKind::Parameter { ty } => Some(ty),
             SymbolKind::ReturnParameter { ty } => Some(ty),
@@ -270,7 +270,7 @@ impl TreeDisplay for Symbol {
         }
     }
 
-    fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay + 'a> {
+    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'a> {
         let p = self.children.values().nth(index).unwrap().borrow(); //.map(|f| &*f.borrow())
 
         Box::new(p)

@@ -183,7 +183,7 @@ impl NodeDisplay for LlvmValueKind<'_> {
 }
 
 impl TreeDisplay for LlvmValueKind<'_> {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match self {
             LlvmValueKind::Function { .. } => 1,
             LlvmValueKind::Tuple(list) => list.len(),
@@ -198,7 +198,7 @@ impl TreeDisplay for LlvmValueKind<'_> {
         }
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match self {
             LlvmValueKind::Function { body, .. } => match index {
                 0 => Some(body),
@@ -221,10 +221,10 @@ impl TreeDisplay for LlvmValueKind<'_> {
         }
     }
 
-    fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
-            LlvmValueKind::StructInstance { members, .. } => members.child_at_bx(index),
-            LlvmValueKind::StructInitializer { members, .. } => members.child_at_bx(index),
+            LlvmValueKind::StructInstance { members, .. } => members.child_at_bx(index, cfg),
+            LlvmValueKind::StructInitializer { members, .. } => members.child_at_bx(index, cfg),
             LlvmValueKind::Symbol(sym) => Box::new(sym.borrow()),
             // ConstValueKind::Ref { base, offset } => Box::new(base),
             _ => panic!(),
@@ -259,11 +259,11 @@ impl NodeDisplay for LlvmValue<'_> {
 }
 
 impl TreeDisplay for LlvmValue<'_> {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         2
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match index {
             0 => Some(&self.ty),
             1 => Some(&self.kind),

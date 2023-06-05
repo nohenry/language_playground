@@ -6,7 +6,6 @@ use tl_util::{Rf, macros::mcr};
 fn main() {
     let mut m = Rf::new(0);
 
-    mcr!();
     // let red= m.clone();
     // *m.borrow_mut() = 7;
 

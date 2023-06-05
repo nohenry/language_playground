@@ -1,22 +1,3 @@
-{} {}
-0 1 "arrow, expression : Some(expression),"
-0 0 "arrow,"
-{} {Type::Path { qself: None, path: Path { leading_colon: None, segments: [PathSegment { ident: Ident { ident: "SpannedToken", span: #0 bytes(48159..48171) }, arguments: PathArguments::None }] } }}
-0 3 "ty, expr : Some(expr),"
-0 2 "ty, eq,"
-0 3 "token, body,"
-0 1 "token : Some(token), args,"
-1 1 "args,"
-0 4 "ty_tok, ty,"
-0 5 "return_type, body : Some(body),"
-0 4 "return_type, arrow : Some(arrow),"
-0 3 "return_type, parameters,"
-0 3 "impl_tok, body : Some(body),"
-0 2 "impl_tok, ty : Some(ty),"
-0 1 "impl_tok, generics : Some(generics),"
-0 0 "impl_tok,"
-0 1 "ret_token, expr : Some(expr),"
-0 0 "ret_token,"
 #![feature(prelude_import)]
 #![feature(trait_upcasting)]
 #![feature(iter_intersperse)]
@@ -133,7 +114,7 @@ pub mod ast {
     where
         T: TreeDisplay + AstNode,
     {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             if let Some((_, Some(_))) = self.tokens.last() {
                 self.tokens.len() * 2
             } else if !self.tokens.is_empty() {
@@ -142,7 +123,7 @@ pub mod ast {
                 0
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             let p = &self.tokens[index / 2];
             if index % 2 == 0 {
                 Some(&p.0)
@@ -191,10 +172,10 @@ pub mod ast {
         }
     }
     impl TreeDisplay for ParamaterList {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             2
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.range),
                 1 => Some(&self.items),
@@ -250,14 +231,14 @@ pub mod ast {
         }
     }
     impl TreeDisplay for KeyValue {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             {
                 (if let Some(_) = self.name { 1 } else { 0 })
                     + (if let Some(_) = Some(true) { 1 } else { 0 })
                     + 0
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             {
                 let mut ind = 0;
                 if let Some(v) = &self.name {
@@ -319,14 +300,14 @@ pub mod ast {
         }
     }
     impl TreeDisplay for Param {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             {
                 (if let Some(_) = self.ty { 1 } else { 0 })
                     + (if let Some(_) = self.name { 1 } else { 0 })
                     + 0
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             {
                 let mut ind = 0;
                 if let Some(v) = &self.ty {
@@ -379,10 +360,10 @@ pub mod ast {
         }
     }
     impl TreeDisplay for ArgList {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             2
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.range),
                 1 => Some(&self.items),
@@ -422,10 +403,10 @@ pub mod ast {
         }
     }
     impl<T: AstNode> TreeDisplay for EnclosedPunctuationList<T> {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             1
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.items),
                 _ => None,
@@ -474,11 +455,11 @@ pub mod ast {
         }
     }
     impl<T: AstNode> TreeDisplay for EnclosedList<T> {
-        fn num_children(&self) -> usize {
-            self.items.num_children()
+        fn num_children(&self, _cfg: &Config) -> usize {
+            self.items.num_children(_cfg)
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
-            self.items.child_at(index)
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+            self.items.child_at(index, _cfg)
         }
     }
     pub enum Type {
@@ -841,11 +822,11 @@ pub mod ast {
         }
     }
     impl TreeDisplay for Type {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             match self {
-                Type::Array(a) => a.items.num_children(),
-                Type::Union(a) => a.num_children(),
-                Type::Tuple(a) => a.items.num_children(),
+                Type::Array(a) => a.items.num_children(_cfg),
+                Type::Union(a) => a.num_children(_cfg),
+                Type::Tuple(a) => a.items.num_children(_cfg),
                 Type::Generic {
                     base_type: Some(_), ..
                 } => 2,
@@ -854,15 +835,15 @@ pub mod ast {
                 Type::Option { .. } => 1,
                 Type::Result { .. } => 1,
                 Type::Ref { .. } => 1,
-                Type::Struct(s) => s.num_children(),
+                Type::Struct(s) => s.num_children(_cfg),
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match self {
-                Type::Array(a) => a.items.child_at(index),
-                Type::Union(a) => a.child_at(index),
-                Type::Tuple(a) => a.items.child_at(index),
+                Type::Array(a) => a.items.child_at(index, _cfg),
+                Type::Union(a) => a.child_at(index, _cfg),
+                Type::Tuple(a) => a.items.child_at(index, _cfg),
                 Type::Generic {
                     base_type: Some(base_type),
                     list,
@@ -882,7 +863,7 @@ pub mod ast {
                 Type::Ref { base_type, .. } => {
                     base_type.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f)
                 }
-                Type::Struct(s) => s.child_at(index),
+                Type::Struct(s) => s.child_at(index, _cfg),
                 _ => None,
             }
         }
@@ -934,15 +915,15 @@ pub mod ast {
         }
     }
     impl TreeDisplay for GenericParameter {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             match self {
-                GenericParameter::Bounded { bounds, .. } => bounds.num_children(),
+                GenericParameter::Bounded { bounds, .. } => bounds.num_children(_cfg),
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
             match self {
-                GenericParameter::Bounded { bounds, .. } => bounds.child_at(index),
+                GenericParameter::Bounded { bounds, .. } => bounds.child_at(index, _cfg),
                 _ => None,
             }
         }
@@ -981,13 +962,13 @@ pub mod ast {
         }
     }
     impl TreeDisplay for ParsedTemplate {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             match self {
                 ParsedTemplate::Template(_, _, _) => 1,
                 _ => 0,
             }
         }
-        fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
+        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
             match self {
                 ParsedTemplate::Template(e, _, _) => Some(&**e),
                 _ => None,
@@ -1008,33 +989,31 @@ pub mod ast {
         }
     }
     impl TreeDisplay for ParsedTemplateString {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             self.0.len()
         }
-        fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
+        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
             self.0.get(_index).map::<&dyn TreeDisplay<()>, _>(|t| t)
         }
     }
+    # [ignore_all (type = bool , type = u64 , type = f64 , type = Option < Unit >)]
     pub enum Expression {
         BinaryExpression {
             left: Option<Box<Expression>>,
+            op_token: SpannedToken,
             right: Option<Box<Expression>>,
-            op_token: Option<SpannedToken>,
         },
-        Boolean(bool, SpannedToken),
-        Integer(u64, Option<Unit>, SpannedToken),
-        Float(f64, Option<Unit>, SpannedToken),
+        Boolean(#[skip_item] bool, SpannedToken),
+        Integer(#[skip_item] u64, #[skip_item] Option<Unit>, SpannedToken),
+        Float(#[skip_item] f64, #[skip_item] Option<Unit>, SpannedToken),
         Ident(SpannedToken),
-        String(ParsedTemplateString, SpannedToken),
+        String(#[skip_item] ParsedTemplateString, SpannedToken),
         FunctionCall {
             expr: Box<Expression>,
             args: ArgList,
         },
         Tuple(Vec<Expression>),
-        Array {
-            values: PunctuationList<Expression>,
-            range: Range,
-        },
+        Array(EnclosedPunctuationList<Expression>),
         Record(EnclosedList<KeyValue>),
     }
     #[automatically_derived]
@@ -1044,12 +1023,12 @@ pub mod ast {
             match self {
                 Expression::BinaryExpression {
                     left: __self_0,
-                    right: __self_1,
-                    op_token: __self_2,
+                    op_token: __self_1,
+                    right: __self_2,
                 } => Expression::BinaryExpression {
                     left: ::core::clone::Clone::clone(__self_0),
-                    right: ::core::clone::Clone::clone(__self_1),
-                    op_token: ::core::clone::Clone::clone(__self_2),
+                    op_token: ::core::clone::Clone::clone(__self_1),
+                    right: ::core::clone::Clone::clone(__self_2),
                 },
                 Expression::Boolean(__self_0, __self_1) => Expression::Boolean(
                     ::core::clone::Clone::clone(__self_0),
@@ -1082,16 +1061,286 @@ pub mod ast {
                 Expression::Tuple(__self_0) => {
                     Expression::Tuple(::core::clone::Clone::clone(__self_0))
                 }
-                Expression::Array {
-                    values: __self_0,
-                    range: __self_1,
-                } => Expression::Array {
-                    values: ::core::clone::Clone::clone(__self_0),
-                    range: ::core::clone::Clone::clone(__self_1),
-                },
+                Expression::Array(__self_0) => {
+                    Expression::Array(::core::clone::Clone::clone(__self_0))
+                }
                 Expression::Record(__self_0) => {
                     Expression::Record(::core::clone::Clone::clone(__self_0))
                 }
+            }
+        }
+    }
+    impl NodeDisplay for Expression {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                Expression::BinaryExpression { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["BinaryExpression"], &[]))
+                }
+                Expression::Boolean(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Boolean"], &[]))
+                }
+                Expression::Integer(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Integer"], &[]))
+                }
+                Expression::Float(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Float"], &[]))
+                }
+                Expression::Ident(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Ident"], &[]))
+                }
+                Expression::String(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["String"], &[]))
+                }
+                Expression::FunctionCall { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["FunctionCall"], &[]))
+                }
+                Expression::Tuple(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Tuple"], &[]))
+                }
+                Expression::Array(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Array"], &[]))
+                }
+                Expression::Record(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Record"], &[]))
+                }
+                _ => Ok(()),
+            }
+        }
+    }
+    impl TreeDisplay for Expression {
+        fn num_children(&self, _cfg: &Config) -> usize {
+            match self {
+                Expression::BinaryExpression {
+                    left,
+                    op_token,
+                    right,
+                } => {
+                    0 + { (if let Some(_) = left { 1 } else { 0 }) + 0 } + 1 + {
+                        (if let Some(_) = right { 1 } else { 0 }) + 0
+                    }
+                }
+                Expression::Boolean(_a0, _a1) => 0 + 1,
+                Expression::Integer(_a0, _a1, _a2) => 0 + 1,
+                Expression::Float(_a0, _a1, _a2) => 0 + 1,
+                Expression::Ident(_a0) => 0 + 1,
+                Expression::String(_a0, _a1) => 0 + 1 + 1,
+                Expression::FunctionCall { expr, args } => 0 + 1 + 1,
+                Expression::Tuple(_a0) => 0 + 1,
+                Expression::Array(_a0) => 0 + 1,
+                Expression::Record(_a0) => 0 + 1,
+                _ => 0,
+            }
+        }
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+            match self {
+                Expression::BinaryExpression {
+                    left,
+                    op_token,
+                    right,
+                } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = left.map_tree() {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        if let Some(v) = Some(op_token) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        if let Some(v) = right.map_tree() {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Boolean(_a0, _a1) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a1) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Integer(_a0, _a1, _a2) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a2) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Float(_a0, _a1, _a2) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a2) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Ident(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::String(_a0, _a1) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        if let Some(v) = Some(_a1) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::FunctionCall { expr, args } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(&**expr) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        if let Some(v) = Some(args) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Tuple(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Array(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                Expression::Record(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                            if index == ind {
+                                return Some(v);
+                            }
+                            ind += 1;
+                        }
+                        ind
+                    };
+                    None
+                }
+                _ => None,
+            }
+        }
+        fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+            match self {
+                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
+                    &["Unexpected index for enum!"],
+                    &[],
+                )),
+            }
+        }
+    }
+    impl AstNode for Expression {
+        fn get_range(&self) -> Range {
+            match self {
+                Expression::BinaryExpression {
+                    left: Some(left),
+                    right: Some(right),
+                    ..
+                } => Range::from((&left.get_range(), &right.get_range())),
+                Expression::BinaryExpression {
+                    left: Some(left),
+                    op_token,
+                    ..
+                } => Range::from((&left.get_range(), &op_token.get_range())),
+                Expression::BinaryExpression {
+                    op_token,
+                    right: Some(right),
+                    ..
+                } => Range::from((&op_token.get_range(), &right.get_range())),
+                Expression::BinaryExpression { op_token, .. } => {
+                    Range::from((&op_token.get_range(), &op_token.get_range()))
+                }
+                Expression::Boolean(_, _a1, ..) => {
+                    Range::from((&_a1.get_range(), &_a1.get_range()))
+                }
+                Expression::Integer(_, _, _a2, ..) => {
+                    Range::from((&_a2.get_range(), &_a2.get_range()))
+                }
+                Expression::Float(_, _, _a2, ..) => {
+                    Range::from((&_a2.get_range(), &_a2.get_range()))
+                }
+                Expression::Ident(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
+                Expression::String(_, _a1, ..) => Range::from((&_a1.get_range(), &_a1.get_range())),
+                Expression::FunctionCall { expr, args, .. } => {
+                    Range::from((&expr.get_range(), &args.get_range()))
+                }
+                Expression::Tuple(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
+                Expression::Array(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
+                Expression::Record(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
             }
         }
     }
@@ -1103,142 +1352,9 @@ pub mod ast {
             }
         }
     }
-    impl AstNode for Expression {
-        fn get_range(&self) -> Range {
-            match self {
-                Self::Record(parameters) => parameters.get_range(),
-                Self::Boolean(_, b) => b.get_range(),
-                Self::BinaryExpression {
-                    left: Some(left),
-                    right: Some(right),
-                    ..
-                } => Range::from((&left.get_range(), &right.get_range())),
-                Self::BinaryExpression {
-                    left: Some(left),
-                    op_token: Some(op),
-                    ..
-                } => Range::from((&left.get_range(), *op.span())),
-                Self::BinaryExpression {
-                    op_token: Some(op),
-                    right: Some(right),
-                    ..
-                } => Range::from((*op.span(), &right.get_range())),
-                Self::BinaryExpression {
-                    op_token: Some(op), ..
-                } => Range::from(*op.span()),
-                Self::Tuple(s) => match (s.first(), s.last()) {
-                    (Some(s), Some(e)) => Range::from((&s.get_range(), &e.get_range())),
-                    _ => Range::default(),
-                },
-                Self::Array { range, .. } => *range,
-                Self::Integer(_, _, s) => s.0.into(),
-                Self::Float(_, _, s) => s.0.into(),
-                Self::Ident(s) => s.0.into(),
-                Self::FunctionCall { expr, args } => {
-                    Range::from((&expr.get_range(), &args.get_range()))
-                }
-                _ => Range::default(),
-            }
-        }
-    }
-    impl NodeDisplay for Expression {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            match self {
-                Self::Record { .. } => f.write_str("Record"),
-                Self::Boolean(true, _) => f.write_str("Boolean - True"),
-                Self::Boolean(false, _) => f.write_str("Boolean - False"),
-                Self::BinaryExpression {
-                    op_token: Some(SpannedToken(_, Token::Operator(op))),
-                    ..
-                } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["BinExp "],
-                    &[::core::fmt::ArgumentV1::new_display(&op.as_str())],
-                )),
-                Self::BinaryExpression { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["BinExp"], &[]))
-                }
-                Self::Integer(i, Some(u), _) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["", ""],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&i),
-                        ::core::fmt::ArgumentV1::new_display(&u),
-                    ],
-                )),
-                Self::Float(i, Some(u), _) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["", ""],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&i),
-                        ::core::fmt::ArgumentV1::new_display(&u),
-                    ],
-                )),
-                Self::Integer(i, None, _) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &[""],
-                    &[::core::fmt::ArgumentV1::new_display(&i)],
-                )),
-                Self::Float(i, None, _) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &[""],
-                    &[::core::fmt::ArgumentV1::new_display(&i)],
-                )),
-                Self::Ident(SpannedToken(_, Token::Ident(i))) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(
-                        &[""],
-                        &[::core::fmt::ArgumentV1::new_display(&i)],
-                    ))
-                }
-                Self::String(_, _) => f.write_str("TemplateString"),
-                Self::FunctionCall { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["FunctionCall"], &[]))
-                }
-                Self::Array { .. } => f.write_str("Array"),
-                _ => ::core::panicking::panic("explicit panic"),
-            }
-        }
-    }
     impl fmt::Debug for Expression {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             <Expression as NodeDisplay>::fmt(self, f)
-        }
-    }
-    impl TreeDisplay for Expression {
-        fn num_children(&self) -> usize {
-            match self {
-                Self::Record { .. } => 1,
-                Self::FunctionCall { .. } => 2,
-                Self::Array { values, .. } => values.num_children(),
-                Self::BinaryExpression {
-                    left: Some(_),
-                    right: Some(_),
-                    ..
-                } => 2,
-                Self::BinaryExpression { left: Some(_), .. } => 1,
-                Self::BinaryExpression { right: Some(_), .. } => 1,
-                Self::String(p, _) => p.num_children(),
-                _ => 0,
-            }
-        }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
-            match self {
-                Self::Record(parameters) => Some(parameters),
-                Self::FunctionCall { expr, args, .. } => match index {
-                    0 => Some(&**expr),
-                    1 => Some(args),
-                    _ => None,
-                },
-                Self::Array { values, .. } => values.child_at(index),
-                Self::BinaryExpression {
-                    left: Some(l),
-                    right: Some(r),
-                    ..
-                } => match index {
-                    0 => Some(&**l),
-                    1 => Some(&**r),
-                    _ => None,
-                },
-                Self::BinaryExpression { left: Some(l), .. } => Some(&**l),
-                Self::BinaryExpression { right: Some(r), .. } => Some(&**r),
-                Self::String(t, _) => t.child_at(index),
-                _ => None,
-            }
         }
     }
     pub enum FunctionBody {
@@ -1282,7 +1398,7 @@ pub mod ast {
         }
     }
     impl TreeDisplay for FunctionBody {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             match self {
                 FunctionBody::Block(_a0, _a1, _a2) => {
                     0 + 1 + 1 + { (if let Some(_) = _a2 { 1 } else { 0 }) + 0 }
@@ -1293,7 +1409,7 @@ pub mod ast {
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match self {
                 FunctionBody::Block(_a0, _a1, _a2) => {
                     {
@@ -1552,7 +1668,7 @@ pub mod ast {
         }
     }
     impl TreeDisplay for Statement {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             match self {
                 Statement::Expression(_a0) => 0 + 1,
                 Statement::Declaration {
@@ -1614,7 +1730,7 @@ pub mod ast {
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match self {
                 Statement::Expression(_a0) => {
                     {
@@ -1976,31 +2092,49 @@ pub mod ast {
             }
         }
     }
-    #[automatically_derived]
-    impl ::core::fmt::Debug for Modifer {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+    impl NodeDisplay for Modifer {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             match self {
-                Modifer::Public => ::core::fmt::Formatter::write_str(f, "Public"),
-                Modifer::Protected => ::core::fmt::Formatter::write_str(f, "Protected"),
-                Modifer::Unique => ::core::fmt::Formatter::write_str(f, "Unique"),
-                Modifer::Const => ::core::fmt::Formatter::write_str(f, "Const"),
+                Modifer::Public => f.write_fmt(::core::fmt::Arguments::new_v1(&["Public"], &[])),
+                Modifer::Protected => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Protected"], &[]))
+                }
+                Modifer::Unique => f.write_fmt(::core::fmt::Arguments::new_v1(&["Unique"], &[])),
+                Modifer::Const => f.write_fmt(::core::fmt::Arguments::new_v1(&["Const"], &[])),
+                _ => Ok(()),
             }
         }
     }
-    impl NodeDisplay for Modifer {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            Debug::fmt(self, f)
-        }
-    }
     impl TreeDisplay for Modifer {
-        fn num_children(&self) -> usize {
-            0
+        fn num_children(&self, _cfg: &Config) -> usize {
+            match self {
+                Modifer::Public => 0,
+                Modifer::Protected => 0,
+                Modifer::Unique => 0,
+                Modifer::Const => 0,
+                _ => 0,
+            }
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
-            None
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+            match self {
+                Modifer::Public => None,
+                Modifer::Protected => None,
+                Modifer::Unique => None,
+                Modifer::Const => None,
+                _ => None,
+            }
+        }
+        fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+            match self {
+                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
+                    &["Unexpected index for enum!"],
+                    &[],
+                )),
+            }
         }
     }
     pub struct ModiferStatement {
+        #[skip_item]
         pub modifier: Modifer,
         pub modifier_token: SpannedToken,
         pub statement: Option<Box<Statement>>,
@@ -2018,10 +2152,15 @@ pub mod ast {
     }
     impl AstNode for ModiferStatement {
         fn get_range(&self) -> Range {
-            if let Some(stmt) = &self.statement {
-                Range::from((*self.modifier_token.span(), &stmt.get_range()))
-            } else {
-                self.modifier_token.get_range()
+            match self {
+                ModiferStatement {
+                    modifier_token,
+                    statement: Some(statement),
+                    ..
+                } => Range::from((&modifier_token.get_range(), &statement.get_range())),
+                ModiferStatement { modifier_token, .. } => {
+                    Range::from((&modifier_token.get_range(), &modifier_token.get_range()))
+                }
             }
         }
     }
@@ -2031,10 +2170,10 @@ pub mod ast {
         }
     }
     impl TreeDisplay for ModiferStatement {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             2
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
             match index {
                 0 => Some(&self.modifier),
                 1 => self.statement.map_tree(),
@@ -3934,10 +4073,10 @@ pub mod token {
         }
     }
     impl TreeDisplay for SpannedToken {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             1
         }
-        fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             Some(&self.0)
         }
     }
@@ -4079,10 +4218,10 @@ pub mod token {
         }
     }
     impl TreeDisplay for Span {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             0
         }
-        fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             ::core::panicking::panic("explicit panic")
         }
     }
@@ -4195,10 +4334,10 @@ pub mod token {
         }
     }
     impl TreeDisplay for Range {
-        fn num_children(&self) -> usize {
+        fn num_children(&self, _cfg: &Config) -> usize {
             2
         }
-        fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.start),
                 1 => Some(&self.end),
@@ -4326,21 +4465,21 @@ impl NodeDisplay for Symbol {
     }
 }
 impl TreeDisplay for Symbol {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match &self.kind {
             SymbolKind::Parameter { .. } => 1,
             SymbolKind::ReturnParameter { .. } => 1,
             _ => self.children.len(),
         }
     }
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         match &self.kind {
             SymbolKind::Parameter { ty } => Some(ty),
             SymbolKind::ReturnParameter { ty } => Some(ty),
             _ => None,
         }
     }
-    fn child_at_bx<'a>(&'a self, index: usize) -> Box<dyn TreeDisplay + 'a> {
+    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'a> {
         let p = self.children.values().nth(index).unwrap().borrow();
         Box::new(p)
     }

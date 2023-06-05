@@ -369,7 +369,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
             }
             Statement::Expression(expr) => return self.evaluate_expression(expr, index),
             Statement::List(list) => {
-                if list.num_children() == 1 {
+                if list.num_children(_cfg) == 1 {
                     let item = list
                         .iter_items()
                         .next()
@@ -441,9 +441,9 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 }
             }
             Statement::Block(list) => {
-                if list.num_children() == 0 {
+                if list.num_children(_cfg) == 0 {
                     return LlvmValue::empty(self.context.as_ref());
-                } else if list.num_children() == 1 {
+                } else if list.num_children(_cfg) == 1 {
                     let item = list
                         .iter_items()
                         .next()
@@ -787,8 +787,8 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 );
             },
             Statement::Block(list) => {
-                if list.num_children() == 0 {
-                } else if list.num_children() == 1 {
+                if list.num_children(_cfg) == 0 {
+                } else if list.num_children(_cfg) == 1 {
                     let item = list
                         .iter_items()
                         .next()

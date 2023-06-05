@@ -9,7 +9,7 @@ use tl_evaluator::{
     scope::scope::{Scope, ScopeValue},
 };
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay},
+    format::{NodeDisplay, TreeDisplay, Config},
     Rf,
 };
 
@@ -326,12 +326,12 @@ impl NodeDisplay for Type {
 
 impl Debug for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <Type as NodeDisplay>::fmt(self, f)
+        <Type as NodeDisplay>::fmt(self, f, &Config {  })
     }
 }
 
 impl TreeDisplay for Type {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match self {
             Type::Function { .. } => 2,
             Type::Tuple(tu) => tu.len(),
@@ -343,7 +343,7 @@ impl TreeDisplay for Type {
         }
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         match self {
             Type::Function {
                 parameters,
@@ -368,7 +368,7 @@ impl TreeDisplay for Type {
         }
     }
 
-    fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
             Type::StructInstance { members, .. } => members.child_at_bx(_index),
             Type::StructInitializer { members, .. } => members.child_at_bx(_index),

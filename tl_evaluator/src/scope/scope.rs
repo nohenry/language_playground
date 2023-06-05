@@ -68,9 +68,9 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for
 impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay>
     TreeDisplay for ScopeValue<T, V>
 {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match self {
-            ScopeValue::EvaluationValue(c) => c.num_children(),
+            ScopeValue::EvaluationValue(c) => c.num_children(_cfg),
             ScopeValue::Struct { .. } => 1,
             ScopeValue::StructTemplate { .. } => 2,
             ScopeValue::IntrinsicStruct { .. } => 0,
@@ -82,9 +82,9 @@ impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + 
         }
     }
 
-    fn child_at(&self, index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match self {
-            ScopeValue::EvaluationValue(c) => c.child_at(index),
+            ScopeValue::EvaluationValue(c) => c.child_at(index, _cfg),
             ScopeValue::Struct { members, .. } => Some(members),
             ScopeValue::StructTemplate {
                 members,
@@ -102,7 +102,7 @@ impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + 
                 1 => Some(&**ty),
                 _ => None,
             },
-            ScopeValue::Use(s) => s.child_at(index),
+            ScopeValue::Use(s) => s.child_at(index, _cfg),
             ScopeValue::Module(_) => None,
             ScopeValue::Root => None,
         }
@@ -217,12 +217,12 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for
 impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + TreeDisplay>
     TreeDisplay for Scope<T, V>
 {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         1 + (if !self.children.is_empty() { 1 } else { 0 })
             + (if !self.uses.is_empty() { 1 } else { 0 })
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match _index {
             0 => Some(&self.value),
             // 1 => Some(&self.index),
@@ -230,7 +230,7 @@ impl<T: EvaluationType<Value = V> + TreeDisplay, V: EvaluationValue<Type = T> + 
         }
     }
 
-    fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match _index {
             1 if !self.uses.is_empty() => Box::new(GrouperIter(
                 "Use".to_string(),

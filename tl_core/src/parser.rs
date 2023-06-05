@@ -336,7 +336,7 @@ impl Parser {
                 let mut args = PunctuationList::default();
 
                 while let Some(arg) = self.parse_parameter() {
-                    if arg.name.is_none() && arg.ty.is_none() {
+                    if arg.ty.is_none() {
                         return None;
                     }
                     let comma = if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
@@ -391,19 +391,16 @@ impl Parser {
         let ident = fallback!(self, self.expect(Token::Ident("".into())));
 
         match (ident, ty) {
-            (Some(ident), Some(ty)) => Some(Param {
-                ty: Some(ty),
-                name: Some(ident.clone()),
+            (Some(ident), ty) => Some(Param {
+                ty,
+                name: ident.clone(),
             }),
             (ident, ty) => {
                 self.add_error(ParseError {
                     kind: ParseErrorKind::InvalidSyntax("Unable to parse arg fields!".to_string()),
                     range: Range::default(),
                 });
-                Some(Param {
-                    ty,
-                    name: ident.cloned(),
-                })
+                return None;
             }
         }
     }

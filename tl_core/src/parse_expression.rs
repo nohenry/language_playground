@@ -39,7 +39,7 @@ impl Parser {
                         (_, l) => left = l,
                     };
 
-                    let op_token = self.tokens.next().cloned();
+                    let op_token = self.tokens.next().unwrap().clone();
 
                     let right = self.parse_operator_expression(prec);
 
@@ -90,7 +90,7 @@ impl Parser {
                 return Some((
                     KeyValue {
                         name: Some(name.clone()),
-                        colon: Some(colon.clone()),
+                        colon: colon.clone(),
                         expr: Box::new(expr),
                     },
                     true,

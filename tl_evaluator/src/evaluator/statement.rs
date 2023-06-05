@@ -187,7 +187,7 @@ impl<'a,
             }
             Statement::Expression(expr) => return self.evaluate_expression(expr, index),
             Statement::List(list) => {
-                if list.num_children() == 1 {
+                if list.num_children(_cfg) == 1 {
                     let item = list
                         .iter_items()
                         .next()
@@ -203,7 +203,7 @@ impl<'a,
                 }
             }
             Statement::Block(list) => {
-                if list.num_children() == 1 {
+                if list.num_children(_cfg) == 1 {
                     let item = list
                         .iter_items()
                         .next()

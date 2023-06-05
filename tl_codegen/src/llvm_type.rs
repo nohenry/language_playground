@@ -212,7 +212,7 @@ impl NodeDisplay for LlvmType<'_> {
 }
 
 impl TreeDisplay for LlvmType<'_> {
-    fn num_children(&self) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         match self {
             LlvmType::Function { .. } => 2,
             LlvmType::Tuple { types, .. } => types.len(),
@@ -224,7 +224,7 @@ impl TreeDisplay for LlvmType<'_> {
         }
     }
 
-    fn child_at(&self, _index: usize) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         match self {
             LlvmType::Function {
                 parameters,
@@ -250,7 +250,7 @@ impl TreeDisplay for LlvmType<'_> {
         }
     }
 
-    fn child_at_bx<'a>(&'a self, _index: usize) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
             LlvmType::StructInstance { members, .. } => members.child_at_bx(_index),
             LlvmType::StructInitializer { members, .. } => members.child_at_bx(_index),
