@@ -1,8 +1,6 @@
-use core::fmt;
-
 use tl_util::{
-    format::{AsTree, Config, FormatType, NodeDisplay, TreeDisplay},
-    macros::{AstNode, FormatNode},
+    format::{AsTree, Config, NodeDisplay, TreeDisplay},
+    macros::{AstNode, NodeFormat, TreeFormat},
 };
 
 use crate::token::{Range, SpannedToken, Token, Unit};
@@ -52,7 +50,8 @@ impl AstNode for SpannedToken {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, NodeFormat)]
+#[extra_format(" {}", self.tokens.len())]
 pub struct PunctuationList<T: AstNode> {
     tokens: Vec<(T, Option<SpannedToken>)>,
 }
@@ -60,7 +59,7 @@ pub struct PunctuationList<T: AstNode> {
 impl<T: AstNode> Default for PunctuationList<T> {
     fn default() -> Self {
         Self {
-            tokens: Vec::default(),
+            tokens: Default::default(),
         }
     }
 }
@@ -110,16 +109,6 @@ where
     }
 }
 
-impl<T> NodeDisplay for PunctuationList<T>
-where
-    T: NodeDisplay + AstNode,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Punctuation List")?;
-        write!(f, " {}", self.tokens.len())
-    }
-}
-
 impl<T> TreeDisplay for PunctuationList<T>
 where
     T: TreeDisplay + AstNode,
@@ -155,56 +144,8 @@ impl<T: PartialEq + AstNode> PartialEq for PunctuationList<T> {
     }
 }
 
-#[derive(Clone)]
-pub struct ParamaterList {
-    pub range: Range,
-    pub items: PunctuationList<Param>,
-}
 
-impl AstNode for ParamaterList {
-    fn get_range(&self) -> Range {
-        self.range
-    }
-}
-
-impl ParamaterList {
-    pub fn iter_items(&self) -> impl Iterator<Item = &Param> + '_ {
-        self.items.iter_items()
-    }
-}
-
-impl NodeDisplay for ParamaterList {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Element Parameters")
-    }
-}
-
-impl TreeDisplay for ParamaterList {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        2
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-        match index {
-            0 => Some(&self.range),
-            1 => Some(&self.items),
-            _ => panic!(),
-        }
-    }
-}
-
-impl PartialEq for ParamaterList {
-    fn eq(&self, other: &Self) -> bool {
-        for (a, b) in self.iter_items().zip(other.iter_items()) {
-            if a != b {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-#[derive(Clone, AstNode)]
+#[derive(Clone, AstNode, NodeFormat, TreeFormat)]
 pub struct KeyValue {
     pub name: Option<SpannedToken>,
     pub colon: SpannedToken,
@@ -220,24 +161,7 @@ impl KeyValue {
     }
 }
 
-impl NodeDisplay for KeyValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("KeyValue")
-    }
-}
-
-impl TreeDisplay for KeyValue {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        addup!(self.name, Some(true))
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-        switchon!(index, &self.name, Some(&*self.expr));
-        None
-    }
-}
-
-#[derive(Clone, AstNode)]
+#[derive(Clone, AstNode, NodeFormat, TreeFormat)]
 pub struct Param {
     pub ty: Option<Type>,
     pub name: SpannedToken,
@@ -258,100 +182,16 @@ impl Param {
     }
 }
 
-impl NodeDisplay for Param {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Parameter")
-    }
-}
-
-impl TreeDisplay for Param {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        addup!(self.ty) + 1
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-        switchon!(index, &self.ty, Some(&self.name));
-        None
-    }
-}
-
-#[derive(Clone)]
-pub struct ArgList {
-    pub range: Range,
-    pub items: PunctuationList<Expression>,
-}
-
-impl AstNode for ArgList {
-    fn get_range(&self) -> Range {
-        self.range
-    }
-}
-
-impl ArgList {
-    pub fn iter_items(&self) -> impl Iterator<Item = &Expression> + '_ {
-        self.items.iter_items()
-    }
-
-    pub fn len(&self) -> usize {
-        self.items.len()
-    }
-}
-
-impl NodeDisplay for ArgList {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Arg Parameters")
-    }
-}
-
-impl TreeDisplay for ArgList {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        2
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-        match index {
-            0 => Some(&self.range),
-            1 => Some(&self.items),
-            _ => panic!(),
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, AstNode, NodeFormat, TreeFormat)]
 pub struct EnclosedPunctuationList<T: AstNode> {
     pub open: SpannedToken,
     pub items: PunctuationList<T>,
     pub close: SpannedToken,
 }
 
-impl<T: AstNode> AstNode for EnclosedPunctuationList<T> {
-    fn get_range(&self) -> Range {
-        Range::from((&self.open, &self.close))
-    }
-}
-
 impl<T: AstNode> EnclosedPunctuationList<T> {
     pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
         self.items.iter_items()
-    }
-}
-
-impl<T: AstNode> NodeDisplay for EnclosedPunctuationList<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Enclosed Punctuation List")
-    }
-}
-
-impl<T: AstNode> TreeDisplay for EnclosedPunctuationList<T> {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        1
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-        match index {
-            0 => Some(&self.items),
-            _ => None,
-        }
     }
 }
 
@@ -366,28 +206,19 @@ impl<T: PartialEq + AstNode> PartialEq for EnclosedPunctuationList<T> {
     }
 }
 
-#[derive(Clone)]
+pub type ParamaterList = EnclosedPunctuationList<Param>;
+pub type ArgList = EnclosedPunctuationList<Expression>;
+
+#[derive(Clone, AstNode, NodeFormat)]
 pub struct EnclosedList<T: AstNode> {
     pub open: SpannedToken,
     pub items: Vec<T>,
     pub close: SpannedToken,
 }
 
-impl<T: AstNode> AstNode for EnclosedList<T> {
-    fn get_range(&self) -> Range {
-        Range::from((&self.open, &self.close))
-    }
-}
-
 impl<T: AstNode> EnclosedList<T> {
     pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
         self.items.iter()
-    }
-}
-
-impl<T: AstNode> NodeDisplay for EnclosedList<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Enclosed List")
     }
 }
 
@@ -401,37 +232,36 @@ impl<T: AstNode> TreeDisplay for EnclosedList<T> {
     }
 }
 
-#[derive(Clone, AstNode)]
+#[derive(Clone, NodeFormat, TreeFormat, AstNode)]
+#[ignore_all(type = u8, type = bool)]
+#[skip_all(type = u8, type = bool)]
 pub enum Type {
     Integer {
-        #[skip_item]
         width: u8,
-        #[skip_item]
+        signed: bool,
+        token: SpannedToken,
+    },
+    IntegerPointer {
         signed: bool,
         token: SpannedToken,
     },
     Float {
-        #[skip_item]
         width: u8,
         token: SpannedToken,
     },
     Fixed {
-        #[skip_item]
         width: u8,
-        #[skip_item]
         decimals: u8,
         token: SpannedToken,
     },
     Boolean(SpannedToken),
     Char {
-        #[skip_item]
         width: u8,
         token: SpannedToken,
     },
     Ident(SpannedToken),
     Ref {
         ref_token: SpannedToken,
-        #[skip_item]
         mutable: bool,
         base_type: Option<Box<Type>>,
     },
@@ -446,6 +276,7 @@ pub enum Type {
     Function {
         parameters: ParamaterList,
         #[skip_item]
+        #[ignore_item]
         return_type: Option<(SpannedToken, Box<Type>)>,
     },
     Option {
@@ -521,7 +352,6 @@ impl PartialEq for Type {
                     list: r0,
                 },
             ) => l0 == r0 && btl0 == btr0,
-            // (Self::Expression(l0), Self::Expression(r0)) => l0 == r0,
             (
                 Self::Function {
                     parameters: l_parameters,
@@ -567,191 +397,7 @@ impl PartialEq for Type {
     }
 }
 
-impl NodeDisplay for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        match self {
-            Self::Float { width, .. } => write!(f, "float{width}"),
-            Self::Fixed { width, decimals, .. } => write!(f, "fixed{width}<{decimals}>"),
-            Self::Integer {
-                width,
-                signed: true,
-                ..
-            } => write!(f, "int{width}"),
-            Self::Integer {
-                width,
-                signed: false,
-                ..
-            } => write!(f, "uint{width}"),
-            Self::Boolean(_) => f.write_str("bool"),
-            Self::Char{width, ..} => write!(f, "char{width}"),
-            Self::Ident(ident) => f.write_str(ident.as_str()),
-            Self::Array(_a) => {
-                f.write_str("Array")
-                // write!(f, "{}", a.open.as_op_str())?;
-                // let p: String = a
-                //     .items
-                //     .iter_items()
-                //     .map(|f| format!("{}", f.format()))
-                //     .intersperse(", ".to_string())
-                //     .collect();
-                // write!(f, "{}{}", p, a.close.as_op_str())
-            }
-            Self::Union(_u) => {
-                f.write_str("Union")
-                // for item in u
-                //     .iter_items()
-                //     .map(|f| format!("{}", f.format()))
-                //     .intersperse(" | ".to_string())
-                // {
-                //     f.write_str(item.as_str())?;
-                // }
-                // Ok(())
-            }
-            Self::Tuple(_a) => {
-                f.write_str("Tuple")
-                // write!(f, "{}", a.open.as_op_str())?;
-                // let p: String = a
-                //     .items
-                //     .iter_items()
-                //     .map(|f| format!("{}", f.format()))
-                //     .intersperse(", ".to_string())
-                //     .collect();
-                // write!(f, "{}{}", p, a.close.as_op_str())
-            }
-            Self::Generic { .. } => {
-                f.write_str("Generic")
-                // write!(f, "{}", a.open.as_op_str())?;
-                // let p: String = a
-                //     .items
-                //     .iter_items()
-                //     .map(|f| format!("{}", f.format()))
-                //     .intersperse(", ".to_string())
-                //     .collect();
-                // write!(f, "{}{}", p, a.close.as_op_str())
-            }
-            Self::Expression(_e) => f.write_str("Expression"),
-            Self::Function {
-                ..
-                // return_type: None,
-            } => {
-                f.write_str("Function")
-                // f.write_str("(")?;
-
-                // let err: fmt::Result = parameters
-                //     .iter_items()
-                //     .map(|f| format!("{} {}", f.ty.as_ref().unwrap().format(), f.name()))
-                //     .intersperse(", ".to_string())
-                //     .map(|st| f.write_str(st.as_str()))
-                //     .collect();
-                // err?;
-
-                // f.write_str(")")
-            }
-            // Self::Function {
-            //     parameters,
-            //     return_type: Some((_, ret)),
-            // } => {
-            //     f.write_str("(")?;
-
-            //     let err: fmt::Result = parameters
-            //         .iter_items()
-            //         .map(|f| format!("{} {}", f.ty.as_ref().unwrap().format(), f.name()))
-            //         .intersperse(", ".to_string())
-            //         .map(|st| f.write_str(st.as_str()))
-            //         .collect();
-            //     err?;
-
-            //     f.write_str(") =>");
-
-            //     ret.fmt(f)
-            // }
-            Self::Option { base_type: _ty, question: _ } => {
-                f.write_str("Optional")
-                // if let Some(ty) = &ty {
-                //     ty.fmt(f)?;
-                // }
-                // f.write_str(question.as_op_str())
-            }
-            Self::Result { base_type: _ty, error: _ } => {
-                f.write_str("Result")
-                // if let Some(ty) = &ty {
-                //     ty.fmt(f)?;
-                // }
-                // f.write_str(error.as_op_str())
-            }
-            Self::Ref {
-                ref_token: _,
-                mutable,
-                base_type: _,
-            } => {
-                write!(f, "Reference {}", if *mutable { "mut" } else { "" })
-
-                // if let Some(base_type) = &base_type {
-                //     base_type.fmt(f)?;
-                // }
-                // f.write_str(ref_token.as_op_str())
-            }
-            Self::Struct(_) => f.write_str("Struct"),
-        }
-    }
-}
-
-impl fmt::Debug for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <Type as NodeDisplay>::fmt(
-            self,
-            f,
-            &Config {
-                format_type: FormatType::Debug,
-            },
-        )
-    }
-}
-
-impl TreeDisplay for Type {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        match self {
-            Type::Array(a) => a.items.num_children(_cfg),
-            Type::Union(a) => a.num_children(_cfg),
-            Type::Tuple(a) => a.items.num_children(_cfg),
-            Type::Generic {
-                base_type: Some(_), ..
-            } => 2,
-            Type::Generic { .. } => 1,
-            Type::Expression(_e) => 1,
-            Type::Option { .. } => 1,
-            Type::Result { .. } => 1,
-            Type::Ref { .. } => 1,
-            Type::Struct(s) => s.num_children(_cfg),
-            _ => 0,
-        }
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-        match self {
-            Type::Array(a) => a.items.child_at(index, _cfg),
-            Type::Union(a) => a.child_at(index, _cfg),
-            Type::Tuple(a) => a.items.child_at(index, _cfg),
-            Type::Generic {
-                base_type: Some(base_type),
-                list,
-            } => match index {
-                0 => Some(&**base_type),
-                1 => Some(list),
-                _ => None,
-            },
-            Type::Generic { list, .. } => Some(list),
-            Type::Expression(e) => Some(&**e),
-            Type::Option { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
-            Type::Result { base_type: ty, .. } => ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
-            Type::Ref { base_type, .. } => base_type.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f),
-            Type::Struct(s) => s.child_at(index, _cfg),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, FormatNode, AstNode)]
+#[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 pub enum GenericParameter {
     Unbounded(SpannedToken),
     Bounded {
@@ -761,7 +407,7 @@ pub enum GenericParameter {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, TreeFormat)]
 pub enum ParsedTemplate {
     String(SpannedToken),
     Template(Box<Expression>, SpannedToken, SpannedToken),
@@ -776,30 +422,8 @@ impl NodeDisplay for ParsedTemplate {
     }
 }
 
-impl TreeDisplay for ParsedTemplate {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        match self {
-            ParsedTemplate::Template(_, _, _) => 1,
-            _ => 0,
-        }
-    }
-
-    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
-        match self {
-            ParsedTemplate::Template(e, _, _) => Some(&**e),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, NodeFormat)]
 pub struct ParsedTemplateString(pub Vec<ParsedTemplate>);
-
-impl NodeDisplay for ParsedTemplateString {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Parsed Template String")
-    }
-}
 
 impl TreeDisplay for ParsedTemplateString {
     fn num_children(&self, _cfg: &Config) -> usize {
@@ -811,7 +435,7 @@ impl TreeDisplay for ParsedTemplateString {
     }
 }
 
-#[derive(Clone, FormatNode, AstNode)]
+#[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 #[ignore_all(type = bool, type = u64, type = f64, type = Option<Unit>)]
 pub enum Expression {
     BinaryExpression {
@@ -842,19 +466,7 @@ impl Expression {
     }
 }
 
-impl fmt::Debug for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <Expression as NodeDisplay>::fmt(
-            self,
-            f,
-            &Config {
-                format_type: FormatType::Debug,
-            },
-        )
-    }
-}
-
-#[derive(Clone, FormatNode, AstNode)]
+#[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 
 pub enum FunctionBody {
     Block(SpannedToken, SpannedToken, Option<SpannedToken>),
@@ -864,11 +476,11 @@ pub enum FunctionBody {
     },
 }
 
-#[derive(Clone, FormatNode, AstNode)]
+#[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 #[ignore_all(type = SpannedToken)]
 pub enum Statement {
     Expression(Expression),
-    Declaration {
+    VariableDeclaration {
         ty: Type,
         #[keep_item]
         ident: SpannedToken,
@@ -931,7 +543,7 @@ impl Statement {
     }
 }
 
-#[derive(Clone, FormatNode)]
+#[derive(Clone, NodeFormat, TreeFormat)]
 pub enum Modifer {
     Public,
     Protected,
@@ -939,30 +551,10 @@ pub enum Modifer {
     Const,
 }
 
-#[derive(Clone, AstNode)]
+#[derive(Clone, AstNode, NodeFormat, TreeFormat)]
 pub struct ModiferStatement {
     #[skip_item]
     pub modifier: Modifer,
     pub modifier_token: SpannedToken,
     pub statement: Option<Box<Statement>>,
-}
-
-impl NodeDisplay for ModiferStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
-        f.write_str("Modifier")
-    }
-}
-
-impl TreeDisplay for ModiferStatement {
-    fn num_children(&self, _cfg: &Config) -> usize {
-        2
-    }
-
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
-        match index {
-            0 => Some(&self.modifier),
-            1 => self.statement.map_tree(),
-            _ => None,
-        }
-    }
 }

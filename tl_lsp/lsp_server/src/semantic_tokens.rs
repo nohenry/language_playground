@@ -129,7 +129,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
                     self.recurse(l, i);
                 }
             }
-            Statement::Declaration {
+            Statement::VariableDeclaration {
                 ty, ident, expr, ..
             } => {
                 self.recurse_type(ty);

@@ -12,7 +12,7 @@ use linked_hash_map::LinkedHashMap;
 use log::{Log, SetLoggerError};
 use parser::Parser;
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay, Config},
+    format::{Config, NodeDisplay, TreeDisplay},
     Rf,
 };
 
@@ -31,15 +31,15 @@ impl Module {
     pub fn parse_str(input: &str, mod_name: &str) -> (Module, Vec<ParseError>) {
         let lexer = Lexer {};
         let tokens = lexer.lex(input);
-        for p in &tokens {
-            println!("{p:#?}");
-        }
+        // for p in &tokens {
+        //     println!("{p:#?}");
+        // }
 
         let parser = Parser::new(tokens);
         let parsed = parser.parse().unwrap();
-        for p in &parsed {
-            println!("{}", p.format());
-        }
+        // for p in &parsed {
+        //     println!("{}", p.format());
+        // }
 
         let er = parser.get_errors().clone();
 
@@ -64,6 +64,22 @@ pub struct Module {
     pub stmts: Vec<Statement>,
 }
 
+impl NodeDisplay for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _config: &Config) -> std::fmt::Result {
+        write!(f, "Module: '{}'", self.name)
+    }
+}
+
+impl TreeDisplay for Module {
+    fn num_children(&self, _cfg: &Config) -> usize {
+        self.stmts.len()
+    }
+
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+        self.stmts.get(index).map::<&dyn TreeDisplay, _>(|s| &*s)
+    }
+}
+
 impl Module {
     pub fn empty(name: &str) -> Module {
         Module {
@@ -73,12 +89,12 @@ impl Module {
         }
     }
 
-    pub fn format(&self) -> String {
-        self.stmts
-            .iter()
-            .map(|f| format!("{}\n", f.format()))
-            .collect()
-    }
+    // pub fn format(&self) -> String {
+    //     self.stmts
+    //         .iter()
+    //         .map(|f| format!("{}\n", f.format()))
+    //         .collect()
+    // }
 
     // pub fn resolve_symbol_in_scope<'a>(
     //     &self,
@@ -435,7 +451,7 @@ impl<U: Clone> ModuleDescender<U> {
             None
         };
         match node {
-            Statement::Declaration {
+            Statement::VariableDeclaration {
                 expr: Some(expr), ..
             } => self.descend_expression(expr),
             Statement::Expression(e) => self.descend_expression(e),
@@ -526,7 +542,7 @@ impl<U: Clone> MutModuleDescender<U> {
                 None
             };
             match node {
-                Statement::Declaration {
+                Statement::VariableDeclaration {
                     expr: Some(expr), ..
                 } => self.descend_expression(expr),
                 Statement::Expression(e) => self.descend_expression(e),
@@ -537,7 +553,7 @@ impl<U: Clone> MutModuleDescender<U> {
             }
         } else {
             match node {
-                Statement::Declaration {
+                Statement::VariableDeclaration {
                     expr: Some(expr), ..
                 } => self.descend_expression(expr),
                 Statement::Expression(e) => self.descend_expression(e),

@@ -1,7 +1,7 @@
 use std::{fs::File, path::Path, io::Read};
 
 use tl_core::Module;
-use tl_util::{Rf, macros::mcr};
+use tl_util::{Rf, macros::mcr, format::TreeDisplay};
 
 fn main() {
     let mut m = Rf::new(0);
@@ -29,6 +29,8 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     file.read_to_string(&mut input).unwrap();
 
     let (module, errors) = Module::parse_str(&input, "mymod");
+
+    println!("{}", module.format());
 
     for error in errors {
         println!("{error}")

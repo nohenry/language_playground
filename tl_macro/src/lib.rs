@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
     parse_macro_input,
     punctuated::Punctuated,
-    Attribute, Data, DeriveInput, Fields, GenericArgument, ReturnType, Type,
+    Attribute, Data, DeriveInput, Fields, GenericArgument, GenericParam, ReturnType, Type,
 };
 
 fn has_attr<'a>(attrs: &'a Vec<Attribute>, st: &[&str]) -> Option<&'a Attribute> {
@@ -25,6 +25,28 @@ fn has_attr<'a>(attrs: &'a Vec<Attribute>, st: &[&str]) -> Option<&'a Attribute>
 
         true
     })
+}
+
+fn has_many_attr<'a>(
+    attrs: &'a Vec<Attribute>,
+    st: &'a [&str],
+) -> impl Iterator<Item = &'a Attribute> + 'a {
+    attrs.iter().filter(|a| {
+        let segs = &a.meta.path().segments;
+        if segs.len() != st.len() {
+            return false;
+        }
+
+        for (a, b) in segs.iter().zip(st.iter()) {
+            if a.ident.to_string() != *b {
+                return false;
+            }
+        }
+
+        true
+    })
+    // .cloned()
+    // .collect()
 }
 
 #[derive(Debug)]
@@ -68,6 +90,13 @@ fn attr_args(attr: &Attribute) -> (HashSet<String>, HashSet<Type>) {
             )
         }
         _ => (HashSet::new(), HashSet::new()),
+    }
+}
+
+fn get_write_format(attr: &Attribute) -> Option<&TokenStream> {
+    match &attr.meta {
+        syn::Meta::List(list) => Some(&list.tokens),
+        _ => None,
     }
 }
 
@@ -242,21 +271,29 @@ pub fn mcr(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     tokens
 }
 
-#[proc_macro_derive(FormatNode, attributes(transient, ignore_item, ignore_all, keep_item,))]
-pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(
+    NodeFormat,
+    attributes(transient, ignore_item, ignore_all, keep_item, extra_format)
+)]
+pub fn derive_node_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(tokens as DeriveInput);
 
     let ident = input.ident;
 
+    let params = input.generics.params;
+    let where_clause = input.generics.where_clause;
+
+    let struct_args = params.iter().map(|param| match param {
+        GenericParam::Type(tp) => tp.ident.to_token_stream(),
+        GenericParam::Const(tp) => tp.ident.to_token_stream(),
+        GenericParam::Lifetime(tp) => tp.lifetime.to_token_stream(),
+    });
+
     let tokens = match &input.data {
         Data::Enum(node) => {
-            // let variants = node.variants.
             let mut tokens = TokenStream::new();
-            let mut num_childs = TokenStream::new();
-            let mut childs = TokenStream::new();
-            let mut boxed_childs = TokenStream::new();
 
-            let (ignore_all, ignore_types) = has_attr(&input.attrs, &["ignore_all"])
+            let (ignore_all, _) = has_attr(&input.attrs, &["ignore_all"])
                 .map(|attr| attr_args(attr))
                 .unwrap_or((HashSet::new(), HashSet::new()));
 
@@ -271,182 +308,23 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     continue;
                 }
 
+                let extras = has_many_attr(&variant.attrs, &["extra_format"])
+                    .map(|attr| get_write_format(attr).unwrap());
+
                 let fields_in_variant = match &variant.fields {
                     Fields::Unnamed(_) => quote::quote! { (..) },
                     Fields::Unit => quote::quote! {},
                     Fields::Named(_) => quote::quote! { {..} },
                 };
 
-                match &variant.fields {
-                    Fields::Unnamed(fields) => {
-                        let mut num_child_values = quote::quote!(0);
-                        let mut child_values = TokenStream::new();
-
-                        let names: String = fields
-                            .unnamed
-                            .iter()
-                            .enumerate()
-                            .map(|(i, _)| format!("_a{}", i))
-                            .intersperse(",".to_string())
-                            .collect();
-                        let name_toks = TokenStream::from_str(&names).unwrap();
-
-                        for (i, field) in fields.unnamed.iter().enumerate() {
-                            let field_name = TokenStream::from_str(&format!("_a{}", i)).unwrap();
-
-                            if ignore_all.contains(&field_name.to_string()) {
-                                continue;
-                            }
-
-                            if ignore_types.contains(&field.ty)
-                                && has_attr(&field.attrs, &["keep_item"]).is_none()
-                            {
-                                continue;
-                            }
-
-                            if has_attr(&field.attrs, &["ignore_item"]).is_some() {
-                                continue;
-                            }
-
-                            // if has_attr(&field.attrs, &["transient"]) {
-                            //     num_child_values.extend(quote::quote! {
-                            //         + #field_name.len()
-                            //     });
-                            // } else
-                            if is_optional_box(&field.ty) {
-                                num_child_values.extend(quote::quote! {
-                                    + addup!(#field_name)
-                                });
-
-                                child_values.extend(quote::quote!(#field_name.map_tree(),));
-                            } else if is_box(&field.ty) {
-                                num_child_values.extend(quote::quote! {
-                                    + 1
-                                });
-
-                                child_values.extend(quote::quote!(Some(&**#field_name),));
-                            } else if is_optional(&field.ty) {
-                                num_child_values.extend(quote::quote! {
-                                    + addup!(#field_name)
-                                });
-
-                                child_values.extend(quote::quote!(#field_name,));
-                            } else {
-                                num_child_values.extend(quote::quote! {
-                                    + 1
-                                });
-
-                                child_values.extend(quote::quote!(Some(#field_name),));
-                            }
-                        }
-
-                        num_childs.extend(quote::quote! {
-                            #ident::#name (#name_toks) => {
-                                #num_child_values
-                            }
-                        });
-
-                        childs.extend(quote::quote! {
-                            #ident::#name (#name_toks) => {
-                                switchon!(index, #child_values);
-                                None
-                            }
-                        });
-                    }
-                    Fields::Unit => {
-                        num_childs.extend(quote::quote! {
-                            #ident::#name => 0,
-                        });
-
-                        childs.extend(quote::quote! {
-                            #ident::#name => None,
-                        });
-                    }
-                    Fields::Named(fields) => {
-                        let mut num_child_values = quote::quote!(0);
-                        let mut child_values = TokenStream::new();
-
-                        let names: String = fields
-                            .named
-                            .iter()
-                            .map(|field| field.ident.as_ref().unwrap().to_string())
-                            .intersperse(",".to_string())
-                            .collect();
-                        let name_toks = TokenStream::from_str(&names).unwrap();
-
-                        for field in fields.named.iter() {
-                            let field_name = field.ident.as_ref().unwrap();
-
-                            if ignore_all.contains(&field_name.to_string()) {
-                                continue;
-                            }
-
-                            if ignore_types.contains(&field.ty)
-                                && has_attr(&field.attrs, &["keep_item"]).is_none()
-                            {
-                                continue;
-                            }
-
-                            if has_attr(&field.attrs, &["ignore_item"]).is_some() {
-                                continue;
-                            }
-
-                            // if has_attr(&field.attrs, &["transient"]) {
-                            //     num_child_values.extend(quote::quote! {
-                            //         + #field_name.len()
-                            //     });
-                            // } else
-                            if is_optional_box(&field.ty) {
-                                num_child_values.extend(quote::quote! {
-                                    + addup!(#field_name)
-                                });
-
-                                child_values.extend(quote::quote!(#field_name.map_tree(),));
-                            } else if is_box(&field.ty) {
-                                num_child_values.extend(quote::quote! {
-                                    + 1
-                                });
-
-                                child_values.extend(quote::quote!(Some(&**#field_name),));
-                            } else if is_optional(&field.ty) {
-                                num_child_values.extend(quote::quote! {
-                                    + addup!(#field_name)
-                                });
-
-                                child_values.extend(quote::quote!(#field_name,));
-                            } else {
-                                num_child_values.extend(quote::quote! {
-                                    + 1
-                                });
-
-                                child_values.extend(quote::quote!(Some(#field_name),));
-                            }
-                        }
-
-                        num_childs.extend(quote::quote! {
-                            #ident::#name {#name_toks} => {
-                                #num_child_values
-                            }
-                        });
-
-                        childs.extend(quote::quote! {
-                            #ident::#name {#name_toks} => {
-                                switchon!(index, #child_values);
-                                None
-                            }
-                        });
-                    }
-                };
-
                 let string = name.to_string();
 
                 tokens.extend(quote::quote! {
-                    #ident::#name #fields_in_variant => write!(f, #string),
+                    #ident::#name #fields_in_variant => { write!(f, #string)?; #(write!(f, #extras)?;)* Ok(()) },
                 })
             }
 
             quote::quote! {
-
                 impl NodeDisplay for #ident {
                     fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
                         match self {
@@ -455,27 +333,26 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         }
                     }
                 }
+            }
+        }
+        Data::Struct(_node) => {
+            let extras = has_many_attr(&input.attrs, &["extra_format"])
+                .map(|attr| get_write_format(attr).unwrap());
 
-                impl TreeDisplay for #ident {
-                    fn num_children(&self, _cfg: &Config) -> usize {
-                        match self {
-                            #num_childs
-                            _ => 0
-                        }
-                    }
+            let name = ident.to_string();
 
-                    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-                        match self {
-                            #childs
-                            _ => None
-                        }
-                    }
+            // let params = if params.len() > 0  {
+            //     quote::quote!(<#params>)
+            // } else {
+            //     params.clone().to_token_stream()
+            // };
 
-                    fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'b> {
-                        match self {
-                            #boxed_childs
-                            _ => panic!("Unexpected index for enum!")
-                        }
+            quote::quote! {
+                impl <#params> NodeDisplay for #ident<#(#struct_args),*> #where_clause {
+                    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
+                        write!(f, #name)?;
+                        #(write!(f, #extras)?;)*
+                        Ok(())
                     }
                 }
             }
@@ -486,10 +363,272 @@ pub fn derive_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     tokens.into_token_stream().into()
 }
 
+fn derive_tree_format_helper(
+    ident: &syn::Ident,
+    fields: &Fields,
+    enum_field: Option<&syn::Ident>,
+    (ignore_items, ignore_types): &(HashSet<String>, HashSet<Type>),
+) -> (TokenStream, TokenStream) {
+    let mut num_childs = TokenStream::new();
+    let mut childs = TokenStream::new();
+    // let name = &variant.ident;
+
+    let enum_field = enum_field
+        .map(|field| quote::quote!(::#field))
+        .unwrap_or(quote::quote!());
+
+    match fields {
+        Fields::Unnamed(fields) => {
+            let mut num_child_values = quote::quote!(0);
+            let mut child_values = TokenStream::new();
+
+            let names: String = fields
+                .unnamed
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("_a{}", i))
+                .intersperse(",".to_string())
+                .collect();
+            let name_toks = TokenStream::from_str(&names).unwrap();
+
+            for (i, field) in fields.unnamed.iter().enumerate() {
+                let field_name = TokenStream::from_str(&format!("_a{}", i)).unwrap();
+
+                if ignore_items.contains(&field_name.to_string()) {
+                    continue;
+                }
+
+                if ignore_types.contains(&field.ty)
+                    && has_attr(&field.attrs, &["keep_item"]).is_none()
+                {
+                    continue;
+                }
+
+                if has_attr(&field.attrs, &["ignore_item"]).is_some() {
+                    continue;
+                }
+
+                // if has_attr(&field.attrs, &["transient"]) {
+                //     num_child_values.extend(quote::quote! {
+                //         + #field_name.len()
+                //     });
+                // } else
+                if is_optional_box(&field.ty) {
+                    num_child_values.extend(quote::quote! {
+                        + addup!(#field_name)
+                    });
+
+                    child_values.extend(quote::quote!(#field_name.map_tree(),));
+                } else if is_box(&field.ty) {
+                    num_child_values.extend(quote::quote! {
+                        + 1
+                    });
+
+                    child_values.extend(quote::quote!(Some(&**#field_name),));
+                } else if is_optional(&field.ty) {
+                    num_child_values.extend(quote::quote! {
+                        + addup!(#field_name)
+                    });
+
+                    child_values.extend(quote::quote!(#field_name,));
+                } else {
+                    num_child_values.extend(quote::quote! {
+                        + 1
+                    });
+
+                    child_values.extend(quote::quote!(Some(#field_name),));
+                }
+            }
+
+            num_childs.extend(quote::quote! {
+                #ident #enum_field (#name_toks) => {
+                    #num_child_values
+                }
+            });
+
+            childs.extend(quote::quote! {
+                #ident #enum_field (#name_toks) => {
+                    switchon!(index, #child_values);
+                    None
+                }
+            });
+        }
+        Fields::Unit => {
+            num_childs.extend(quote::quote! {
+                #ident #enum_field  => 0,
+            });
+
+            childs.extend(quote::quote! {
+                #ident #enum_field => None,
+            });
+        }
+        Fields::Named(fields) => {
+            let mut num_child_values = quote::quote!(0);
+            let mut child_values = TokenStream::new();
+
+            let names: String = fields
+                .named
+                .iter()
+                .map(|field| field.ident.as_ref().unwrap().to_string())
+                .intersperse(",".to_string())
+                .collect();
+            let name_toks = TokenStream::from_str(&names).unwrap();
+
+            for field in fields.named.iter() {
+                let field_name = field.ident.as_ref().unwrap();
+
+                if ignore_items.contains(&field_name.to_string()) {
+                    continue;
+                }
+
+                if ignore_types.contains(&field.ty)
+                    && has_attr(&field.attrs, &["keep_item"]).is_none()
+                {
+                    continue;
+                }
+
+                if has_attr(&field.attrs, &["ignore_item"]).is_some() {
+                    continue;
+                }
+
+                // if has_attr(&field.attrs, &["transient"]) {
+                //     num_child_values.extend(quote::quote! {
+                //         + #field_name.len()
+                //     });
+                // } else
+                if is_optional_box(&field.ty) {
+                    num_child_values.extend(quote::quote! {
+                        + addup!(#field_name)
+                    });
+
+                    child_values.extend(quote::quote!(#field_name.map_tree(),));
+                } else if is_box(&field.ty) {
+                    num_child_values.extend(quote::quote! {
+                        + 1
+                    });
+
+                    child_values.extend(quote::quote!(Some(&**#field_name),));
+                } else if is_optional(&field.ty) {
+                    num_child_values.extend(quote::quote! {
+                        + addup!(#field_name)
+                    });
+
+                    child_values.extend(quote::quote!(#field_name,));
+                } else {
+                    num_child_values.extend(quote::quote! {
+                        + 1
+                    });
+
+                    child_values.extend(quote::quote!(Some(#field_name),));
+                }
+            }
+
+            num_childs.extend(quote::quote! {
+                #ident #enum_field {#name_toks} => {
+                    #num_child_values
+                }
+            });
+
+            childs.extend(quote::quote! {
+                #ident #enum_field {#name_toks} => {
+                    switchon!(index, #child_values);
+                    None
+                }
+            });
+        }
+    };
+
+    (num_childs, childs)
+}
+
+#[proc_macro_derive(TreeFormat, attributes(transient, ignore_item, ignore_all, keep_item,))]
+pub fn derive_tree_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(tokens as DeriveInput);
+
+    let ident = input.ident;
+
+    let ignore = has_attr(&input.attrs, &["ignore_all"])
+        .map(|attr| attr_args(attr))
+        .unwrap_or((HashSet::new(), HashSet::new()));
+
+    let params = input.generics.params;
+    let where_clause = input.generics.where_clause;
+
+    let struct_args = params.iter().map(|param| match param {
+        GenericParam::Type(tp) => tp.ident.to_token_stream(),
+        GenericParam::Const(tp) => tp.ident.to_token_stream(),
+        GenericParam::Lifetime(tp) => tp.lifetime.to_token_stream(),
+    });
+
+    let mut num_childs = TokenStream::new();
+    let mut childs = TokenStream::new();
+    let mut boxed_childs = TokenStream::new();
+
+    match &input.data {
+        Data::Enum(node) => {
+            for variant in &node.variants {
+
+                if ignore.0.contains(&variant.ident.to_string()) {
+                    continue;
+                }
+
+                if has_attr(&variant.attrs, &["ignore_item"]).is_some() {
+                    continue;
+                }
+
+                let (num_child, child) = derive_tree_format_helper(
+                    &ident,
+                    &variant.fields,
+                    Some(&variant.ident),
+                    &ignore,
+                );
+
+                num_childs.extend(num_child);
+                childs.extend(child);
+            }
+        }
+        Data::Struct(node) => {
+            let (num_child, child) = derive_tree_format_helper(&ident, &node.fields, None, &ignore);
+
+            num_childs.extend(num_child);
+            childs.extend(child);
+        }
+        _ => panic!("Unexpected type"),
+    };
+
+    let tokens = quote::quote! {
+        impl <#params> TreeDisplay for #ident<#(#struct_args),*> #where_clause {
+            fn num_children(&self, _cfg: &Config) -> usize {
+                match self {
+                    #num_childs
+                    _ => 0
+                }
+            }
+
+            fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+                match self {
+                    #childs
+                    _ => None
+                }
+            }
+
+            fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'b> {
+                match self {
+                    #boxed_childs
+                    _ => panic!("Unexpected index for enum!")
+                }
+            }
+        }
+    };
+
+    tokens.into()
+}
+
 fn derive_ast_node_helper(
     ident: &syn::Ident,
     fields: &Fields,
     enum_field: Option<&syn::Ident>,
+    (ignore_items, ignore_types): &(HashSet<String>, HashSet<Type>),
 ) -> TokenStream {
     let mut output = TokenStream::new();
     match &fields {
@@ -500,7 +639,18 @@ fn derive_ast_node_helper(
                                 stream: &TokenStream| {
                 while left <= right && right >= 0 {
                     let right_field = &fields.unnamed[right as usize];
-                    if has_attr(&right_field.attrs, &["skip_item"]).is_some() {
+
+                    if has_attr(&right_field.attrs, &["skip_item"]).is_some()
+                        || ignore_types.contains(&right_field.ty)
+                    {
+                        right -= 1;
+                        continue;
+                    }
+
+                    let right_str = format!("_a{}", right);
+                    let right_name = TokenStream::from_str(&right_str).unwrap();
+
+                    if ignore_items.contains(&right_str) {
                         right -= 1;
                         continue;
                     }
@@ -509,8 +659,6 @@ fn derive_ast_node_helper(
                         .map(|_| "_")
                         .intersperse(",")
                         .collect();
-
-                    let right_name = TokenStream::from_str(&format!("_a{}", right)).unwrap();
 
                     let mut out = stream.clone();
 
@@ -553,12 +701,20 @@ fn derive_ast_node_helper(
             while left < fields.unnamed.len() as i32 {
                 let left_field = &fields.unnamed[left as usize];
 
-                if has_attr(&left_field.attrs, &["skip_item"]).is_some() {
+                if has_attr(&left_field.attrs, &["skip_item"]).is_some()
+                    || ignore_types.contains(&left_field.ty)
+                {
                     left += 1;
                     continue;
                 }
 
-                let left_name = TokenStream::from_str(&format!("_a{}", left)).unwrap();
+                let left_str = format!("_a{}", left);
+                let left_name = TokenStream::from_str(&left_str).unwrap();
+
+                if ignore_items.contains(&left_str) {
+                    left -= 1;
+                    continue;
+                }
 
                 let mut inner_names = TokenStream::new();
                 let ignore_lefts: String =
@@ -603,16 +759,19 @@ fn derive_ast_node_helper(
                                 left_name: &TokenStream,
                                 stream: &TokenStream| {
                 while left <= right && right >= 0 {
-                    let mut out = stream.clone();
-
                     let right_field = &fields.named[right as usize];
 
-                    if has_attr(&right_field.attrs, &["skip_item"]).is_some() {
+                    if has_attr(&right_field.attrs, &["skip_item"]).is_some()
+                        || ignore_types.contains(&right_field.ty)
+                        || ignore_items.contains(&right_field.ident.as_ref().unwrap().to_string())
+                    {
                         right -= 1;
                         continue;
                     }
 
                     let right_name = right_field.ident.clone().unwrap().to_token_stream();
+
+                    let mut out = stream.clone();
 
                     if left != right {
                         if is_optional(&right_field.ty) {
@@ -647,7 +806,10 @@ fn derive_ast_node_helper(
             while left < fields.named.len() as i32 {
                 let left_field = &fields.named[left as usize];
 
-                if has_attr(&left_field.attrs, &["skip_item"]).is_some() {
+                if has_attr(&left_field.attrs, &["skip_item"]).is_some()
+                    || ignore_types.contains(&left_field.ty)
+                    || ignore_items.contains(&left_field.ident.as_ref().unwrap().to_string())
+                {
                     left += 1;
                     continue;
                 }
@@ -678,50 +840,54 @@ fn derive_ast_node_helper(
     output
 }
 
-#[proc_macro_derive(AstNode, attributes(skip_item))]
+#[proc_macro_derive(AstNode, attributes(skip_item, skip_all))]
 pub fn derive_ast_node(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(tokens as DeriveInput);
 
     let ident = input.ident;
 
-    let tokens = match &input.data {
+    let ignore = has_attr(&input.attrs, &["skip_all"])
+        .map(|attr| attr_args(attr))
+        .unwrap_or((HashSet::new(), HashSet::new()));
+
+    let params = input.generics.params;
+    let where_clause = input.generics.where_clause;
+
+    let struct_args = params.iter().map(|param| match param {
+        GenericParam::Type(tp) => tp.ident.to_token_stream(),
+        GenericParam::Const(tp) => tp.ident.to_token_stream(),
+        GenericParam::Lifetime(tp) => tp.lifetime.to_token_stream(),
+    });
+
+    let mut num_childs = TokenStream::new();
+
+    match &input.data {
         Data::Struct(node) => {
-            let mut num_childs = TokenStream::new();
-            num_childs.extend(derive_ast_node_helper(&ident, &node.fields, None));
-
-            quote::quote! {
-                impl AstNode for #ident {
-                    fn get_range(&self) -> Range {
-                        match self {
-                            #num_childs
-                        }
-                    }
-                }
-            }
+            num_childs.extend(derive_ast_node_helper(&ident, &node.fields, None, &ignore));
         }
-
         Data::Enum(node) => {
-            let mut num_childs = TokenStream::new();
-
             for variant in &node.variants {
                 let name = &variant.ident;
-                num_childs.extend(derive_ast_node_helper(&ident, &variant.fields, Some(name)));
-            }
-
-            quote::quote! {
-                impl AstNode for #ident {
-                    fn get_range(&self) -> Range {
-                        match self {
-                            #num_childs
-                        }
-                    }
-                }
+                num_childs.extend(derive_ast_node_helper(
+                    &ident,
+                    &variant.fields,
+                    Some(name),
+                    &ignore,
+                ));
             }
         }
         _ => panic!("Unexpected type"),
     };
 
-    // let tokens = quote::quote! {};
+    let tokens = quote::quote! {
+        impl <#params> AstNode for #ident<#(#struct_args),*> #where_clause {
+            fn get_range(&self) -> Range {
+                match self {
+                    #num_childs
+                }
+            }
+        }
+    };
 
     tokens.into()
 }

@@ -265,7 +265,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 self.wstate().scope.pop_scope();
             }
             // Variable declaration
-            Statement::Declaration {
+            Statement::VariableDeclaration {
                 ty,
                 ident,
                 expr: Some(raw_expr),
@@ -557,7 +557,7 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
                     index,
                 );
             }
-            Statement::Declaration { ident, .. } => {}
+            Statement::VariableDeclaration { ident, .. } => {}
             Statement::ImportStatement { args, .. } => {
                 let path = args
                     .iter_items()
@@ -765,7 +765,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                     index,
                 );
             }
-            Statement::Declaration {
+            Statement::VariableDeclaration {
                 ty,
                 ident,
                 ..

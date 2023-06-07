@@ -8,45 +8,272 @@
 use std::prelude::rust_2021::*;
 #[macro_use]
 extern crate std;
+
+// trace_macros!(true);
+
 use ast::{EnclosedList, Expression, Param, ParamaterList, Statement, Type};
 use lexer::Lexer;
 use linked_hash_map::LinkedHashMap;
 use log::{Log, SetLoggerError};
 use parser::Parser;
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay},
+    format::{Config, NodeDisplay, TreeDisplay},
     Rf,
 };
+
 pub mod ast {
+
+
+    // for p in &tokens {
+    //     println!("{p:#?}");
+    // }
+
+    // for p in &parsed {
+    //     println!("{}", p.format());
+    // }
+
+
+
+
+
+
+
+
+
+    // pub fn format(&self) -> String {
+    //     self.stmts
+    //         .iter()
+    //         .map(|f| format!("{}\n", f.format()))
+    //         .collect()
+    // }
+
+    // pub fn resolve_symbol_in_scope<'a>(
+    //     &self,
+    //     symbol: &str,
+    //     scope: impl Iterator<Item = &'a String>,
+    // ) -> Option<Rf<Symbol>> {
+    //     let Some(sym) = self.resolve_symbol_chain_string(scope) else {
+    //         return None
+    //     };
+    //     self.impl_resolve_symbol_in_scope(symbol, &sym)
+    // }
+
+    // pub fn impl_resolve_symbol_in_scope(
+    //     &self,
+    //     symbol: &str,
+    //     node: &Rf<Symbol>,
+    // ) -> Option<Rf<Symbol>> {
+    //     let nodev = node.borrow();
+    //     if let SymbolKind::Use(_) = &nodev.kind {
+    //         return None;
+    //     }
+    //     if let Some(child) = nodev.children.get(symbol) {
+    //         Some(child.clone())
+    //     } else {
+    //         for (_, child) in &nodev.children {
+    //             let child = child.borrow();
+    //             if let SymbolKind::Use(scp) = &child.kind {
+    //                 return self.resolve_symbol_in_scope(symbol, scp.iter());
+    //             }
+    //         }
+    //         None
+    //     }
+    // }
+
+    // pub fn resolve_symbol(&self, node: &Rf<Symbol>, symbol_name: &str) -> Option<Rf<Symbol>> {
+    //     if let Some(node) = self.impl_resolve_symbol_in_scope(symbol_name, node) {
+    //         Some(node)
+    //     } else {
+    //         let Some(parent) = ({ &node.borrow().parent }) else {
+    //                 return None
+    //             };
+
+    //         self.resolve_symbol(parent, symbol_name)
+    //     }
+    // }
+
+    // pub fn resolve_symbol_chain_indicies<'a>(
+    //     &self,
+    //     iter: impl Iterator<Item = &'a usize>,
+    // ) -> Option<Rf<Symbol>> {
+    //     Module::impl_resolve_symbol_chain_indicies(&self.symbol_tree, iter).ok()
+    // }
+
+    // fn impl_resolve_symbol_chain_indicies<'a>(
+    //     last: &Rf<Symbol>,
+    //     mut iter: impl Iterator<Item = &'a usize>,
+    // ) -> Result<Rf<Symbol>, bool> {
+    //     if let Some(index) = iter.next() {
+    //         if let Some(s) = last.borrow().children.values().nth(*index) {
+    //             match Module::impl_resolve_symbol_chain_indicies(s, iter) {
+    //                 Ok(n) => return Ok(n),
+    //                 Err(true) => return Ok(s.clone()),
+    //                 _ => (),
+    //             }
+    //         }
+    //     } else {
+    //         return Err(true);
+    //     }
+    //     Err(false)
+    // }
+
+    // pub fn resolve_symbol_chain<'a>(
+    //     &self,
+    //     iter: impl Iterator<Item = &'a SpannedToken>,
+    // ) -> Option<Rf<Symbol>> {
+    //     Module::impl_resolve_from_iter(&self.symbol_tree, iter).ok()
+    // }
+
+    // pub fn resolve_symbol_chain_string<'a>(
+    //     &self,
+    //     iter: impl Iterator<Item = &'a String>,
+    // ) -> Option<Rf<Symbol>> {
+    //     Module::impl_resolve_from_iter_string(&self.symbol_tree, iter).ok()
+    // }
+
+    // pub fn iter_symbol<'a, F: FnMut(&SpannedToken, &Rf<Symbol>)>(
+    //     &self,
+    //     iter: impl Iterator<Item = &'a SpannedToken>,
+    //     f: F,
+    // ) {
+    //     Module::impl_iter_symbol(&self.symbol_tree, iter, f);
+    // }
+
+    // fn impl_iter_symbol<'a, F: FnMut(&SpannedToken, &Rf<Symbol>)>(
+    //     last: &Rf<Symbol>,
+    //     mut iter: impl Iterator<Item = &'a SpannedToken>,
+    //     mut f: F,
+    // ) {
+    //     if let Some(tok @ SpannedToken(_, Token::Ident(i))) = iter.next() {
+    //         if let Some(s) = last.borrow().children.get(i) {
+    //             f(tok, s);
+    //             Module::impl_iter_symbol(s, iter, f);
+    //         }
+    //     }
+    // }
+
+    // fn impl_resolve_from_iter<'a>(
+    //     last: &Rf<Symbol>,
+    //     mut iter: impl Iterator<Item = &'a SpannedToken>,
+    // ) -> Result<Rf<Symbol>, bool> {
+    //     if let Some(SpannedToken(_, Token::Ident(i))) = iter.next() {
+    //         if let Some(s) = last.borrow().children.get(i) {
+    //             match Module::impl_resolve_from_iter(s, iter) {
+    //                 Ok(n) => return Ok(n),
+    //                 Err(true) => return Ok(s.clone()),
+    //                 _ => (),
+    //             }
+    //         }
+    //     } else {
+    //         return Err(true);
+    //     }
+    //     Err(false)
+    // }
+
+    // fn impl_resolve_from_iter_string<'a>(
+    //     last: &Rf<Symbol>,
+    //     mut iter: impl Iterator<Item = &'a String>,
+    // ) -> Result<Rf<Symbol>, bool> {
+    //     if let Some(i) = iter.next() {
+    //         if let Some(s) = last.borrow().children.get(i) {
+    //             match Module::impl_resolve_from_iter_string(s, iter) {
+    //                 Ok(n) => return Ok(n),
+    //                 Err(true) => return Ok(s.clone()),
+    //                 _ => (),
+    //             }
+    //         }
+    //     } else {
+    //         return Err(true);
+    //     }
+    //     Err(false)
+    // }
+
+
+
+
+
+
+    //.map(|f| &*f.borrow())
+
+
+
+
+    // Find free index; max 128
+
+
+
+
+
+
+
+    // on_stru: Option<Box<dyn F>>.
+
+
+
+
+
+
+
+
+    // if let Some(on_prm) = &mut self.on_parameters {
+    //     on_prm(parameters, self.user_data.clone());
+    // }
+
+
+    // if let Some(on_prm) = &mut self.on_return_parameters {
+    //     on_prm(return_type, self.user_data.clone());
+    // }
+
+
+
+
+
+
+
+
     use core::fmt;
-    use std::fmt::Debug;
     use tl_util::{
-        format::{AsTree, NodeDisplay, TreeDisplay},
-        macros::{AstNode, FormatNode},
+        format::{AsTree, Config, FormatType, NodeDisplay, TreeDisplay},
+        macros::{AstNode, NodeFormat, TreeFormat},
     };
     use crate::token::{Range, SpannedToken, Token, Unit};
     pub trait AstNode: TreeDisplay {
-        fn get_range(&self) -> Range;
+        fn get_range(&self)
+        -> Range;
     }
     impl<T: AstNode> AstNode for Vec<T> {
         fn get_range(&self) -> Range {
             if let (Some(first), Some(last)) = (self.first(), self.last()) {
-                Range::from((&first.get_range(), &last.get_range()))
-            } else {
-                Range::default()
-            }
+                    Range::from((&first.get_range(), &last.get_range()))
+                } else { Range::default() }
         }
+    }
+    macro_rules! addup {
+        ($($e : expr), *) =>
+        { { $((if let Some(_) = $e { 1 } else { 0 }) +) * 0 } } ;
+    }
+    macro_rules! switchon {
+        ($index : expr, $($e : expr), * $(,) ?) =>
+        { { let mut ind = 0 ; switchon! { @ parse $index, ind, $($e), *, } } }
+        ;
+        (@ parse $index : expr, $ind : expr, $e : expr, $($es : expr), * $(,)
+        ?) =>
+        {
+            if let Some(v) = $e
+            { if $index == $ind { return Some(v) } $ind += 1 ; } switchon!
+            { @ parse $index, $ind, $($es), *, }
+        } ; (@ parse $index : expr, $ind : expr, $(,) ?) => { $ind } ;
     }
     impl AstNode for SpannedToken {
-        fn get_range(&self) -> Range {
-            self.0.into()
-        }
+        fn get_range(&self) -> Range { self.0.into() }
     }
+    #[extra_format(" {}", self.tokens.len())]
     pub struct PunctuationList<T: AstNode> {
         tokens: Vec<(T, Option<SpannedToken>)>,
     }
     #[automatically_derived]
-    impl<T: ::core::clone::Clone + AstNode> ::core::clone::Clone for PunctuationList<T> {
+    impl<T: ::core::clone::Clone + AstNode> ::core::clone::Clone for
+        PunctuationList<T> {
         #[inline]
         fn clone(&self) -> PunctuationList<T> {
             PunctuationList {
@@ -54,12 +281,18 @@ pub mod ast {
             }
         }
     }
-    impl<T: AstNode> Default for PunctuationList<T> {
-        fn default() -> Self {
-            Self {
-                tokens: Vec::default(),
-            }
+    impl<T: AstNode> NodeDisplay for PunctuationList<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["PunctuationList"],
+                        &[]))?;
+            f.write_fmt(::core::fmt::Arguments::new_v1(&[" "],
+                        &[::core::fmt::ArgumentV1::new_display(&self.tokens.len())]))?;
+            Ok(())
         }
+    }
+    impl<T: AstNode> Default for PunctuationList<T> {
+        fn default() -> Self { Self { tokens: Default::default() } }
     }
     impl<T: AstNode> PunctuationList<T> {
         pub fn push(&mut self, val: T, separator: Option<SpannedToken>) {
@@ -68,76 +301,53 @@ pub mod ast {
         pub fn push_sep(&mut self, val: T, separator: SpannedToken) {
             self.tokens.push((val, Some(separator)))
         }
-        pub fn push_term(&mut self, val: T) {
-            self.tokens.push((val, None))
-        }
+        pub fn push_term(&mut self, val: T) { self.tokens.push((val, None)) }
         pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
             self.tokens.iter().map(|(v, _)| v)
         }
-        pub fn iter(&self) -> impl Iterator<Item = &(T, Option<SpannedToken>)> + '_ {
+        pub fn iter(&self)
+            -> impl Iterator<Item = &(T, Option<SpannedToken>)> + '_ {
             self.tokens.iter()
         }
-        pub fn take(self) -> Vec<(T, Option<SpannedToken>)> {
-            self.tokens
-        }
-        pub fn len(&self) -> usize {
-            self.tokens.len()
-        }
+        pub fn take(self) -> Vec<(T, Option<SpannedToken>)> { self.tokens }
+        pub fn len(&self) -> usize { self.tokens.len() }
     }
-    impl<T> AstNode for PunctuationList<T>
-    where
-        T: AstNode,
-    {
+    impl<T> AstNode for PunctuationList<T> where T: AstNode {
         fn get_range(&self) -> Range {
             match (self.iter().next(), self.iter().last()) {
-                (Some((_, Some(f))), Some((_, Some(l)))) => Range::from((*f.span(), *l.span())),
-                (Some((_, Some(f))), Some((l, _))) => Range::from((*f.span(), &l.get_range())),
-                (Some((f, _)), Some((_, Some(l)))) => Range::from((&f.get_range(), *l.span())),
-                (Some((f, _)), Some((l, _))) => Range::from((&f.get_range(), &l.get_range())),
+                (Some((_, Some(f))), Some((_, Some(l)))) =>
+                    Range::from((*f.span(), *l.span())),
+                (Some((_, Some(f))), Some((l, _))) =>
+                    Range::from((*f.span(), &l.get_range())),
+                (Some((f, _)), Some((_, Some(l)))) =>
+                    Range::from((&f.get_range(), *l.span())),
+                (Some((f, _)), Some((l, _))) =>
+                    Range::from((&f.get_range(), &l.get_range())),
                 _ => Range::default(),
             }
         }
     }
-    impl<T> NodeDisplay for PunctuationList<T>
-    where
-        T: NodeDisplay + AstNode,
-    {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("Punctuation List")?;
-            f.write_fmt(::core::fmt::Arguments::new_v1(
-                &[" "],
-                &[::core::fmt::ArgumentV1::new_display(&self.tokens.len())],
-            ))
-        }
-    }
-    impl<T> TreeDisplay for PunctuationList<T>
-    where
-        T: TreeDisplay + AstNode,
-    {
+    impl<T> TreeDisplay for PunctuationList<T> where T: TreeDisplay + AstNode
+        {
         fn num_children(&self, _cfg: &Config) -> usize {
             if let Some((_, Some(_))) = self.tokens.last() {
-                self.tokens.len() * 2
-            } else if !self.tokens.is_empty() {
-                self.tokens.len() * 2 - 1
-            } else {
-                0
-            }
+                    self.tokens.len() * 2
+                } else if !self.tokens.is_empty() {
+                   self.tokens.len() * 2 - 1
+               } else { 0 }
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             let p = &self.tokens[index / 2];
             if index % 2 == 0 {
-                Some(&p.0)
-            } else {
-                Some(p.1.as_ref().unwrap())
-            }
+                    Some(&p.0)
+                } else { Some(p.1.as_ref().unwrap()) }
         }
     }
     impl<T: PartialEq + AstNode> PartialEq for PunctuationList<T> {
         fn eq(&self, other: &Self) -> bool {
             for (a, b) in self.iter_items().zip(other.iter_items()) {
-                if a != b {
-                    return false;
-                }
+                if a != b { return false; }
             }
             true
         }
@@ -156,26 +366,26 @@ pub mod ast {
             }
         }
     }
-    impl AstNode for ParamaterList {
-        fn get_range(&self) -> Range {
-            self.range
+    impl NodeDisplay for ParamaterList<> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["ParamaterList"],
+                        &[]))?;
+            Ok(())
         }
+    }
+    impl AstNode for ParamaterList {
+        fn get_range(&self) -> Range { self.range }
     }
     impl ParamaterList {
         pub fn iter_items(&self) -> impl Iterator<Item = &Param> + '_ {
             self.items.iter_items()
         }
     }
-    impl NodeDisplay for ParamaterList {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("Element Parameters")
-        }
-    }
     impl TreeDisplay for ParamaterList {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            2
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn num_children(&self, _cfg: &Config) -> usize { 2 }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.range),
                 1 => Some(&self.items),
@@ -186,16 +396,14 @@ pub mod ast {
     impl PartialEq for ParamaterList {
         fn eq(&self, other: &Self) -> bool {
             for (a, b) in self.iter_items().zip(other.iter_items()) {
-                if a != b {
-                    return false;
-                }
+                if a != b { return false; }
             }
             true
         }
     }
     pub struct KeyValue {
         pub name: Option<SpannedToken>,
-        pub colon: Option<SpannedToken>,
+        pub colon: SpannedToken,
         pub expr: Box<Expression>,
     }
     #[automatically_derived]
@@ -209,11 +417,63 @@ pub mod ast {
             }
         }
     }
-    impl AstNode for KeyValue {
+    impl AstNode for KeyValue<> {
         fn get_range(&self) -> Range {
-            match (&self.name, &self.expr) {
-                (Some(name), expr) => Range::from((*name.span(), &expr.get_range())),
-                (None, expr) => expr.get_range(),
+            match self {
+                KeyValue { name: Some(name), expr, .. } =>
+                    Range::from((&name.get_range(), &expr.get_range())),
+                KeyValue { colon, expr, .. } =>
+                    Range::from((&colon.get_range(), &expr.get_range())),
+            }
+        }
+    }
+    impl NodeDisplay for KeyValue<> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["KeyValue"], &[]))?;
+            Ok(())
+        }
+    }
+    impl TreeDisplay for KeyValue<> {
+        fn num_children(&self, _cfg: &Config) -> usize {
+            match self {
+                KeyValue { name, colon, expr } => {
+                    0 + { (if let Some(_) = name { 1 } else { 0 }) + 0 } + 1 + 1
+                }
+                _ => 0,
+            }
+        }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
+            match self {
+                KeyValue { name, colon, expr } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = name {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = Some(colon) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = Some(&**expr) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                _ => None,
+            }
+        }
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
+            match self {
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
             }
         }
     }
@@ -225,42 +485,9 @@ pub mod ast {
             }
         }
     }
-    impl NodeDisplay for KeyValue {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("KeyValue")
-        }
-    }
-    impl TreeDisplay for KeyValue {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            {
-                (if let Some(_) = self.name { 1 } else { 0 })
-                    + (if let Some(_) = Some(true) { 1 } else { 0 })
-                    + 0
-            }
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-            {
-                let mut ind = 0;
-                if let Some(v) = &self.name {
-                    if index == ind {
-                        return Some(v);
-                    }
-                    ind += 1;
-                }
-                if let Some(v) = Some(&*self.expr) {
-                    if index == ind {
-                        return Some(v);
-                    }
-                    ind += 1;
-                }
-                ind
-            };
-            None
-        }
-    }
     pub struct Param {
         pub ty: Option<Type>,
-        pub name: Option<SpannedToken>,
+        pub name: SpannedToken,
     }
     #[automatically_derived]
     impl ::core::clone::Clone for Param {
@@ -272,56 +499,50 @@ pub mod ast {
             }
         }
     }
-    impl PartialEq for Param {
-        fn eq(&self, other: &Self) -> bool {
-            self.ty == other.ty
-        }
-    }
-    impl AstNode for Param {
+    impl AstNode for Param<> {
         fn get_range(&self) -> Range {
-            match (&self.name, &self.ty) {
-                (Some(name), None) => Range::from(*name.span()),
-                (Some(name), Some(value)) => Range::from((name, &value.get_range())),
-                _ => Range::default(),
+            match self {
+                Param { ty: Some(ty), name, .. } =>
+                    Range::from((&ty.get_range(), &name.get_range())),
+                Param { name, .. } =>
+                    Range::from((&name.get_range(), &name.get_range())),
             }
         }
+    }
+    impl NodeDisplay for Param<> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["Param"], &[]))?;
+            Ok(())
+        }
+    }
+    impl PartialEq for Param {
+        fn eq(&self, other: &Self) -> bool { self.ty == other.ty }
     }
     impl Param {
         pub fn name(&self) -> &String {
             match &self.name {
-                Some(SpannedToken(_, Token::Ident(s))) => s,
+                SpannedToken(_, Token::Ident(s)) => s,
                 _ => ::core::panicking::panic("explicit panic"),
             }
         }
     }
-    impl NodeDisplay for Param {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("Parameter")
-        }
-    }
     impl TreeDisplay for Param {
         fn num_children(&self, _cfg: &Config) -> usize {
-            {
-                (if let Some(_) = self.ty { 1 } else { 0 })
-                    + (if let Some(_) = self.name { 1 } else { 0 })
-                    + 0
-            }
+            { (if let Some(_) = self.ty { 1 } else { 0 }) + 0 } + 1
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             {
                 let mut ind = 0;
                 if let Some(v) = &self.ty {
-                    if index == ind {
-                        return Some(v);
+                        if index == ind { return Some(v) }
+                        ind += 1;
                     }
-                    ind += 1;
-                }
-                if let Some(v) = &self.name {
-                    if index == ind {
-                        return Some(v);
+                if let Some(v) = Some(&self.name) {
+                        if index == ind { return Some(v) }
+                        ind += 1;
                     }
-                    ind += 1;
-                }
                 ind
             };
             None
@@ -341,29 +562,26 @@ pub mod ast {
             }
         }
     }
-    impl AstNode for ArgList {
-        fn get_range(&self) -> Range {
-            self.range
+    impl NodeDisplay for ArgList<> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["ArgList"], &[]))?;
+            Ok(())
         }
+    }
+    impl AstNode for ArgList {
+        fn get_range(&self) -> Range { self.range }
     }
     impl ArgList {
         pub fn iter_items(&self) -> impl Iterator<Item = &Expression> + '_ {
             self.items.iter_items()
         }
-        pub fn len(&self) -> usize {
-            self.items.len()
-        }
-    }
-    impl NodeDisplay for ArgList {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("Arg Parameters")
-        }
+        pub fn len(&self) -> usize { self.items.len() }
     }
     impl TreeDisplay for ArgList {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            2
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn num_children(&self, _cfg: &Config) -> usize { 2 }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.range),
                 1 => Some(&self.items),
@@ -377,7 +595,8 @@ pub mod ast {
         pub close: SpannedToken,
     }
     #[automatically_derived]
-    impl<T: ::core::clone::Clone + AstNode> ::core::clone::Clone for EnclosedPunctuationList<T> {
+    impl<T: ::core::clone::Clone + AstNode> ::core::clone::Clone for
+        EnclosedPunctuationList<T> {
         #[inline]
         fn clone(&self) -> EnclosedPunctuationList<T> {
             EnclosedPunctuationList {
@@ -385,6 +604,14 @@ pub mod ast {
                 items: ::core::clone::Clone::clone(&self.items),
                 close: ::core::clone::Clone::clone(&self.close),
             }
+        }
+    }
+    impl<T: AstNode> NodeDisplay for EnclosedPunctuationList<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["EnclosedPunctuationList"],
+                        &[]))?;
+            Ok(())
         }
     }
     impl<T: AstNode> AstNode for EnclosedPunctuationList<T> {
@@ -397,28 +624,17 @@ pub mod ast {
             self.items.iter_items()
         }
     }
-    impl<T: AstNode> NodeDisplay for EnclosedPunctuationList<T> {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("Enclosed Punctuation List")
-        }
-    }
     impl<T: AstNode> TreeDisplay for EnclosedPunctuationList<T> {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            1
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-            match index {
-                0 => Some(&self.items),
-                _ => None,
-            }
+        fn num_children(&self, _cfg: &Config) -> usize { 1 }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
+            match index { 0 => Some(&self.items), _ => None, }
         }
     }
     impl<T: PartialEq + AstNode> PartialEq for EnclosedPunctuationList<T> {
         fn eq(&self, other: &Self) -> bool {
             for (a, b) in self.iter_items().zip(other.iter_items()) {
-                if a != b {
-                    return false;
-                }
+                if a != b { return false; }
             }
             true
         }
@@ -429,7 +645,8 @@ pub mod ast {
         pub close: SpannedToken,
     }
     #[automatically_derived]
-    impl<T: ::core::clone::Clone + AstNode> ::core::clone::Clone for EnclosedList<T> {
+    impl<T: ::core::clone::Clone + AstNode> ::core::clone::Clone for
+        EnclosedList<T> {
         #[inline]
         fn clone(&self) -> EnclosedList<T> {
             EnclosedList {
@@ -441,7 +658,18 @@ pub mod ast {
     }
     impl<T: AstNode> AstNode for EnclosedList<T> {
         fn get_range(&self) -> Range {
-            Range::from((&self.open, &self.close))
+            match self {
+                EnclosedList { open, close, .. } =>
+                    Range::from((&open.get_range(), &close.get_range())),
+            }
+        }
+    }
+    impl<T: AstNode> NodeDisplay for EnclosedList<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            f.write_fmt(::core::fmt::Arguments::new_v1(&["EnclosedList"],
+                        &[]))?;
+            Ok(())
         }
     }
     impl<T: AstNode> EnclosedList<T> {
@@ -449,22 +677,24 @@ pub mod ast {
             self.items.iter()
         }
     }
-    impl<T: AstNode> NodeDisplay for EnclosedList<T> {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("Enclosed List")
-        }
-    }
     impl<T: AstNode> TreeDisplay for EnclosedList<T> {
         fn num_children(&self, _cfg: &Config) -> usize {
             self.items.num_children(_cfg)
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             self.items.child_at(index, _cfg)
         }
     }
+    #[ignore_all(type = u8, type = bool)]
+    #[skip_all(type = u8, type = bool)]
     pub enum Type {
         Integer {
             width: u8,
+            signed: bool,
+            token: SpannedToken,
+        },
+        IntegerPointer {
             signed: bool,
             token: SpannedToken,
         },
@@ -498,6 +728,8 @@ pub mod ast {
         Expression(Box<Expression>),
         Function {
             parameters: ParamaterList,
+            #[skip_item]
+            #[ignore_item]
             return_type: Option<(SpannedToken, Box<Type>)>,
         },
         Option {
@@ -516,356 +748,534 @@ pub mod ast {
         fn clone(&self) -> Type {
             match self {
                 Type::Integer {
-                    width: __self_0,
-                    signed: __self_1,
-                    token: __self_2,
-                } => Type::Integer {
-                    width: ::core::clone::Clone::clone(__self_0),
-                    signed: ::core::clone::Clone::clone(__self_1),
-                    token: ::core::clone::Clone::clone(__self_2),
-                },
-                Type::Float {
-                    width: __self_0,
-                    token: __self_1,
-                } => Type::Float {
-                    width: ::core::clone::Clone::clone(__self_0),
-                    token: ::core::clone::Clone::clone(__self_1),
-                },
+                    width: __self_0, signed: __self_1, token: __self_2 } =>
+                    Type::Integer {
+                        width: ::core::clone::Clone::clone(__self_0),
+                        signed: ::core::clone::Clone::clone(__self_1),
+                        token: ::core::clone::Clone::clone(__self_2),
+                    },
+                Type::IntegerPointer { signed: __self_0, token: __self_1 } =>
+                    Type::IntegerPointer {
+                        signed: ::core::clone::Clone::clone(__self_0),
+                        token: ::core::clone::Clone::clone(__self_1),
+                    },
+                Type::Float { width: __self_0, token: __self_1 } =>
+                    Type::Float {
+                        width: ::core::clone::Clone::clone(__self_0),
+                        token: ::core::clone::Clone::clone(__self_1),
+                    },
                 Type::Fixed {
-                    width: __self_0,
-                    decimals: __self_1,
-                    token: __self_2,
-                } => Type::Fixed {
-                    width: ::core::clone::Clone::clone(__self_0),
-                    decimals: ::core::clone::Clone::clone(__self_1),
-                    token: ::core::clone::Clone::clone(__self_2),
-                },
-                Type::Boolean(__self_0) => Type::Boolean(::core::clone::Clone::clone(__self_0)),
-                Type::Char {
-                    width: __self_0,
-                    token: __self_1,
-                } => Type::Char {
-                    width: ::core::clone::Clone::clone(__self_0),
-                    token: ::core::clone::Clone::clone(__self_1),
-                },
-                Type::Ident(__self_0) => Type::Ident(::core::clone::Clone::clone(__self_0)),
+                    width: __self_0, decimals: __self_1, token: __self_2 } =>
+                    Type::Fixed {
+                        width: ::core::clone::Clone::clone(__self_0),
+                        decimals: ::core::clone::Clone::clone(__self_1),
+                        token: ::core::clone::Clone::clone(__self_2),
+                    },
+                Type::Boolean(__self_0) =>
+                    Type::Boolean(::core::clone::Clone::clone(__self_0)),
+                Type::Char { width: __self_0, token: __self_1 } =>
+                    Type::Char {
+                        width: ::core::clone::Clone::clone(__self_0),
+                        token: ::core::clone::Clone::clone(__self_1),
+                    },
+                Type::Ident(__self_0) =>
+                    Type::Ident(::core::clone::Clone::clone(__self_0)),
                 Type::Ref {
-                    ref_token: __self_0,
-                    mutable: __self_1,
-                    base_type: __self_2,
-                } => Type::Ref {
-                    ref_token: ::core::clone::Clone::clone(__self_0),
-                    mutable: ::core::clone::Clone::clone(__self_1),
-                    base_type: ::core::clone::Clone::clone(__self_2),
-                },
-                Type::Array(__self_0) => Type::Array(::core::clone::Clone::clone(__self_0)),
-                Type::Union(__self_0) => Type::Union(::core::clone::Clone::clone(__self_0)),
-                Type::Tuple(__self_0) => Type::Tuple(::core::clone::Clone::clone(__self_0)),
-                Type::Generic {
-                    base_type: __self_0,
-                    list: __self_1,
-                } => Type::Generic {
-                    base_type: ::core::clone::Clone::clone(__self_0),
-                    list: ::core::clone::Clone::clone(__self_1),
-                },
-                Type::Expression(__self_0) => {
-                    Type::Expression(::core::clone::Clone::clone(__self_0))
+                    ref_token: __self_0, mutable: __self_1, base_type: __self_2
+                    } =>
+                    Type::Ref {
+                        ref_token: ::core::clone::Clone::clone(__self_0),
+                        mutable: ::core::clone::Clone::clone(__self_1),
+                        base_type: ::core::clone::Clone::clone(__self_2),
+                    },
+                Type::Array(__self_0) =>
+                    Type::Array(::core::clone::Clone::clone(__self_0)),
+                Type::Union(__self_0) =>
+                    Type::Union(::core::clone::Clone::clone(__self_0)),
+                Type::Tuple(__self_0) =>
+                    Type::Tuple(::core::clone::Clone::clone(__self_0)),
+                Type::Generic { base_type: __self_0, list: __self_1 } =>
+                    Type::Generic {
+                        base_type: ::core::clone::Clone::clone(__self_0),
+                        list: ::core::clone::Clone::clone(__self_1),
+                    },
+                Type::Expression(__self_0) =>
+                    Type::Expression(::core::clone::Clone::clone(__self_0)),
+                Type::Function { parameters: __self_0, return_type: __self_1 }
+                    =>
+                    Type::Function {
+                        parameters: ::core::clone::Clone::clone(__self_0),
+                        return_type: ::core::clone::Clone::clone(__self_1),
+                    },
+                Type::Option { base_type: __self_0, question: __self_1 } =>
+                    Type::Option {
+                        base_type: ::core::clone::Clone::clone(__self_0),
+                        question: ::core::clone::Clone::clone(__self_1),
+                    },
+                Type::Result { error: __self_0, base_type: __self_1 } =>
+                    Type::Result {
+                        error: ::core::clone::Clone::clone(__self_0),
+                        base_type: ::core::clone::Clone::clone(__self_1),
+                    },
+                Type::Struct(__self_0) =>
+                    Type::Struct(::core::clone::Clone::clone(__self_0)),
+            }
+        }
+    }
+    impl NodeDisplay for Type {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
+            match self {
+                Type::Integer { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Integer"],
+                                &[]))?;
+                    Ok(())
                 }
-                Type::Function {
-                    parameters: __self_0,
-                    return_type: __self_1,
-                } => Type::Function {
-                    parameters: ::core::clone::Clone::clone(__self_0),
-                    return_type: ::core::clone::Clone::clone(__self_1),
-                },
-                Type::Option {
-                    base_type: __self_0,
-                    question: __self_1,
-                } => Type::Option {
-                    base_type: ::core::clone::Clone::clone(__self_0),
-                    question: ::core::clone::Clone::clone(__self_1),
-                },
-                Type::Result {
-                    error: __self_0,
-                    base_type: __self_1,
-                } => Type::Result {
-                    error: ::core::clone::Clone::clone(__self_0),
-                    base_type: ::core::clone::Clone::clone(__self_1),
-                },
-                Type::Struct(__self_0) => Type::Struct(::core::clone::Clone::clone(__self_0)),
+                Type::IntegerPointer { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["IntegerPointer"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Float { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Float"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Fixed { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Fixed"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Boolean(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Boolean"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Char { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Char"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Ident(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Ident"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Ref { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Ref"], &[]))?;
+                    Ok(())
+                }
+                Type::Array(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Array"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Union(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Union"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Tuple(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Tuple"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Generic { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Generic"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Expression(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Expression"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Function { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Function"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Option { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Option"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Result { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Result"],
+                                &[]))?;
+                    Ok(())
+                }
+                Type::Struct(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Struct"],
+                                &[]))?;
+                    Ok(())
+                }
+                _ => Ok(()),
+            }
+        }
+    }
+    impl TreeDisplay for Type<> {
+        fn num_children(&self, _cfg: &Config) -> usize {
+            match self {
+                Type::Integer { width, signed, token } => { 0 + 1 }
+                Type::IntegerPointer { signed, token } => { 0 + 1 }
+                Type::Float { width, token } => { 0 + 1 }
+                Type::Fixed { width, decimals, token } => { 0 + 1 }
+                Type::Boolean(_a0) => { 0 + 1 }
+                Type::Char { width, token } => { 0 + 1 }
+                Type::Ident(_a0) => { 0 + 1 }
+                Type::Ref { ref_token, mutable, base_type } => {
+                    0 + 1 +
+                        { (if let Some(_) = base_type { 1 } else { 0 }) + 0 }
+                }
+                Type::Array(_a0) => { 0 + 1 }
+                Type::Union(_a0) => { 0 + 1 }
+                Type::Tuple(_a0) => { 0 + 1 }
+                Type::Generic { base_type, list } => {
+                    0 + { (if let Some(_) = base_type { 1 } else { 0 }) + 0 } +
+                        1
+                }
+                Type::Expression(_a0) => { 0 + 1 }
+                Type::Function { parameters, return_type } => { 0 + 1 }
+                Type::Option { base_type, question } => {
+                    0 + { (if let Some(_) = base_type { 1 } else { 0 }) + 0 } +
+                        1
+                }
+                Type::Result { error, base_type } => {
+                    0 + 1 +
+                        { (if let Some(_) = base_type { 1 } else { 0 }) + 0 }
+                }
+                Type::Struct(_a0) => { 0 + 1 }
+                _ => 0,
+            }
+        }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
+            match self {
+                Type::Integer { width, signed, token } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(token) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::IntegerPointer { signed, token } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(token) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Float { width, token } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(token) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Fixed { width, decimals, token } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(token) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Boolean(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Char { width, token } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(token) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Ident(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Ref { ref_token, mutable, base_type } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(ref_token) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = base_type.map_tree() {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Array(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Union(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Tuple(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Generic { base_type, list } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = base_type.map_tree() {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = Some(list) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Expression(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(&**_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Function { parameters, return_type } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(parameters) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Option { base_type, question } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = base_type.map_tree() {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = Some(question) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Result { error, base_type } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(error) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = base_type.map_tree() {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                Type::Struct(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                _ => None,
+            }
+        }
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
+            match self {
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
+            }
+        }
+    }
+    impl AstNode for Type<> {
+        fn get_range(&self) -> Range {
+            match self {
+                Type::Integer { token, .. } =>
+                    Range::from((&token.get_range(), &token.get_range())),
+                Type::IntegerPointer { token, .. } =>
+                    Range::from((&token.get_range(), &token.get_range())),
+                Type::Float { token, .. } =>
+                    Range::from((&token.get_range(), &token.get_range())),
+                Type::Fixed { token, .. } =>
+                    Range::from((&token.get_range(), &token.get_range())),
+                Type::Boolean(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Type::Char { token, .. } =>
+                    Range::from((&token.get_range(), &token.get_range())),
+                Type::Ident(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Type::Ref { ref_token, base_type: Some(base_type), .. } =>
+                    Range::from((&ref_token.get_range(),
+                            &base_type.get_range())),
+                Type::Ref { ref_token, .. } =>
+                    Range::from((&ref_token.get_range(),
+                            &ref_token.get_range())),
+                Type::Array(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Type::Union(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Type::Tuple(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Type::Generic { base_type: Some(base_type), list, .. } =>
+                    Range::from((&base_type.get_range(), &list.get_range())),
+                Type::Generic { list, .. } =>
+                    Range::from((&list.get_range(), &list.get_range())),
+                Type::Expression(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Type::Function { parameters, .. } =>
+                    Range::from((&parameters.get_range(),
+                            &parameters.get_range())),
+                Type::Option { base_type: Some(base_type), question, .. } =>
+                    Range::from((&base_type.get_range(),
+                            &question.get_range())),
+                Type::Option { question, .. } =>
+                    Range::from((&question.get_range(), &question.get_range())),
+                Type::Result { error, base_type: Some(base_type), .. } =>
+                    Range::from((&error.get_range(), &base_type.get_range())),
+                Type::Result { error, .. } =>
+                    Range::from((&error.get_range(), &error.get_range())),
+                Type::Struct(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
             }
         }
     }
     impl PartialEq for Type {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
-                (
+                (Self::Integer {
+                    width: l_width, signed: l_signed, token: _l_token },
                     Self::Integer {
-                        width: l_width,
-                        signed: l_signed,
-                        token: _l_token,
-                    },
-                    Self::Integer {
-                        width: r_width,
-                        signed: r_signed,
-                        token: _r_token,
-                    },
-                ) => l_width == r_width && l_signed == r_signed,
-                (
-                    Self::Float {
-                        width: l_width,
-                        token: _l_token,
-                    },
-                    Self::Float {
-                        width: r_width,
-                        token: _r_token,
-                    },
-                ) => l_width == r_width,
+                    width: r_width, signed: r_signed, token: _r_token }) =>
+                    l_width == r_width && l_signed == r_signed,
+                (Self::Float { width: l_width, token: _l_token },
+                    Self::Float { width: r_width, token: _r_token }) =>
+                    l_width == r_width,
                 (Self::Boolean(_l0), Self::Boolean(_r0)) => true,
-                (
-                    Self::Char {
-                        width: _l_width,
-                        token: _l_token,
-                    },
-                    Self::Char {
-                        width: _r_width,
-                        token: _r_token,
-                    },
-                ) => _r_width == _l_width,
-                (Self::Ident(l0), Self::Ident(r0)) => l0.as_str() == r0.as_str(),
-                (
-                    Self::Ref {
-                        ref_token: _l_ref_token,
-                        mutable: _l_mutable,
-                        base_type: Some(l_base_type),
-                    },
-                    Self::Ref {
-                        ref_token: _r_ref_token,
-                        mutable: _r_mutable,
-                        base_type: Some(r_base_type),
-                    },
-                ) => _l_mutable == _r_mutable && l_base_type == r_base_type,
+                (Self::Char { width: _l_width, token: _l_token }, Self::Char {
+                    width: _r_width, token: _r_token }) => _r_width == _l_width,
+                (Self::Ident(l0), Self::Ident(r0)) =>
+                    l0.as_str() == r0.as_str(),
+                (Self::Ref {
+                    ref_token: _l_ref_token,
+                    mutable: _l_mutable,
+                    base_type: Some(l_base_type) }, Self::Ref {
+                    ref_token: _r_ref_token,
+                    mutable: _r_mutable,
+                    base_type: Some(r_base_type) }) =>
+                    _l_mutable == _r_mutable && l_base_type == r_base_type,
                 (Self::Array(l0), Self::Array(r0)) => l0 == r0,
                 (Self::Union(l0), Self::Union(r0)) => l0 == r0,
                 (Self::Tuple(l0), Self::Tuple(r0)) => l0 == r0,
-                (
-                    Self::Generic {
-                        base_type: Some(btl0),
-                        list: l0,
-                    },
-                    Self::Generic {
-                        base_type: Some(btr0),
-                        list: r0,
-                    },
-                ) => l0 == r0 && btl0 == btr0,
-                (
-                    Self::Function {
-                        parameters: l_parameters,
-                        return_type: Some(l_return_type),
-                    },
-                    Self::Function {
-                        parameters: r_parameters,
-                        return_type: Some(r_return_type),
-                    },
-                ) => l_parameters == r_parameters && l_return_type.1 == r_return_type.1,
-                (
-                    Self::Function {
-                        parameters: l_parameters,
-                        return_type: None,
-                    },
-                    Self::Function {
-                        parameters: r_parameters,
-                        return_type: None,
-                    },
-                ) => l_parameters == r_parameters,
-                (
-                    Self::Option {
-                        base_type: Some(l_ty),
-                        question: _l_question,
-                    },
-                    Self::Option {
-                        base_type: Some(r_ty),
-                        question: _r_question,
-                    },
-                ) => l_ty == r_ty,
-                (
-                    Self::Result {
-                        error: _l_error,
-                        base_type: Some(l_ty),
-                    },
-                    Self::Result {
-                        error: _r_error,
-                        base_type: Some(r_ty),
-                    },
-                ) => l_ty == r_ty,
+                (Self::Generic { base_type: Some(btl0), list: l0 },
+                    Self::Generic { base_type: Some(btr0), list: r0 }) =>
+                    l0 == r0 && btl0 == btr0,
+                (Self::Function {
+                    parameters: l_parameters, return_type: Some(l_return_type)
+                    }, Self::Function {
+                    parameters: r_parameters, return_type: Some(r_return_type)
+                    }) =>
+                    l_parameters == r_parameters &&
+                        l_return_type.1 == r_return_type.1,
+                (Self::Function { parameters: l_parameters, return_type: None
+                    }, Self::Function {
+                    parameters: r_parameters, return_type: None }) =>
+                    l_parameters == r_parameters,
+                (Self::Option { base_type: Some(l_ty), question: _l_question
+                    }, Self::Option {
+                    base_type: Some(r_ty), question: _r_question }) =>
+                    l_ty == r_ty,
+                (Self::Result { error: _l_error, base_type: Some(l_ty) },
+                    Self::Result { error: _r_error, base_type: Some(r_ty) }) =>
+                    l_ty == r_ty,
                 _ => false,
-            }
-        }
-    }
-    impl AstNode for Type {
-        fn get_range(&self) -> Range {
-            match self {
-                Self::Integer { token, .. } => token.span().into(),
-                Self::Float { token, .. } => token.span().into(),
-                Self::Fixed { token, .. } => token.span().into(),
-                Self::Boolean(tok) => tok.span().into(),
-                Self::Char { token, .. } => token.span().into(),
-                Self::Ident(ident) => ident.span().into(),
-                Self::Array(a) => a.get_range(),
-                Self::Union(a) => a.get_range(),
-                Self::Tuple(a) => a.get_range(),
-                Self::Generic {
-                    base_type: Some(base_type),
-                    list,
-                } => Range::from((&base_type.get_range(), &list.get_range())),
-                Self::Generic { list, .. } => list.get_range(),
-                Self::Expression(a) => a.get_range(),
-                Self::Function {
-                    parameters,
-                    return_type: None,
-                } => parameters.get_range(),
-                Self::Function {
-                    parameters,
-                    return_type: Some((_, ty)),
-                } => Range::from((&parameters.get_range(), &ty.get_range())),
-                Self::Option {
-                    base_type: Some(ty),
-                    question,
-                } => Range::from((&ty.get_range(), &question.get_range())),
-                Self::Option { question, .. } => question.get_range(),
-                Self::Result {
-                    base_type: Some(ty),
-                    error,
-                } => Range::from((&error.get_range(), &ty.get_range())),
-                Self::Result { error, .. } => error.get_range(),
-                Self::Ref {
-                    ref_token,
-                    base_type: Some(base_type),
-                    ..
-                } => Range::from((&base_type.get_range(), &ref_token.get_range())),
-                Self::Ref { ref_token, .. } => ref_token.get_range(),
-                Self::Struct(s) => s.get_range(),
-            }
-        }
-    }
-    impl NodeDisplay for Type {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            match self {
-                Self::Float { width, .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["float"],
-                    &[::core::fmt::ArgumentV1::new_display(&width)],
-                )),
-                Self::Fixed {
-                    width, decimals, ..
-                } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["fixed", "<", ">"],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&width),
-                        ::core::fmt::ArgumentV1::new_display(&decimals),
-                    ],
-                )),
-                Self::Integer {
-                    width,
-                    signed: true,
-                    ..
-                } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["int"],
-                    &[::core::fmt::ArgumentV1::new_display(&width)],
-                )),
-                Self::Integer {
-                    width,
-                    signed: false,
-                    ..
-                } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["uint"],
-                    &[::core::fmt::ArgumentV1::new_display(&width)],
-                )),
-                Self::Boolean(_) => f.write_str("bool"),
-                Self::Char { width, .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["char"],
-                    &[::core::fmt::ArgumentV1::new_display(&width)],
-                )),
-                Self::Ident(ident) => f.write_str(ident.as_str()),
-                Self::Array(_a) => f.write_str("Array"),
-                Self::Union(_u) => f.write_str("Union"),
-                Self::Tuple(_a) => f.write_str("Tuple"),
-                Self::Generic { .. } => f.write_str("Generic"),
-                Self::Expression(_e) => f.write_str("Expression"),
-                Self::Function { .. } => f.write_str("Function"),
-                Self::Option {
-                    base_type: _ty,
-                    question: _,
-                } => f.write_str("Optional"),
-                Self::Result {
-                    base_type: _ty,
-                    error: _,
-                } => f.write_str("Result"),
-                Self::Ref {
-                    ref_token: _,
-                    mutable,
-                    base_type: _,
-                } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["Reference "],
-                    &[::core::fmt::ArgumentV1::new_display(&if *mutable {
-                        "mut"
-                    } else {
-                        ""
-                    })],
-                )),
-                Self::Struct(_) => f.write_str("Struct"),
             }
         }
     }
     impl fmt::Debug for Type {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            <Type as NodeDisplay>::fmt(self, f)
-        }
-    }
-    impl TreeDisplay for Type {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            match self {
-                Type::Array(a) => a.items.num_children(_cfg),
-                Type::Union(a) => a.num_children(_cfg),
-                Type::Tuple(a) => a.items.num_children(_cfg),
-                Type::Generic {
-                    base_type: Some(_), ..
-                } => 2,
-                Type::Generic { .. } => 1,
-                Type::Expression(_e) => 1,
-                Type::Option { .. } => 1,
-                Type::Result { .. } => 1,
-                Type::Ref { .. } => 1,
-                Type::Struct(s) => s.num_children(_cfg),
-                _ => 0,
-            }
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
-            match self {
-                Type::Array(a) => a.items.child_at(index, _cfg),
-                Type::Union(a) => a.child_at(index, _cfg),
-                Type::Tuple(a) => a.items.child_at(index, _cfg),
-                Type::Generic {
-                    base_type: Some(base_type),
-                    list,
-                } => match index {
-                    0 => Some(&**base_type),
-                    1 => Some(list),
-                    _ => None,
-                },
-                Type::Generic { list, .. } => Some(list),
-                Type::Expression(e) => Some(&**e),
-                Type::Option { base_type: ty, .. } => {
-                    ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f)
-                }
-                Type::Result { base_type: ty, .. } => {
-                    ty.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f)
-                }
-                Type::Ref { base_type, .. } => {
-                    base_type.as_ref().map::<&dyn TreeDisplay, _>(|f| &**f)
-                }
-                Type::Struct(s) => s.child_at(index, _cfg),
-                _ => None,
-            }
+            <Type as
+                    NodeDisplay>::fmt(self, f,
+                &Config { format_type: FormatType::Debug })
         }
     }
     pub enum GenericParameter {
@@ -881,50 +1291,98 @@ pub mod ast {
         #[inline]
         fn clone(&self) -> GenericParameter {
             match self {
-                GenericParameter::Unbounded(__self_0) => {
-                    GenericParameter::Unbounded(::core::clone::Clone::clone(__self_0))
-                }
+                GenericParameter::Unbounded(__self_0) =>
+                    GenericParameter::Unbounded(::core::clone::Clone::clone(__self_0)),
                 GenericParameter::Bounded {
-                    ident: __self_0,
-                    colon: __self_1,
-                    bounds: __self_2,
-                } => GenericParameter::Bounded {
-                    ident: ::core::clone::Clone::clone(__self_0),
-                    colon: ::core::clone::Clone::clone(__self_1),
-                    bounds: ::core::clone::Clone::clone(__self_2),
-                },
-            }
-        }
-    }
-    impl AstNode for GenericParameter {
-        fn get_range(&self) -> Range {
-            match self {
-                GenericParameter::Unbounded(u) => u.get_range(),
-                GenericParameter::Bounded { ident, bounds, .. } => {
-                    Range::from((*ident.span(), &bounds.get_range()))
-                }
+                    ident: __self_0, colon: __self_1, bounds: __self_2 } =>
+                    GenericParameter::Bounded {
+                        ident: ::core::clone::Clone::clone(__self_0),
+                        colon: ::core::clone::Clone::clone(__self_1),
+                        bounds: ::core::clone::Clone::clone(__self_2),
+                    },
             }
         }
     }
     impl NodeDisplay for GenericParameter {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
-                GenericParameter::Unbounded(u) => f.write_str(u.as_str()),
-                GenericParameter::Bounded { ident, .. } => f.write_str(ident.as_str()),
+                GenericParameter::Unbounded(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Unbounded"],
+                                &[]))?;
+                    Ok(())
+                }
+                GenericParameter::Bounded { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Bounded"],
+                                &[]))?;
+                    Ok(())
+                }
+                _ => Ok(()),
             }
         }
     }
-    impl TreeDisplay for GenericParameter {
+    impl TreeDisplay for GenericParameter<> {
         fn num_children(&self, _cfg: &Config) -> usize {
             match self {
-                GenericParameter::Bounded { bounds, .. } => bounds.num_children(_cfg),
+                GenericParameter::Unbounded(_a0) => { 0 + 1 }
+                GenericParameter::Bounded { ident, colon, bounds } => {
+                    0 + 1 + 1 + 1
+                }
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match self {
-                GenericParameter::Bounded { bounds, .. } => bounds.child_at(index, _cfg),
+                GenericParameter::Unbounded(_a0) => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(_a0) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
+                GenericParameter::Bounded { ident, colon, bounds } => {
+                    {
+                        let mut ind = 0;
+                        if let Some(v) = Some(ident) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = Some(colon) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        if let Some(v) = Some(bounds) {
+                                if index == ind { return Some(v) }
+                                ind += 1;
+                            }
+                        ind
+                    };
+                    None
+                }
                 _ => None,
+            }
+        }
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
+            match self {
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
+            }
+        }
+    }
+    impl AstNode for GenericParameter<> {
+        fn get_range(&self) -> Range {
+            match self {
+                GenericParameter::Unbounded(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                GenericParameter::Bounded { ident, bounds, .. } =>
+                    Range::from((&ident.get_range(), &bounds.get_range())),
             }
         }
     }
@@ -937,38 +1395,35 @@ pub mod ast {
         #[inline]
         fn clone(&self) -> ParsedTemplate {
             match self {
-                ParsedTemplate::String(__self_0) => {
-                    ParsedTemplate::String(::core::clone::Clone::clone(__self_0))
-                }
-                ParsedTemplate::Template(__self_0, __self_1, __self_2) => ParsedTemplate::Template(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                    ::core::clone::Clone::clone(__self_2),
-                ),
+                ParsedTemplate::String(__self_0) =>
+                    ParsedTemplate::String(::core::clone::Clone::clone(__self_0)),
+                ParsedTemplate::Template(__self_0, __self_1, __self_2) =>
+                    ParsedTemplate::Template(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1),
+                        ::core::clone::Clone::clone(__self_2)),
             }
         }
     }
     impl NodeDisplay for ParsedTemplate {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
-                ParsedTemplate::String(l) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["Literal: `", "`"],
-                    &[::core::fmt::ArgumentV1::new_display(&l.as_str())],
-                )),
-                ParsedTemplate::Template(_t, _, _) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Value"], &[]))
-                }
+                ParsedTemplate::String(l) =>
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Literal: `",
+                                        "`"],
+                            &[::core::fmt::ArgumentV1::new_display(&l.as_str())])),
+                ParsedTemplate::Template(_t, _, _) =>
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Value"],
+                            &[])),
             }
         }
     }
     impl TreeDisplay for ParsedTemplate {
         fn num_children(&self, _cfg: &Config) -> usize {
-            match self {
-                ParsedTemplate::Template(_, _, _) => 1,
-                _ => 0,
-            }
+            match self { ParsedTemplate::Template(_, _, _) => 1, _ => 0, }
         }
-        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+        fn child_at(&self, _index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay<()>> {
             match self {
                 ParsedTemplate::Template(e, _, _) => Some(&**e),
                 _ => None,
@@ -984,30 +1439,42 @@ pub mod ast {
         }
     }
     impl NodeDisplay for ParsedTemplateString {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             f.write_str("Parsed Template String")
         }
     }
     impl TreeDisplay for ParsedTemplateString {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            self.0.len()
-        }
-        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+        fn num_children(&self, _cfg: &Config) -> usize { self.0.len() }
+        fn child_at(&self, _index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay<()>> {
             self.0.get(_index).map::<&dyn TreeDisplay<()>, _>(|t| t)
         }
     }
-    # [ignore_all (type = bool , type = u64 , type = f64 , type = Option < Unit >)]
+    #[ignore_all(type = bool, type = u64, type = f64, type = Option < Unit >)]
     pub enum Expression {
         BinaryExpression {
             left: Option<Box<Expression>>,
             op_token: SpannedToken,
             right: Option<Box<Expression>>,
         },
-        Boolean(#[skip_item] bool, SpannedToken),
-        Integer(#[skip_item] u64, #[skip_item] Option<Unit>, SpannedToken),
-        Float(#[skip_item] f64, #[skip_item] Option<Unit>, SpannedToken),
+        Boolean(
+            #[skip_item]
+            bool, SpannedToken),
+        Integer(
+            #[skip_item]
+            u64,
+            #[skip_item]
+            Option<Unit>, SpannedToken),
+        Float(
+            #[skip_item]
+            f64,
+            #[skip_item]
+            Option<Unit>, SpannedToken),
         Ident(SpannedToken),
-        String(#[skip_item] ParsedTemplateString, SpannedToken),
+        String(
+            #[skip_item]
+            ParsedTemplateString, SpannedToken),
         FunctionCall {
             expr: Box<Expression>,
             args: ArgList,
@@ -1022,142 +1489,137 @@ pub mod ast {
         fn clone(&self) -> Expression {
             match self {
                 Expression::BinaryExpression {
-                    left: __self_0,
-                    op_token: __self_1,
-                    right: __self_2,
-                } => Expression::BinaryExpression {
-                    left: ::core::clone::Clone::clone(__self_0),
-                    op_token: ::core::clone::Clone::clone(__self_1),
-                    right: ::core::clone::Clone::clone(__self_2),
-                },
-                Expression::Boolean(__self_0, __self_1) => Expression::Boolean(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                ),
-                Expression::Integer(__self_0, __self_1, __self_2) => Expression::Integer(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                    ::core::clone::Clone::clone(__self_2),
-                ),
-                Expression::Float(__self_0, __self_1, __self_2) => Expression::Float(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                    ::core::clone::Clone::clone(__self_2),
-                ),
-                Expression::Ident(__self_0) => {
-                    Expression::Ident(::core::clone::Clone::clone(__self_0))
-                }
-                Expression::String(__self_0, __self_1) => Expression::String(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                ),
-                Expression::FunctionCall {
-                    expr: __self_0,
-                    args: __self_1,
-                } => Expression::FunctionCall {
-                    expr: ::core::clone::Clone::clone(__self_0),
-                    args: ::core::clone::Clone::clone(__self_1),
-                },
-                Expression::Tuple(__self_0) => {
-                    Expression::Tuple(::core::clone::Clone::clone(__self_0))
-                }
-                Expression::Array(__self_0) => {
-                    Expression::Array(::core::clone::Clone::clone(__self_0))
-                }
-                Expression::Record(__self_0) => {
-                    Expression::Record(::core::clone::Clone::clone(__self_0))
-                }
+                    left: __self_0, op_token: __self_1, right: __self_2 } =>
+                    Expression::BinaryExpression {
+                        left: ::core::clone::Clone::clone(__self_0),
+                        op_token: ::core::clone::Clone::clone(__self_1),
+                        right: ::core::clone::Clone::clone(__self_2),
+                    },
+                Expression::Boolean(__self_0, __self_1) =>
+                    Expression::Boolean(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1)),
+                Expression::Integer(__self_0, __self_1, __self_2) =>
+                    Expression::Integer(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1),
+                        ::core::clone::Clone::clone(__self_2)),
+                Expression::Float(__self_0, __self_1, __self_2) =>
+                    Expression::Float(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1),
+                        ::core::clone::Clone::clone(__self_2)),
+                Expression::Ident(__self_0) =>
+                    Expression::Ident(::core::clone::Clone::clone(__self_0)),
+                Expression::String(__self_0, __self_1) =>
+                    Expression::String(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1)),
+                Expression::FunctionCall { expr: __self_0, args: __self_1 } =>
+                    Expression::FunctionCall {
+                        expr: ::core::clone::Clone::clone(__self_0),
+                        args: ::core::clone::Clone::clone(__self_1),
+                    },
+                Expression::Tuple(__self_0) =>
+                    Expression::Tuple(::core::clone::Clone::clone(__self_0)),
+                Expression::Array(__self_0) =>
+                    Expression::Array(::core::clone::Clone::clone(__self_0)),
+                Expression::Record(__self_0) =>
+                    Expression::Record(::core::clone::Clone::clone(__self_0)),
             }
         }
     }
     impl NodeDisplay for Expression {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
                 Expression::BinaryExpression { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["BinaryExpression"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["BinaryExpression"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Boolean(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Boolean"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Boolean"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Integer(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Integer"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Integer"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Float(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Float"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Float"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Ident(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Ident"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Ident"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::String(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["String"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["String"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::FunctionCall { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["FunctionCall"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["FunctionCall"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Tuple(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Tuple"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Tuple"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Array(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Array"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Array"],
+                                &[]))?;
+                    Ok(())
                 }
                 Expression::Record(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Record"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Record"],
+                                &[]))?;
+                    Ok(())
                 }
                 _ => Ok(()),
             }
         }
     }
-    impl TreeDisplay for Expression {
+    impl TreeDisplay for Expression<> {
         fn num_children(&self, _cfg: &Config) -> usize {
             match self {
-                Expression::BinaryExpression {
-                    left,
-                    op_token,
-                    right,
-                } => {
-                    0 + { (if let Some(_) = left { 1 } else { 0 }) + 0 } + 1 + {
-                        (if let Some(_) = right { 1 } else { 0 }) + 0
-                    }
+                Expression::BinaryExpression { left, op_token, right } => {
+                    0 + { (if let Some(_) = left { 1 } else { 0 }) + 0 } + 1 +
+                        { (if let Some(_) = right { 1 } else { 0 }) + 0 }
                 }
-                Expression::Boolean(_a0, _a1) => 0 + 1,
-                Expression::Integer(_a0, _a1, _a2) => 0 + 1,
-                Expression::Float(_a0, _a1, _a2) => 0 + 1,
-                Expression::Ident(_a0) => 0 + 1,
-                Expression::String(_a0, _a1) => 0 + 1 + 1,
-                Expression::FunctionCall { expr, args } => 0 + 1 + 1,
-                Expression::Tuple(_a0) => 0 + 1,
-                Expression::Array(_a0) => 0 + 1,
-                Expression::Record(_a0) => 0 + 1,
+                Expression::Boolean(_a0, _a1) => { 0 + 1 }
+                Expression::Integer(_a0, _a1, _a2) => { 0 + 1 }
+                Expression::Float(_a0, _a1, _a2) => { 0 + 1 }
+                Expression::Ident(_a0) => { 0 + 1 }
+                Expression::String(_a0, _a1) => { 0 + 1 + 1 }
+                Expression::FunctionCall { expr, args } => { 0 + 1 + 1 }
+                Expression::Tuple(_a0) => { 0 + 1 }
+                Expression::Array(_a0) => { 0 + 1 }
+                Expression::Record(_a0) => { 0 + 1 }
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match self {
-                Expression::BinaryExpression {
-                    left,
-                    op_token,
-                    right,
-                } => {
+                Expression::BinaryExpression { left, op_token, right } => {
                     {
                         let mut ind = 0;
                         if let Some(v) = left.map_tree() {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(op_token) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = right.map_tree() {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1166,11 +1628,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a1) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1179,11 +1639,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a2) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1192,11 +1650,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a2) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1205,11 +1661,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1218,17 +1672,13 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(_a1) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1237,17 +1687,13 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(&**expr) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(args) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1256,11 +1702,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1269,11 +1713,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1282,11 +1724,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1294,53 +1734,47 @@ pub mod ast {
                 _ => None,
             }
         }
-        fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
             match self {
-                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
-                    &["Unexpected index for enum!"],
-                    &[],
-                )),
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
             }
         }
     }
-    impl AstNode for Expression {
+    impl AstNode for Expression<> {
         fn get_range(&self) -> Range {
             match self {
                 Expression::BinaryExpression {
-                    left: Some(left),
-                    right: Some(right),
-                    ..
-                } => Range::from((&left.get_range(), &right.get_range())),
-                Expression::BinaryExpression {
-                    left: Some(left),
-                    op_token,
-                    ..
-                } => Range::from((&left.get_range(), &op_token.get_range())),
-                Expression::BinaryExpression {
-                    op_token,
-                    right: Some(right),
-                    ..
-                } => Range::from((&op_token.get_range(), &right.get_range())),
-                Expression::BinaryExpression { op_token, .. } => {
-                    Range::from((&op_token.get_range(), &op_token.get_range()))
-                }
-                Expression::Boolean(_, _a1, ..) => {
-                    Range::from((&_a1.get_range(), &_a1.get_range()))
-                }
-                Expression::Integer(_, _, _a2, ..) => {
-                    Range::from((&_a2.get_range(), &_a2.get_range()))
-                }
-                Expression::Float(_, _, _a2, ..) => {
-                    Range::from((&_a2.get_range(), &_a2.get_range()))
-                }
-                Expression::Ident(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
-                Expression::String(_, _a1, ..) => Range::from((&_a1.get_range(), &_a1.get_range())),
-                Expression::FunctionCall { expr, args, .. } => {
-                    Range::from((&expr.get_range(), &args.get_range()))
-                }
-                Expression::Tuple(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
-                Expression::Array(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
-                Expression::Record(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
+                    left: Some(left), right: Some(right), .. } =>
+                    Range::from((&left.get_range(), &right.get_range())),
+                Expression::BinaryExpression { left: Some(left), op_token, ..
+                    } =>
+                    Range::from((&left.get_range(), &op_token.get_range())),
+                Expression::BinaryExpression { op_token, right: Some(right),
+                    .. } =>
+                    Range::from((&op_token.get_range(), &right.get_range())),
+                Expression::BinaryExpression { op_token, .. } =>
+                    Range::from((&op_token.get_range(), &op_token.get_range())),
+                Expression::Boolean(_, _a1, ..) =>
+                    Range::from((&_a1.get_range(), &_a1.get_range())),
+                Expression::Integer(_, _, _a2, ..) =>
+                    Range::from((&_a2.get_range(), &_a2.get_range())),
+                Expression::Float(_, _, _a2, ..) =>
+                    Range::from((&_a2.get_range(), &_a2.get_range())),
+                Expression::Ident(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Expression::String(_, _a1, ..) =>
+                    Range::from((&_a1.get_range(), &_a1.get_range())),
+                Expression::FunctionCall { expr, args, .. } =>
+                    Range::from((&expr.get_range(), &args.get_range())),
+                Expression::Tuple(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Expression::Array(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Expression::Record(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
             }
         }
     }
@@ -1354,7 +1788,9 @@ pub mod ast {
     }
     impl fmt::Debug for Expression {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            <Expression as NodeDisplay>::fmt(self, f)
+            <Expression as
+                    NodeDisplay>::fmt(self, f,
+                &Config { format_type: FormatType::Debug })
         }
     }
     pub enum FunctionBody {
@@ -1369,69 +1805,68 @@ pub mod ast {
         #[inline]
         fn clone(&self) -> FunctionBody {
             match self {
-                FunctionBody::Block(__self_0, __self_1, __self_2) => FunctionBody::Block(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                    ::core::clone::Clone::clone(__self_2),
-                ),
+                FunctionBody::Block(__self_0, __self_1, __self_2) =>
+                    FunctionBody::Block(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1),
+                        ::core::clone::Clone::clone(__self_2)),
                 FunctionBody::Expression {
-                    arrow: __self_0,
-                    expression: __self_1,
-                } => FunctionBody::Expression {
-                    arrow: ::core::clone::Clone::clone(__self_0),
-                    expression: ::core::clone::Clone::clone(__self_1),
-                },
+                    arrow: __self_0, expression: __self_1 } =>
+                    FunctionBody::Expression {
+                        arrow: ::core::clone::Clone::clone(__self_0),
+                        expression: ::core::clone::Clone::clone(__self_1),
+                    },
             }
         }
     }
     impl NodeDisplay for FunctionBody {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
                 FunctionBody::Block(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Block"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Block"],
+                                &[]))?;
+                    Ok(())
                 }
                 FunctionBody::Expression { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Expression"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Expression"],
+                                &[]))?;
+                    Ok(())
                 }
                 _ => Ok(()),
             }
         }
     }
-    impl TreeDisplay for FunctionBody {
+    impl TreeDisplay for FunctionBody<> {
         fn num_children(&self, _cfg: &Config) -> usize {
             match self {
                 FunctionBody::Block(_a0, _a1, _a2) => {
                     0 + 1 + 1 + { (if let Some(_) = _a2 { 1 } else { 0 }) + 0 }
                 }
                 FunctionBody::Expression { arrow, expression } => {
-                    0 + 1 + { (if let Some(_) = expression { 1 } else { 0 }) + 0 }
+                    0 + 1 +
+                        { (if let Some(_) = expression { 1 } else { 0 }) + 0 }
                 }
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match self {
                 FunctionBody::Block(_a0, _a1, _a2) => {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(_a1) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = _a2 {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1440,17 +1875,13 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(arrow) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = expression.map_tree() {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1458,39 +1889,34 @@ pub mod ast {
                 _ => None,
             }
         }
-        fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
             match self {
-                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
-                    &["Unexpected index for enum!"],
-                    &[],
-                )),
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
             }
         }
     }
-    impl AstNode for FunctionBody {
+    impl AstNode for FunctionBody<> {
         fn get_range(&self) -> Range {
             match self {
-                FunctionBody::Block(_a0, .., Some(_a2)) => {
-                    Range::from((&_a0.get_range(), &_a2.get_range()))
-                }
-                FunctionBody::Block(_a0, .., _a1, _) => {
-                    Range::from((&_a0.get_range(), &_a1.get_range()))
-                }
+                FunctionBody::Block(_a0, .., Some(_a2)) =>
+                    Range::from((&_a0.get_range(), &_a2.get_range())),
+                FunctionBody::Block(_a0, .., _a1, _) =>
+                    Range::from((&_a0.get_range(), &_a1.get_range())),
                 FunctionBody::Expression {
-                    arrow,
-                    expression: Some(expression),
-                    ..
-                } => Range::from((&arrow.get_range(), &expression.get_range())),
-                FunctionBody::Expression { arrow, .. } => {
-                    Range::from((&arrow.get_range(), &arrow.get_range()))
-                }
+                    arrow, expression: Some(expression), .. } =>
+                    Range::from((&arrow.get_range(), &expression.get_range())),
+                FunctionBody::Expression { arrow, .. } =>
+                    Range::from((&arrow.get_range(), &arrow.get_range())),
             }
         }
     }
-    # [ignore_all (type = SpannedToken)]
+    #[ignore_all(type = SpannedToken)]
     pub enum Statement {
         Expression(Expression),
-        Declaration {
+        VariableDeclaration {
             ty: Type,
             #[keep_item]
             ident: SpannedToken,
@@ -1541,260 +1967,231 @@ pub mod ast {
         #[inline]
         fn clone(&self) -> Statement {
             match self {
-                Statement::Expression(__self_0) => {
-                    Statement::Expression(::core::clone::Clone::clone(__self_0))
-                }
-                Statement::Declaration {
-                    ty: __self_0,
-                    ident: __self_1,
-                    eq: __self_2,
-                    expr: __self_3,
-                } => Statement::Declaration {
-                    ty: ::core::clone::Clone::clone(__self_0),
-                    ident: ::core::clone::Clone::clone(__self_1),
-                    eq: ::core::clone::Clone::clone(__self_2),
-                    expr: ::core::clone::Clone::clone(__self_3),
-                },
+                Statement::Expression(__self_0) =>
+                    Statement::Expression(::core::clone::Clone::clone(__self_0)),
+                Statement::VariableDeclaration {
+                    ty: __self_0, ident: __self_1, eq: __self_2, expr: __self_3
+                    } =>
+                    Statement::VariableDeclaration {
+                        ty: ::core::clone::Clone::clone(__self_0),
+                        ident: ::core::clone::Clone::clone(__self_1),
+                        eq: ::core::clone::Clone::clone(__self_2),
+                        expr: ::core::clone::Clone::clone(__self_3),
+                    },
                 Statement::Class {
                     token: __self_0,
                     ident: __self_1,
                     generic: __self_2,
-                    body: __self_3,
-                } => Statement::Class {
-                    token: ::core::clone::Clone::clone(__self_0),
-                    ident: ::core::clone::Clone::clone(__self_1),
-                    generic: ::core::clone::Clone::clone(__self_2),
-                    body: ::core::clone::Clone::clone(__self_3),
-                },
-                Statement::ImportStatement {
-                    token: __self_0,
-                    args: __self_1,
-                } => Statement::ImportStatement {
-                    token: ::core::clone::Clone::clone(__self_0),
-                    args: ::core::clone::Clone::clone(__self_1),
-                },
-                Statement::List(__self_0) => Statement::List(::core::clone::Clone::clone(__self_0)),
-                Statement::Block(__self_0) => {
-                    Statement::Block(::core::clone::Clone::clone(__self_0))
-                }
+                    body: __self_3 } =>
+                    Statement::Class {
+                        token: ::core::clone::Clone::clone(__self_0),
+                        ident: ::core::clone::Clone::clone(__self_1),
+                        generic: ::core::clone::Clone::clone(__self_2),
+                        body: ::core::clone::Clone::clone(__self_3),
+                    },
+                Statement::ImportStatement { token: __self_0, args: __self_1 }
+                    =>
+                    Statement::ImportStatement {
+                        token: ::core::clone::Clone::clone(__self_0),
+                        args: ::core::clone::Clone::clone(__self_1),
+                    },
+                Statement::List(__self_0) =>
+                    Statement::List(::core::clone::Clone::clone(__self_0)),
+                Statement::Block(__self_0) =>
+                    Statement::Block(::core::clone::Clone::clone(__self_0)),
                 Statement::TypeAlias {
                     ty_tok: __self_0,
                     ident: __self_1,
                     generic: __self_2,
                     eq: __self_3,
-                    ty: __self_4,
-                } => Statement::TypeAlias {
-                    ty_tok: ::core::clone::Clone::clone(__self_0),
-                    ident: ::core::clone::Clone::clone(__self_1),
-                    generic: ::core::clone::Clone::clone(__self_2),
-                    eq: ::core::clone::Clone::clone(__self_3),
-                    ty: ::core::clone::Clone::clone(__self_4),
-                },
+                    ty: __self_4 } =>
+                    Statement::TypeAlias {
+                        ty_tok: ::core::clone::Clone::clone(__self_0),
+                        ident: ::core::clone::Clone::clone(__self_1),
+                        generic: ::core::clone::Clone::clone(__self_2),
+                        eq: ::core::clone::Clone::clone(__self_3),
+                        ty: ::core::clone::Clone::clone(__self_4),
+                    },
                 Statement::Function {
                     return_type: __self_0,
                     ident: __self_1,
                     generic: __self_2,
                     parameters: __self_3,
                     arrow: __self_4,
-                    body: __self_5,
-                } => Statement::Function {
-                    return_type: ::core::clone::Clone::clone(__self_0),
-                    ident: ::core::clone::Clone::clone(__self_1),
-                    generic: ::core::clone::Clone::clone(__self_2),
-                    parameters: ::core::clone::Clone::clone(__self_3),
-                    arrow: ::core::clone::Clone::clone(__self_4),
-                    body: ::core::clone::Clone::clone(__self_5),
-                },
+                    body: __self_5 } =>
+                    Statement::Function {
+                        return_type: ::core::clone::Clone::clone(__self_0),
+                        ident: ::core::clone::Clone::clone(__self_1),
+                        generic: ::core::clone::Clone::clone(__self_2),
+                        parameters: ::core::clone::Clone::clone(__self_3),
+                        arrow: ::core::clone::Clone::clone(__self_4),
+                        body: ::core::clone::Clone::clone(__self_5),
+                    },
                 Statement::Impl {
                     impl_tok: __self_0,
                     generics: __self_1,
                     ty: __self_2,
-                    body: __self_3,
-                } => Statement::Impl {
-                    impl_tok: ::core::clone::Clone::clone(__self_0),
-                    generics: ::core::clone::Clone::clone(__self_1),
-                    ty: ::core::clone::Clone::clone(__self_2),
-                    body: ::core::clone::Clone::clone(__self_3),
-                },
-                Statement::Return {
-                    ret_token: __self_0,
-                    expr: __self_1,
-                } => Statement::Return {
-                    ret_token: ::core::clone::Clone::clone(__self_0),
-                    expr: ::core::clone::Clone::clone(__self_1),
-                },
-                Statement::Modifer(__self_0) => {
-                    Statement::Modifer(::core::clone::Clone::clone(__self_0))
-                }
+                    body: __self_3 } =>
+                    Statement::Impl {
+                        impl_tok: ::core::clone::Clone::clone(__self_0),
+                        generics: ::core::clone::Clone::clone(__self_1),
+                        ty: ::core::clone::Clone::clone(__self_2),
+                        body: ::core::clone::Clone::clone(__self_3),
+                    },
+                Statement::Return { ret_token: __self_0, expr: __self_1 } =>
+                    Statement::Return {
+                        ret_token: ::core::clone::Clone::clone(__self_0),
+                        expr: ::core::clone::Clone::clone(__self_1),
+                    },
+                Statement::Modifer(__self_0) =>
+                    Statement::Modifer(::core::clone::Clone::clone(__self_0)),
             }
         }
     }
     impl NodeDisplay for Statement {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
                 Statement::Expression(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Expression"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Expression"],
+                                &[]))?;
+                    Ok(())
                 }
-                Statement::Declaration { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Declaration"], &[]))
+                Statement::VariableDeclaration { .. } => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["VariableDeclaration"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::Class { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Class"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Class"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::ImportStatement { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["ImportStatement"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["ImportStatement"],
+                                &[]))?;
+                    Ok(())
                 }
-                Statement::List(..) => f.write_fmt(::core::fmt::Arguments::new_v1(&["List"], &[])),
+                Statement::List(..) => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["List"],
+                                &[]))?;
+                    Ok(())
+                }
                 Statement::Block(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Block"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Block"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::TypeAlias { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["TypeAlias"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["TypeAlias"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::Function { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Function"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Function"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::Impl { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Impl"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Impl"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::Return { .. } => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Return"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Return"],
+                                &[]))?;
+                    Ok(())
                 }
                 Statement::Modifer(..) => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Modifer"], &[]))
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Modifer"],
+                                &[]))?;
+                    Ok(())
                 }
                 _ => Ok(()),
             }
         }
     }
-    impl TreeDisplay for Statement {
+    impl TreeDisplay for Statement<> {
         fn num_children(&self, _cfg: &Config) -> usize {
             match self {
-                Statement::Expression(_a0) => 0 + 1,
-                Statement::Declaration {
-                    ty,
-                    ident,
-                    eq,
-                    expr,
-                } => 0 + 1 + 1 + { (if let Some(_) = expr { 1 } else { 0 }) + 0 },
-                Statement::Class {
-                    token,
-                    ident,
-                    generic,
-                    body,
-                } => 0 + { (if let Some(_) = generic { 1 } else { 0 }) + 0 } + 1,
+                Statement::Expression(_a0) => { 0 + 1 }
+                Statement::VariableDeclaration { ty, ident, eq, expr } => {
+                    0 + 1 + 1 + { (if let Some(_) = expr { 1 } else { 0 }) + 0 }
+                }
+                Statement::Class { token, ident, generic, body } => {
+                    0 + { (if let Some(_) = generic { 1 } else { 0 }) + 0 } + 1
+                }
                 Statement::ImportStatement { token, args } => {
                     0 + { (if let Some(_) = token { 1 } else { 0 }) + 0 } + 1
                 }
-                Statement::List(_a0) => 0 + 1,
-                Statement::Block(_a0) => 0 + 1,
-                Statement::TypeAlias {
-                    ty_tok,
-                    ident,
-                    generic,
-                    eq,
-                    ty,
-                } => {
-                    0 + { (if let Some(_) = generic { 1 } else { 0 }) + 0 }
-                        + { (if let Some(_) = eq { 1 } else { 0 }) + 0 }
-                        + 1
+                Statement::List(_a0) => { 0 + 1 }
+                Statement::Block(_a0) => { 0 + 1 }
+                Statement::TypeAlias { ty_tok, ident, generic, eq, ty } => {
+                    0 + { (if let Some(_) = generic { 1 } else { 0 }) + 0 } +
+                            { (if let Some(_) = eq { 1 } else { 0 }) + 0 } + 1
                 }
                 Statement::Function {
-                    return_type,
-                    ident,
-                    generic,
-                    parameters,
-                    arrow,
-                    body,
-                } => {
-                    0 + 1
-                        + { (if let Some(_) = generic { 1 } else { 0 }) + 0 }
-                        + 1
-                        + { (if let Some(_) = arrow { 1 } else { 0 }) + 0 }
-                        + { (if let Some(_) = body { 1 } else { 0 }) + 0 }
+                    return_type, ident, generic, parameters, arrow, body } => {
+                    0 + 1 + { (if let Some(_) = generic { 1 } else { 0 }) + 0 }
+                                + 1 + { (if let Some(_) = arrow { 1 } else { 0 }) + 0 } +
+                        { (if let Some(_) = body { 1 } else { 0 }) + 0 }
                 }
-                Statement::Impl {
-                    impl_tok,
-                    generics,
-                    ty,
-                    body,
-                } => {
-                    0 + { (if let Some(_) = generics { 1 } else { 0 }) + 0 }
-                        + { (if let Some(_) = ty { 1 } else { 0 }) + 0 }
-                        + { (if let Some(_) = body { 1 } else { 0 }) + 0 }
+                Statement::Impl { impl_tok, generics, ty, body } => {
+                    0 + { (if let Some(_) = generics { 1 } else { 0 }) + 0 } +
+                            { (if let Some(_) = ty { 1 } else { 0 }) + 0 } +
+                        { (if let Some(_) = body { 1 } else { 0 }) + 0 }
                 }
                 Statement::Return { ret_token, expr } => {
                     0 + { (if let Some(_) = expr { 1 } else { 0 }) + 0 }
                 }
-                Statement::Modifer(_a0) => 0 + 1,
+                Statement::Modifer(_a0) => { 0 + 1 }
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match self {
                 Statement::Expression(_a0) => {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
                 }
-                Statement::Declaration {
-                    ty,
-                    ident,
-                    eq,
-                    expr,
-                } => {
+                Statement::VariableDeclaration { ty, ident, eq, expr } => {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(ty) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(ident) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = expr {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
                 }
-                Statement::Class {
-                    token,
-                    ident,
-                    generic,
-                    body,
-                } => {
+                Statement::Class { token, ident, generic, body } => {
                     {
                         let mut ind = 0;
                         if let Some(v) = generic {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(body) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1803,17 +2200,13 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = token {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(args) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1822,11 +2215,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1835,116 +2226,75 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
                 }
-                Statement::TypeAlias {
-                    ty_tok,
-                    ident,
-                    generic,
-                    eq,
-                    ty,
-                } => {
+                Statement::TypeAlias { ty_tok, ident, generic, eq, ty } => {
                     {
                         let mut ind = 0;
                         if let Some(v) = generic {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = eq {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(&**ty) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
                 }
                 Statement::Function {
-                    return_type,
-                    ident,
-                    generic,
-                    parameters,
-                    arrow,
-                    body,
-                } => {
+                    return_type, ident, generic, parameters, arrow, body } => {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(return_type) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = generic {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = Some(parameters) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = arrow {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = body.map_tree() {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
                 }
-                Statement::Impl {
-                    impl_tok,
-                    generics,
-                    ty,
-                    body,
-                } => {
+                Statement::Impl { impl_tok, generics, ty, body } => {
                     {
                         let mut ind = 0;
                         if let Some(v) = generics {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = ty {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         if let Some(v) = body {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1953,11 +2303,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = expr {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1966,11 +2314,9 @@ pub mod ast {
                     {
                         let mut ind = 0;
                         if let Some(v) = Some(_a0) {
-                            if index == ind {
-                                return Some(v);
+                                if index == ind { return Some(v) }
+                                ind += 1;
                             }
-                            ind += 1;
-                        }
                         ind
                     };
                     None
@@ -1978,85 +2324,58 @@ pub mod ast {
                 _ => None,
             }
         }
-        fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
             match self {
-                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
-                    &["Unexpected index for enum!"],
-                    &[],
-                )),
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
             }
         }
     }
-    impl AstNode for Statement {
+    impl AstNode for Statement<> {
         fn get_range(&self) -> Range {
             match self {
-                Statement::Expression(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
-                Statement::Declaration {
-                    ty,
-                    expr: Some(expr),
-                    ..
-                } => Range::from((&ty.get_range(), &expr.get_range())),
-                Statement::Declaration { ty, eq, .. } => {
-                    Range::from((&ty.get_range(), &eq.get_range()))
-                }
-                Statement::Class { token, body, .. } => {
-                    Range::from((&token.get_range(), &body.get_range()))
-                }
-                Statement::ImportStatement {
-                    token: Some(token),
-                    args,
-                    ..
-                } => Range::from((&token.get_range(), &args.get_range())),
-                Statement::ImportStatement { args, .. } => {
-                    Range::from((&args.get_range(), &args.get_range()))
-                }
-                Statement::List(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
-                Statement::Block(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
-                Statement::TypeAlias { ty_tok, ty, .. } => {
-                    Range::from((&ty_tok.get_range(), &ty.get_range()))
-                }
-                Statement::Function {
-                    return_type,
-                    body: Some(body),
-                    ..
-                } => Range::from((&return_type.get_range(), &body.get_range())),
-                Statement::Function {
-                    return_type,
-                    arrow: Some(arrow),
-                    ..
-                } => Range::from((&return_type.get_range(), &arrow.get_range())),
-                Statement::Function {
-                    return_type,
-                    parameters,
-                    ..
-                } => Range::from((&return_type.get_range(), &parameters.get_range())),
-                Statement::Impl {
-                    impl_tok,
-                    body: Some(body),
-                    ..
-                } => Range::from((&impl_tok.get_range(), &body.get_range())),
-                Statement::Impl {
-                    impl_tok,
-                    ty: Some(ty),
-                    ..
-                } => Range::from((&impl_tok.get_range(), &ty.get_range())),
-                Statement::Impl {
-                    impl_tok,
-                    generics: Some(generics),
-                    ..
-                } => Range::from((&impl_tok.get_range(), &generics.get_range())),
-                Statement::Impl { impl_tok, .. } => {
-                    Range::from((&impl_tok.get_range(), &impl_tok.get_range()))
-                }
-                Statement::Return {
-                    ret_token,
-                    expr: Some(expr),
-                    ..
-                } => Range::from((&ret_token.get_range(), &expr.get_range())),
-                Statement::Return { ret_token, .. } => {
-                    Range::from((&ret_token.get_range(), &ret_token.get_range()))
-                }
-                Statement::Modifer(_a0, ..) => Range::from((&_a0.get_range(), &_a0.get_range())),
+                Statement::Expression(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Statement::VariableDeclaration { ty, expr: Some(expr), .. } =>
+                    Range::from((&ty.get_range(), &expr.get_range())),
+                Statement::VariableDeclaration { ty, eq, .. } =>
+                    Range::from((&ty.get_range(), &eq.get_range())),
+                Statement::Class { token, body, .. } =>
+                    Range::from((&token.get_range(), &body.get_range())),
+                Statement::ImportStatement { token: Some(token), args, .. } =>
+                    Range::from((&token.get_range(), &args.get_range())),
+                Statement::ImportStatement { args, .. } =>
+                    Range::from((&args.get_range(), &args.get_range())),
+                Statement::List(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Statement::Block(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
+                Statement::TypeAlias { ty_tok, ty, .. } =>
+                    Range::from((&ty_tok.get_range(), &ty.get_range())),
+                Statement::Function { return_type, body: Some(body), .. } =>
+                    Range::from((&return_type.get_range(), &body.get_range())),
+                Statement::Function { return_type, arrow: Some(arrow), .. } =>
+                    Range::from((&return_type.get_range(), &arrow.get_range())),
+                Statement::Function { return_type, parameters, .. } =>
+                    Range::from((&return_type.get_range(),
+                            &parameters.get_range())),
+                Statement::Impl { impl_tok, body: Some(body), .. } =>
+                    Range::from((&impl_tok.get_range(), &body.get_range())),
+                Statement::Impl { impl_tok, ty: Some(ty), .. } =>
+                    Range::from((&impl_tok.get_range(), &ty.get_range())),
+                Statement::Impl { impl_tok, generics: Some(generics), .. } =>
+                    Range::from((&impl_tok.get_range(), &generics.get_range())),
+                Statement::Impl { impl_tok, .. } =>
+                    Range::from((&impl_tok.get_range(), &impl_tok.get_range())),
+                Statement::Return { ret_token, expr: Some(expr), .. } =>
+                    Range::from((&ret_token.get_range(), &expr.get_range())),
+                Statement::Return { ret_token, .. } =>
+                    Range::from((&ret_token.get_range(),
+                            &ret_token.get_range())),
+                Statement::Modifer(_a0, ..) =>
+                    Range::from((&_a0.get_range(), &_a0.get_range())),
             }
         }
     }
@@ -2068,18 +2387,10 @@ pub mod ast {
             }
         }
         pub fn is_return(&self) -> bool {
-            match self {
-                Statement::Return { .. } => true,
-                _ => false,
-            }
+            match self { Statement::Return { .. } => true, _ => false, }
         }
     }
-    pub enum Modifer {
-        Public,
-        Protected,
-        Unique,
-        Const,
-    }
+    pub enum Modifer { Public, Protected, Unique, Const, }
     #[automatically_derived]
     impl ::core::clone::Clone for Modifer {
         #[inline]
@@ -2093,19 +2404,34 @@ pub mod ast {
         }
     }
     impl NodeDisplay for Modifer {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
-                Modifer::Public => f.write_fmt(::core::fmt::Arguments::new_v1(&["Public"], &[])),
-                Modifer::Protected => {
-                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Protected"], &[]))
+                Modifer::Public => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Public"],
+                                &[]))?;
+                    Ok(())
                 }
-                Modifer::Unique => f.write_fmt(::core::fmt::Arguments::new_v1(&["Unique"], &[])),
-                Modifer::Const => f.write_fmt(::core::fmt::Arguments::new_v1(&["Const"], &[])),
+                Modifer::Protected => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Protected"],
+                                &[]))?;
+                    Ok(())
+                }
+                Modifer::Unique => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Unique"],
+                                &[]))?;
+                    Ok(())
+                }
+                Modifer::Const => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Const"],
+                                &[]))?;
+                    Ok(())
+                }
                 _ => Ok(()),
             }
         }
     }
-    impl TreeDisplay for Modifer {
+    impl TreeDisplay for Modifer<> {
         fn num_children(&self, _cfg: &Config) -> usize {
             match self {
                 Modifer::Public => 0,
@@ -2115,7 +2441,8 @@ pub mod ast {
                 _ => 0,
             }
         }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match self {
                 Modifer::Public => None,
                 Modifer::Protected => None,
@@ -2124,12 +2451,12 @@ pub mod ast {
                 _ => None,
             }
         }
-        fn child_at_bx<'b>(&'b self, index: usize) -> Box<dyn TreeDisplay + 'b> {
+        fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config)
+            -> Box<dyn TreeDisplay + 'b> {
             match self {
-                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
-                    &["Unexpected index for enum!"],
-                    &[],
-                )),
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Unexpected index for enum!"],
+                            &[])),
             }
         }
     }
@@ -2150,30 +2477,29 @@ pub mod ast {
             }
         }
     }
-    impl AstNode for ModiferStatement {
+    impl AstNode for ModiferStatement<> {
         fn get_range(&self) -> Range {
             match self {
-                ModiferStatement {
-                    modifier_token,
-                    statement: Some(statement),
-                    ..
-                } => Range::from((&modifier_token.get_range(), &statement.get_range())),
-                ModiferStatement { modifier_token, .. } => {
-                    Range::from((&modifier_token.get_range(), &modifier_token.get_range()))
-                }
+                ModiferStatement { modifier_token, statement: Some(statement),
+                    .. } =>
+                    Range::from((&modifier_token.get_range(),
+                            &statement.get_range())),
+                ModiferStatement { modifier_token, .. } =>
+                    Range::from((&modifier_token.get_range(),
+                            &modifier_token.get_range())),
             }
         }
     }
     impl NodeDisplay for ModiferStatement {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+            -> std::fmt::Result {
             f.write_str("Modifier")
         }
     }
     impl TreeDisplay for ModiferStatement {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            2
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+        fn num_children(&self, _cfg: &Config) -> usize { 2 }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay<()>> {
             match index {
                 0 => Some(&self.modifier),
                 1 => self.statement.map_tree(),
@@ -2192,14 +2518,8 @@ pub mod error {
     #[automatically_derived]
     impl ::core::fmt::Debug for ParseError {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-            ::core::fmt::Formatter::debug_struct_field2_finish(
-                f,
-                "ParseError",
-                "kind",
-                &&self.kind,
-                "range",
-                &&self.range,
-            )
+            ::core::fmt::Formatter::debug_struct_field2_finish(f,
+                "ParseError", "kind", &&self.kind, "range", &&self.range)
         }
     }
     #[automatically_derived]
@@ -2218,16 +2538,14 @@ pub mod error {
         }
     }
     impl Error for ParseError {}
-    pub enum ParseErrorKind {
-        InvalidSyntax(String),
-    }
+    pub enum ParseErrorKind { InvalidSyntax(String), }
     #[automatically_derived]
     impl ::core::fmt::Debug for ParseErrorKind {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
             match self {
-                ParseErrorKind::InvalidSyntax(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(f, "InvalidSyntax", &__self_0)
-                }
+                ParseErrorKind::InvalidSyntax(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "InvalidSyntax", &__self_0),
             }
         }
     }
@@ -2236,19 +2554,17 @@ pub mod error {
         #[inline]
         fn clone(&self) -> ParseErrorKind {
             match self {
-                ParseErrorKind::InvalidSyntax(__self_0) => {
-                    ParseErrorKind::InvalidSyntax(::core::clone::Clone::clone(__self_0))
-                }
+                ParseErrorKind::InvalidSyntax(__self_0) =>
+                    ParseErrorKind::InvalidSyntax(::core::clone::Clone::clone(__self_0)),
             }
         }
     }
     impl Display for ParseErrorKind {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Self::InvalidSyntax(s) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["Invalid Syntax: "],
-                    &[::core::fmt::ArgumentV1::new_display(&s)],
-                )),
+                Self::InvalidSyntax(s) =>
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Invalid Syntax: "],
+                            &[::core::fmt::ArgumentV1::new_display(&s)])),
             }
         }
     }
@@ -2268,194 +2584,216 @@ pub mod lexer {
             let mut block_comment = false;
             let input_len = input.len();
             while start_index < input_len && end_index <= input_len {
-                let sub_str = &input[start_index..(input.ceil_char_boundary(end_index))];
-                let next = if string {
-                    None
-                } else {
-                    if end_index + 1 <= input.len() {
-                        let end = input.ceil_char_boundary(end_index + 1);
-                        if end <= input.len() {
-                            input[input.floor_char_boundary(end_index)..end]
-                                .chars()
-                                .next()
-                        } else {
+                let sub_str =
+                    &input[start_index..(input.ceil_char_boundary(end_index))];
+                let next =
+                    if string {
                             None
+                        } else {
+                           if end_index + 1 <= input.len() {
+                                   let end = input.ceil_char_boundary(end_index + 1);
+                                   if end <= input.len() {
+                                           input[input.floor_char_boundary(end_index)..end].chars().next()
+                                       } else { None }
+                               } else { None }
+                       };
+                if let (Some(token), lex_length) =
+                            self.try_lex(sub_str, next, string) {
+                        match token {
+                            Token::Operator(Operator::BlockCommentClose) if
+                                block_comment => block_comment = false,
+                            Token::Newline if line_comment => {
+                                if end_index + 1 < input_len &&
+                                            &input[start_index..end_index + 1] == "\r\n" {
+                                        start_index += 1;
+                                    }
+                                line_num += 1;
+                                position = 0;
+                                line_comment = false
+                            }
+                            _ if block_comment || line_comment => (),
+                            Token::Operator(Operator::BlockCommentOpen) =>
+                                block_comment = true,
+                            Token::Operator(Operator::LineComment) =>
+                                line_comment = true,
+                            Token::Operator(Operator::Quote) => string = true,
+                            Token::String => {
+                                let tok =
+                                    self.parse_template(&sub_str[0..sub_str.len() - 1],
+                                        line_num, position, tokens.len() as _);
+                                let token = SpannedToken::new(tok.1, tok.0);
+                                position += token.0.length;
+                                tokens.push(token);
+                                string = false
+                            }
+                            Token::Whitespace => position += 1,
+                            Token::Newline => {
+                                if end_index + 1 < input_len &&
+                                            &input[start_index..end_index + 1] == "\r\n" {
+                                        start_index += 1;
+                                    }
+                                line_num += 1;
+                                position = 0;
+                            }
+                            Token::Ident(_) => {
+                                let token =
+                                    SpannedToken::new(token,
+                                        Span {
+                                            line_num,
+                                            position,
+                                            length: (end_index - start_index) as u32,
+                                            token_index: tokens.len() as u32,
+                                        });
+                                tokens.push(token);
+                                position += (end_index - start_index) as u32;
+                            }
+                            token => {
+                                let length =
+                                    lex_length.unwrap_or(end_index - start_index) as u32;
+                                let token =
+                                    SpannedToken::new(token,
+                                        Span {
+                                            line_num,
+                                            position,
+                                            length,
+                                            token_index: tokens.len() as u32,
+                                        });
+                                tokens.push(token);
+                                position += length;
+                                start_index += length as usize;
+                                end_index = start_index + 1;
+                                continue;
+                            }
                         }
+                        start_index += sub_str.len();
+                        end_index = start_index + 1;
                     } else {
-                        None
-                    }
-                };
-                if let (Some(token), lex_length) = self.try_lex(sub_str, next, string) {
-                    match token {
-                        Token::Operator(Operator::BlockCommentClose) if block_comment => {
-                            block_comment = false
-                        }
-                        Token::Newline if line_comment => {
-                            if end_index + 1 < input_len
-                                && &input[start_index..end_index + 1] == "\r\n"
-                            {
-                                start_index += 1;
-                            }
-                            line_num += 1;
-                            position = 0;
-                            line_comment = false
-                        }
-                        _ if block_comment || line_comment => (),
-                        Token::Operator(Operator::BlockCommentOpen) => block_comment = true,
-                        Token::Operator(Operator::LineComment) => line_comment = true,
-                        Token::Operator(Operator::Quote) => string = true,
-                        Token::String => {
-                            let tok = self.parse_template(
-                                &sub_str[0..sub_str.len() - 1],
-                                line_num,
-                                position,
-                                tokens.len() as _,
-                            );
-                            let token = SpannedToken::new(tok.1, tok.0);
-                            position += token.0.length;
-                            tokens.push(token);
-                            string = false
-                        }
-                        Token::Whitespace => position += 1,
-                        Token::Newline => {
-                            if end_index + 1 < input_len
-                                && &input[start_index..end_index + 1] == "\r\n"
-                            {
-                                start_index += 1;
-                            }
-                            line_num += 1;
-                            position = 0;
-                        }
-                        Token::Ident(_) => {
-                            let token = SpannedToken::new(
-                                token,
-                                Span {
-                                    line_num,
-                                    position,
-                                    length: (end_index - start_index) as u32,
-                                    token_index: tokens.len() as u32,
-                                },
-                            );
-                            tokens.push(token);
-                            position += (end_index - start_index) as u32;
-                        }
-                        token => {
-                            let length = lex_length.unwrap_or(end_index - start_index) as u32;
-                            let token = SpannedToken::new(
-                                token,
-                                Span {
-                                    line_num,
-                                    position,
-                                    length,
-                                    token_index: tokens.len() as u32,
-                                },
-                            );
-                            tokens.push(token);
-                            position += length;
-                            start_index += length as usize;
-                            end_index = start_index + 1;
-                            continue;
-                        }
-                    }
-                    start_index += sub_str.len();
-                    end_index = start_index + 1;
-                } else {
-                    end_index += (sub_str.len() - sub_str.chars().count()) + 1;
-                }
+                       end_index += (sub_str.len() - sub_str.chars().count()) + 1;
+                   }
             }
-            tokens.push(SpannedToken::new(
-                Token::Newline,
-                Span {
-                    line_num,
-                    position,
-                    length: 1,
-                    token_index: tokens.len() as u32,
-                },
-            ));
+            tokens.push(SpannedToken::new(Token::Newline,
+                    Span {
+                        line_num,
+                        position,
+                        length: 1,
+                        token_index: tokens.len() as u32,
+                    }));
             tokens
         }
-        pub fn try_lex(
-            &self,
-            input: &str,
-            next: Option<char>,
-            string: bool,
-        ) -> (Option<Token>, Option<usize>) {
+        pub fn try_lex(&self, input: &str, next: Option<char>, string: bool)
+            -> (Option<Token>, Option<usize>) {
             if string {
-                if let Some('\'') = input.chars().last() {
-                    return (Some(Token::String), None);
+                    if let Some('\'') = input.chars().last() {
+                            return (Some(Token::String), None);
+                        }
+                    return (None, None);
                 }
-                return (None, None);
-            }
             if input.len() == 1 {
-                match input.chars().next() {
-                    Some('[') => return (Some(Token::Operator(Operator::OpenSquare)), None),
-                    Some(']') => return (Some(Token::Operator(Operator::CloseSquare)), None),
-                    Some('(') => return (Some(Token::Operator(Operator::OpenParen)), None),
-                    Some(')') => return (Some(Token::Operator(Operator::CloseParen)), None),
-                    Some('{') => return (Some(Token::Operator(Operator::OpenBrace)), None),
-                    Some('}') => return (Some(Token::Operator(Operator::CloseBrace)), None),
-                    Some('<') => return (Some(Token::Operator(Operator::OpenAngle)), None),
-                    Some('>') => return (Some(Token::Operator(Operator::CloseAngle)), None),
-                    Some(':') => return (Some(Token::Operator(Operator::Colon)), None),
-                    Some('.') => match next {
-                        Some('.') => return (None, None),
-                        _ => return (Some(Token::Operator(Operator::Dot)), None),
-                    },
-                    Some(',') => return (Some(Token::Operator(Operator::Comma)), None),
-                    Some('+') => return (Some(Token::Operator(Operator::Plus)), None),
-                    Some('-') => match next {
-                        Some('>') => return (None, None),
-                        _ => return (Some(Token::Operator(Operator::Minus)), None),
-                    },
-                    Some('*') => match next {
-                        Some('*') => return (None, None),
-                        _ => return (Some(Token::Operator(Operator::Multiply)), None),
-                    },
-                    Some('|') => match next {
-                        Some('|') => return (None, None),
-                        _ => return (Some(Token::Operator(Operator::Pipe)), None),
-                    },
-                    Some('&') => match next {
-                        Some('&') => return (None, None),
-                        _ => return (Some(Token::Operator(Operator::Ampersand)), None),
-                    },
-                    Some('/') => match next {
-                        Some('/') => return (None, None),
-                        _ => return (Some(Token::Operator(Operator::Divide)), None),
-                    },
-                    Some('!') => return (Some(Token::Operator(Operator::Exclamation)), None),
-                    Some('@') => return (Some(Token::Operator(Operator::At)), None),
-                    Some('#') => return (Some(Token::Operator(Operator::Pound)), None),
-                    Some('$') => return (Some(Token::Operator(Operator::Dollar)), None),
-                    Some('%') => return (Some(Token::Operator(Operator::Percent)), None),
-                    Some('^') => return (Some(Token::Operator(Operator::Carot)), None),
-                    Some(';') => return (Some(Token::Operator(Operator::SemiColon)), None),
-                    Some('~') => return (Some(Token::Operator(Operator::Tilde)), None),
-                    Some('`') => return (Some(Token::Operator(Operator::BackTick)), None),
-                    Some('\'') => return (Some(Token::Operator(Operator::Quote)), None),
-                    Some('?') => return (Some(Token::Operator(Operator::Question)), None),
-                    Some('=') => return (Some(Token::Operator(Operator::Equals)), None),
-                    Some('\r' | '\n') => return (Some(Token::Newline), None),
-                    Some(c) if c.is_whitespace() => return (Some(Token::Whitespace), None),
-                    _ => (),
+                    match input.chars().next() {
+                        Some('[') =>
+                            return (Some(Token::Operator(Operator::OpenSquare)), None),
+                        Some(']') =>
+                            return (Some(Token::Operator(Operator::CloseSquare)), None),
+                        Some('(') =>
+                            return (Some(Token::Operator(Operator::OpenParen)), None),
+                        Some(')') =>
+                            return (Some(Token::Operator(Operator::CloseParen)), None),
+                        Some('{') =>
+                            return (Some(Token::Operator(Operator::OpenBrace)), None),
+                        Some('}') =>
+                            return (Some(Token::Operator(Operator::CloseBrace)), None),
+                        Some('<') =>
+                            return (Some(Token::Operator(Operator::OpenAngle)), None),
+                        Some('>') =>
+                            return (Some(Token::Operator(Operator::CloseAngle)), None),
+                        Some(':') =>
+                            return (Some(Token::Operator(Operator::Colon)), None),
+                        Some('.') =>
+                            match next {
+                                Some('.') => return (None, None),
+                                _ => return (Some(Token::Operator(Operator::Dot)), None),
+                            },
+                        Some(',') =>
+                            return (Some(Token::Operator(Operator::Comma)), None),
+                        Some('+') =>
+                            return (Some(Token::Operator(Operator::Plus)), None),
+                        Some('-') =>
+                            match next {
+                                Some('>') => return (None, None),
+                                _ => return (Some(Token::Operator(Operator::Minus)), None),
+                            },
+                        Some('*') =>
+                            match next {
+                                Some('*') => return (None, None),
+                                _ =>
+                                    return (Some(Token::Operator(Operator::Multiply)), None),
+                            },
+                        Some('|') =>
+                            match next {
+                                Some('|') => return (None, None),
+                                _ => return (Some(Token::Operator(Operator::Pipe)), None),
+                            },
+                        Some('&') =>
+                            match next {
+                                Some('&') => return (None, None),
+                                _ =>
+                                    return (Some(Token::Operator(Operator::Ampersand)), None),
+                            },
+                        Some('/') =>
+                            match next {
+                                Some('/') => return (None, None),
+                                _ => return (Some(Token::Operator(Operator::Divide)), None),
+                            },
+                        Some('!') =>
+                            return (Some(Token::Operator(Operator::Exclamation)), None),
+                        Some('@') =>
+                            return (Some(Token::Operator(Operator::At)), None),
+                        Some('#') =>
+                            return (Some(Token::Operator(Operator::Pound)), None),
+                        Some('$') =>
+                            return (Some(Token::Operator(Operator::Dollar)), None),
+                        Some('%') =>
+                            return (Some(Token::Operator(Operator::Percent)), None),
+                        Some('^') =>
+                            return (Some(Token::Operator(Operator::Carot)), None),
+                        Some(';') =>
+                            return (Some(Token::Operator(Operator::SemiColon)), None),
+                        Some('~') =>
+                            return (Some(Token::Operator(Operator::Tilde)), None),
+                        Some('`') =>
+                            return (Some(Token::Operator(Operator::BackTick)), None),
+                        Some('\'') =>
+                            return (Some(Token::Operator(Operator::Quote)), None),
+                        Some('?') =>
+                            return (Some(Token::Operator(Operator::Question)), None),
+                        Some('=') =>
+                            return (Some(Token::Operator(Operator::Equals)), None),
+                        Some('\r' | '\n') => return (Some(Token::Newline), None),
+                        Some(c) if c.is_whitespace() =>
+                            return (Some(Token::Whitespace), None),
+                        _ => (),
+                    }
                 }
-            }
             let mut chars = input.chars();
             match (chars.next(), chars.next(), chars.next()) {
-                (Some('*'), Some('*'), _) => {
-                    return (Some(Token::Operator(Operator::Exponent)), None)
-                }
-                (Some('|'), Some('|'), _) => return (Some(Token::Operator(Operator::Or)), None),
-                (Some('&'), Some('&'), _) => return (Some(Token::Operator(Operator::And)), None),
-                (Some('-'), Some('>'), _) => return (Some(Token::Operator(Operator::Arrow)), None),
+                (Some('*'), Some('*'), _) =>
+                    return (Some(Token::Operator(Operator::Exponent)), None),
+                (Some('|'), Some('|'), _) =>
+                    return (Some(Token::Operator(Operator::Or)), None),
+                (Some('&'), Some('&'), _) =>
+                    return (Some(Token::Operator(Operator::And)), None),
+                (Some('-'), Some('>'), _) =>
+                    return (Some(Token::Operator(Operator::Arrow)), None),
                 (Some('/'), Some('/'), _) => {
                     return (Some(Token::Operator(Operator::LineComment)), None)
                 }
                 (Some('/'), Some('*'), _) => {
-                    return (Some(Token::Operator(Operator::BlockCommentOpen)), None)
+                    return (Some(Token::Operator(Operator::BlockCommentOpen)),
+                            None)
                 }
                 (Some('*'), Some('/'), _) => {
-                    return (Some(Token::Operator(Operator::BlockCommentClose)), None)
+                    return (Some(Token::Operator(Operator::BlockCommentClose)),
+                            None)
                 }
                 (Some('.'), Some('.'), Some('.')) => {
                     return (Some(Token::Operator(Operator::TripleDot)), None)
@@ -2463,51 +2801,47 @@ pub mod lexer {
                 (Some('.'), Some('.'), Some('=')) => {
                     return (Some(Token::Operator(Operator::TripleDot)), None)
                 }
-                (Some('.'), Some('.'), _) => match next {
-                    Some('.' | '=') => return (None, None),
-                    _ => return (Some(Token::Operator(Operator::DoubleDot)), None),
-                },
+                (Some('.'), Some('.'), _) =>
+                    match next {
+                        Some('.' | '=') => return (None, None),
+                        _ =>
+                            return (Some(Token::Operator(Operator::DoubleDot)), None),
+                    },
                 _ => (),
             }
-            let del = next.map(|c| !(c.is_numeric() || c == '.')).unwrap_or(true);
-            let count = input
-                .chars()
-                .fold(0u8, |acc, c| if c == '.' { 1 + acc } else { acc });
+            let del =
+                next.map(|c| !(c.is_numeric() || c == '.')).unwrap_or(true);
+            let count =
+                input.chars().fold(0u8,
+                    |acc, c| if c == '.' { 1 + acc } else { acc });
             if count == 1 && next == Some('.') {
-                let val = input[..input.len() - 1].parse().unwrap_or(0.0f64);
-                return (Some(Token::Float(val)), None);
-            }
-            if !input.chars().any(|c| !(c.is_numeric() || c == '.')) && count <= 1 && del {
-                if count == 1 {
-                    let val = input.parse().unwrap_or(0.0f64);
+                    let val =
+                        input[..input.len() - 1].parse().unwrap_or(0.0f64);
                     return (Some(Token::Float(val)), None);
-                } else {
-                    let val = input.parse().unwrap_or(0u64);
-                    return (Some(Token::Integer(val)), None);
                 }
-            }
-            let del = next
-                .map(|c| !(c.is_alphanumeric() || c == '_'))
-                .unwrap_or(true);
-            if input
-                .chars()
-                .next()
-                .filter(|f| f.is_alphabetic() || *f == '_')
-                .is_some()
-                & !input.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
-                && del
-            {
-                return (Some(Token::Ident(input.to_string())), None);
-            }
+            if !input.chars().any(|c| !(c.is_numeric() || c == '.')) &&
+                            count <= 1 && del {
+                    if count == 1 {
+                            let val = input.parse().unwrap_or(0.0f64);
+                            return (Some(Token::Float(val)), None);
+                        } else {
+                           let val = input.parse().unwrap_or(0u64);
+                           return (Some(Token::Integer(val)), None);
+                       }
+                }
+            let del =
+                next.map(|c|
+                            !(c.is_alphanumeric() || c == '_')).unwrap_or(true);
+            if input.chars().next().filter(|f|
+                                        f.is_alphabetic() || *f == '_').is_some() &
+                            !input.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
+                        && del {
+                    return (Some(Token::Ident(input.to_string())), None);
+                }
             (None, None)
         }
-        pub fn parse_template(
-            &self,
-            input: &str,
-            line: u32,
-            mut position: u32,
-            token_index: u32,
-        ) -> (Span, Token) {
+        pub fn parse_template(&self, input: &str, line: u32,
+            mut position: u32, token_index: u32) -> (Span, Token) {
             let mut iindex = 0;
             let mut last_index = 0;
             let mut last_span = Span::default();
@@ -2516,90 +2850,77 @@ pub mod lexer {
             let sindex = position + 1;
             for i in 0..input.chars().count() {
                 let c = input.chars().nth(i).unwrap();
-                if c == '}' {
-                    open -= 1;
-                }
+                if c == '}' { open -= 1; }
                 if c == '{' && open == 0 {
-                    let st = input[last_index..i].to_string();
-                    let len = st.len();
-                    last_span = Span {
-                        line_num: line,
-                        position: position + len as u32,
-                        length: 1,
-                        token_index,
-                    };
-                    let token = SpannedToken::new(
-                        Token::Ident(st),
-                        Span {
-                            line_num: line,
-                            position: position + 1,
-                            length: len as u32,
-                            token_index,
-                        },
-                    );
-                    position += len as u32 + 1;
-                    toks.push(Template::String(token));
-                    iindex = i;
-                    open += 1
-                } else if c == '}' && open == 0 {
-                    let st = &input[iindex + 1..i];
-                    let utoks = self.lex(st);
-                    let tok_len = utoks.len();
-                    let p = utoks
-                        .into_iter()
-                        .map(|f| {
-                            SpannedToken::new(
-                                f.1,
-                                Span {
-                                    line_num: f.0.line_num + line,
-                                    position: f.0.position + position + 1,
-                                    length: f.0.length,
-                                    token_index,
-                                },
-                            )
-                        })
-                        .take(tok_len)
-                        .collect::<Vec<_>>();
-                    last_index = i + 1;
-                    position += st.len() as u32 + 2;
-                    toks.push(Template::Template(
-                        p,
-                        SpannedToken::new(Token::Operator(Operator::OpenBrace), last_span),
-                        SpannedToken::new(
-                            Token::Operator(Operator::CloseBrace),
+                        let st = input[last_index..i].to_string();
+                        let len = st.len();
+                        last_span =
                             Span {
                                 line_num: line,
-                                position: position - 1,
+                                position: position + len as u32,
                                 length: 1,
                                 token_index,
-                            },
-                        ),
-                    ));
-                }
+                            };
+                        let token =
+                            SpannedToken::new(Token::Ident(st),
+                                Span {
+                                    line_num: line,
+                                    position: position + 1,
+                                    length: len as u32,
+                                    token_index,
+                                });
+                        position += len as u32 + 1;
+                        toks.push(Template::String(token));
+                        iindex = i;
+                        open += 1
+                    } else if c == '}' && open == 0 {
+                       let st = &input[iindex + 1..i];
+                       let utoks = self.lex(st);
+                       let tok_len = utoks.len();
+                       let p =
+                           utoks.into_iter().map(|f|
+                                           {
+                                               SpannedToken::new(f.1,
+                                                   Span {
+                                                       line_num: f.0.line_num + line,
+                                                       position: f.0.position + position + 1,
+                                                       length: f.0.length,
+                                                       token_index,
+                                                   })
+                                           }).take(tok_len).collect::<Vec<_>>();
+                       last_index = i + 1;
+                       position += st.len() as u32 + 2;
+                       toks.push(Template::Template(p,
+                               SpannedToken::new(Token::Operator(Operator::OpenBrace),
+                                   last_span),
+                               SpannedToken::new(Token::Operator(Operator::CloseBrace),
+                                   Span {
+                                       line_num: line,
+                                       position: position - 1,
+                                       length: 1,
+                                       token_index,
+                                   })));
+                   }
             }
             {
                 let st = input[last_index..input.len()].to_string();
                 let len = st.len();
-                let token = SpannedToken::new(
-                    Token::Ident(st),
-                    Span {
-                        line_num: line,
-                        position,
-                        length: len as u32,
-                        token_index,
-                    },
-                );
+                let token =
+                    SpannedToken::new(Token::Ident(st),
+                        Span {
+                            line_num: line,
+                            position,
+                            length: len as u32,
+                            token_index,
+                        });
                 toks.push(Template::String(token));
             }
-            (
-                Span {
+            (Span {
                     length: input.len() as u32 + 2,
                     line_num: line,
                     position: sindex - 1,
                     token_index,
-                },
-                Token::TemplateString(toks),
-            )
+                }, Token::TemplateString(toks))
         }
     }
     pub enum Template {
@@ -2611,14 +2932,12 @@ pub mod lexer {
         #[inline]
         fn clone(&self) -> Template {
             match self {
-                Template::String(__self_0) => {
-                    Template::String(::core::clone::Clone::clone(__self_0))
-                }
-                Template::Template(__self_0, __self_1, __self_2) => Template::Template(
-                    ::core::clone::Clone::clone(__self_0),
-                    ::core::clone::Clone::clone(__self_1),
-                    ::core::clone::Clone::clone(__self_2),
-                ),
+                Template::String(__self_0) =>
+                    Template::String(::core::clone::Clone::clone(__self_0)),
+                Template::Template(__self_0, __self_1, __self_2) =>
+                    Template::Template(::core::clone::Clone::clone(__self_0),
+                        ::core::clone::Clone::clone(__self_1),
+                        ::core::clone::Clone::clone(__self_2)),
             }
         }
     }
@@ -2626,199 +2945,169 @@ pub mod lexer {
     impl ::core::fmt::Debug for Template {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
             match self {
-                Template::String(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(f, "String", &__self_0)
-                }
-                Template::Template(__self_0, __self_1, __self_2) => {
-                    ::core::fmt::Formatter::debug_tuple_field3_finish(
-                        f, "Template", &__self_0, &__self_1, &__self_2,
-                    )
-                }
+                Template::String(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "String", &__self_0),
+                Template::Template(__self_0, __self_1, __self_2) =>
+                    ::core::fmt::Formatter::debug_tuple_field3_finish(f,
+                        "Template", &__self_0, &__self_1, &__self_2),
             }
         }
-    }
-    fn get_utf8_slice(string: &str, start: usize, end: usize) -> Option<&str> {
-        if !(end >= start) {
-            ::core::panicking::panic("assertion failed: end >= start")
-        };
-        string.char_indices().nth(start).and_then(|(start_pos, _)| {
-            string[start_pos..]
-                .char_indices()
-                .nth(end - start - 1)
-                .map(|(end_pos, _)| &string[start_pos..end_pos])
-        })
     }
 }
 pub mod parse_expression {
     use crate::{
         ast::{
-            EnclosedList, Expression, KeyValue, ParsedTemplate, ParsedTemplateString,
-            PunctuationList, Statement,
+            EnclosedList, Expression, KeyValue, ParsedTemplate,
+            ParsedTemplateString, PunctuationList, Statement,
         },
         error::{ParseError, ParseErrorKind},
-        lexer::Template,
-        parser::Parser,
+        lexer::Template, parser::Parser,
         token::{Operator, Range, SpannedToken, Token},
     };
     impl Parser {
         pub fn parse_expression(&self) -> Option<Expression> {
             match self.tokens.peek() {
-                Some(Token::Operator(Operator::OpenBrace)) => self.parse_struct_initializer(),
+                Some(Token::Operator(Operator::OpenBrace)) =>
+                    self.parse_struct_initializer(),
                 _ => self.parse_operator_expression(0),
             }
         }
-        pub fn parse_operator_expression(&self, last_prec: u32) -> Option<Expression> {
+        pub fn parse_operator_expression(&self, last_prec: u32)
+            -> Option<Expression> {
             let mut left = self.parse_primary_expression();
             while let Some(t) = self.tokens.peek() {
-                left = match t {
-                    Token::Operator(o) => {
-                        let prec = self.precedence_of_operator(o);
-                        if prec <= last_prec || prec == 0 {
-                            break;
-                        }
-                        match (o, left) {
-                            (Operator::OpenParen, Some(expr)) => {
-                                let (cl, skip) = self.parse_function_call(expr);
-                                left = Some(cl);
-                                if skip {
-                                    continue;
+                left =
+                    match t {
+                        Token::Operator(o) => {
+                            let prec = self.precedence_of_operator(o);
+                            if prec <= last_prec || prec == 0 { break; }
+                            match (o, left) {
+                                (Operator::OpenParen, Some(expr)) => {
+                                    let (cl, skip) = self.parse_function_call(expr);
+                                    left = Some(cl);
+                                    if skip { continue; }
                                 }
-                            }
-                            (_, l) => left = l,
-                        };
-                        let op_token = self.tokens.next().cloned();
-                        let right = self.parse_operator_expression(prec);
-                        Some(Expression::BinaryExpression {
-                            left: left.map(Box::new),
-                            right: right.map(Box::new),
-                            op_token,
-                        })
+                                (_, l) => left = l,
+                            };
+                            let op_token = self.tokens.next().unwrap().clone();
+                            let right = self.parse_operator_expression(prec);
+                            Some(Expression::BinaryExpression {
+                                    left: left.map(Box::new),
+                                    right: right.map(Box::new),
+                                    op_token,
+                                })
+                        }
+                        _ => break,
                     }
-                    _ => break,
-                }
             }
             left
         }
         pub fn parse_primary_expression(&self) -> Option<Expression> {
-            if let Some(Token::Operator(Operator::OpenParen)) = self.tokens.peek() {
-                let _open = self.tokens.next().unwrap();
-                let expr = self.parse_operator_expression(0);
-                let _close = self.tokens.next().unwrap();
-                expr
-            } else {
-                self.parse_literal()
-            }
+            if let Some(Token::Operator(Operator::OpenParen)) =
+                        self.tokens.peek() {
+                    let _open = self.tokens.next().unwrap();
+                    let expr = self.parse_operator_expression(0);
+                    let _close = self.tokens.next().unwrap();
+                    expr
+                } else { self.parse_literal() }
         }
         pub fn parse_struct_initializer(&self) -> Option<Expression> {
             let open = self.expect_operator(Operator::OpenBrace)?;
-            let list = self.parse_list(|| {
-                let name = match self.tokens.peek() {
-                    Some(Token::Ident(_)) => self.tokens.next(),
-                    _ => None,
-                };
-                let colon = self.expect_operator(Operator::Colon);
-                let expr = self.parse_expression();
-                if let (Some(name), Some(colon), Some(expr)) = (name, colon, expr) {
-                    return Some((
-                        KeyValue {
-                            name: Some(name.clone()),
-                            colon: Some(colon.clone()),
-                            expr: Box::new(expr),
-                        },
-                        true,
-                    ));
-                }
-                None
-            })?;
+            let list =
+                self.parse_list(||
+                            {
+                                let name =
+                                    match self.tokens.peek() {
+                                        Some(Token::Ident(_)) => self.tokens.next(),
+                                        _ => None,
+                                    };
+                                let colon = self.expect_operator(Operator::Colon);
+                                let expr = self.parse_expression();
+                                if let (Some(name), Some(colon), Some(expr)) =
+                                            (name, colon, expr) {
+                                        return Some((KeyValue {
+                                                        name: Some(name.clone()),
+                                                        colon: colon.clone(),
+                                                        expr: Box::new(expr),
+                                                    }, true));
+                                    }
+                                None
+                            })?;
             let close = self.expect_operator(Operator::CloseBrace)?;
             Some(Expression::Record(EnclosedList {
-                open: open.clone(),
-                items: list,
-                close: close.clone(),
-            }))
+                        open: open.clone(),
+                        items: list,
+                        close: close.clone(),
+                    }))
         }
-        pub fn parse_function_call(&self, expression: Expression) -> (Expression, bool) {
-            let Some (args) = self . parse_arguments () else { return (expression , false) ; } ;
-            (
-                Expression::FunctionCall {
-                    expr: Box::new(expression),
-                    args,
-                },
-                true,
-            )
+        pub fn parse_function_call(&self, expression: Expression)
+            -> (Expression, bool) {
+            let Some(args) =
+                self.parse_arguments() else { return (expression, false); };
+            (Expression::FunctionCall { expr: Box::new(expression), args },
+                true)
         }
-        pub fn parse_function_body(
-            &self,
-        ) -> Option<(Option<SpannedToken>, PunctuationList<Statement>)> {
+        pub fn parse_function_body(&self)
+            -> Option<(Option<SpannedToken>, PunctuationList<Statement>)> {
             let first_comma = self.expect_operator(Operator::Comma).cloned();
             let mut stmts = PunctuationList::default();
             while let Some(stmt) = self.parse_statement() {
-                let comma = if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
-                    self.tokens.next().cloned()
-                } else {
-                    None
-                };
+                let comma =
+                    if let Some(Token::Operator(Operator::Comma)) =
+                                self.tokens.peek() {
+                            self.tokens.next().cloned()
+                        } else { None };
                 if let Some(Token::Newline) = self.tokens.peek() {
-                    stmts.push(stmt, comma);
-                    break;
-                }
+                        stmts.push(stmt, comma);
+                        break;
+                    }
                 if comma.is_none() {
-                    self.add_error(ParseError {
-                        kind: ParseErrorKind::InvalidSyntax(
-                            "Expected comma in function body!".to_string(),
-                        ),
-                        range: Range::default(),
-                    });
-                    stmts.push(stmt, comma);
-                    return Some((first_comma, stmts));
-                }
+                        self.add_error(ParseError {
+                                kind: ParseErrorKind::InvalidSyntax("Expected comma in function body!".to_string()),
+                                range: Range::default(),
+                            });
+                        stmts.push(stmt, comma);
+                        return Some((first_comma, stmts));
+                    }
                 stmts.push(stmt, comma);
             }
             Some((first_comma, stmts))
         }
         pub fn parse_literal(&self) -> Option<Expression> {
             match self.tokens.peek() {
-                Some(Token::Integer(i)) => Some(Expression::Integer(
-                    *i,
-                    None,
-                    self.tokens.next().unwrap().clone(),
-                )),
-                Some(Token::Float(f)) => Some(Expression::Float(
-                    *f,
-                    None,
-                    self.tokens.next().unwrap().clone(),
-                )),
-                Some(Token::Ident(i)) if i == "true" => Some(Expression::Boolean(
-                    true,
-                    self.tokens.next().unwrap().clone(),
-                )),
-                Some(Token::Ident(i)) if i == "false" => Some(Expression::Boolean(
-                    false,
-                    self.tokens.next().unwrap().clone(),
-                )),
-                Some(Token::Ident(_)) => {
-                    Some(Expression::Ident(self.tokens.next().unwrap().clone()))
-                }
+                Some(Token::Integer(i)) =>
+                    Some(Expression::Integer(*i, None,
+                            self.tokens.next().unwrap().clone())),
+                Some(Token::Float(f)) =>
+                    Some(Expression::Float(*f, None,
+                            self.tokens.next().unwrap().clone())),
+                Some(Token::Ident(i)) if i == "true" =>
+                    Some(Expression::Boolean(true,
+                            self.tokens.next().unwrap().clone())),
+                Some(Token::Ident(i)) if i == "false" =>
+                    Some(Expression::Boolean(false,
+                            self.tokens.next().unwrap().clone())),
+                Some(Token::Ident(_)) =>
+                    Some(Expression::Ident(self.tokens.next().unwrap().clone())),
                 Some(Token::TemplateString(ts)) => {
                     let tok = self.tokens.next().unwrap();
-                    let v: Vec<_> = ts
-                        .iter()
-                        .filter_map(|t| match t {
-                            Template::String(s) => Some(ParsedTemplate::String(s.clone())),
-                            Template::Template(t, o, c) => Some(ParsedTemplate::Template(
-                                Box::new({
-                                    let parser = Parser::new(t.clone());
-                                    let expr = parser.parse_operator_expression(0)?;
-                                    let mut errors = self.errors.write().unwrap();
-                                    errors.append(&mut parser.get_errors_mut());
-                                    expr
-                                }),
-                                o.clone(),
-                                c.clone(),
-                            )),
-                        })
-                        .collect();
-                    Some(Expression::String(ParsedTemplateString(v), tok.clone()))
+                    let v: Vec<_> =
+                        ts.iter().filter_map(|t|
+                                    match t {
+                                        Template::String(s) =>
+                                            Some(ParsedTemplate::String(s.clone())),
+                                        Template::Template(t, o, c) =>
+                                            Some(ParsedTemplate::Template(Box::new({
+                                                            let parser = Parser::new(t.clone());
+                                                            let expr = parser.parse_operator_expression(0)?;
+                                                            let mut errors = self.errors.write().unwrap();
+                                                            errors.append(&mut parser.get_errors_mut());
+                                                            expr
+                                                        }), o.clone(), c.clone())),
+                                    }).collect();
+                    Some(Expression::String(ParsedTemplateString(v),
+                            tok.clone()))
                 }
                 _ => None,
             }
@@ -2829,257 +3118,261 @@ pub mod parse_expression {
                 Operator::Or => 10,
                 Operator::And => 14,
                 Operator::Plus | Operator::Minus => 20,
-                Operator::Multiply
-                | Operator::Divide
-                | Operator::Pipe
-                | Operator::Ampersand
-                | Operator::Percent => 30,
+                Operator::Multiply | Operator::Divide | Operator::Pipe |
+                    Operator::Ampersand | Operator::Percent => 30,
                 Operator::Exponent => 40,
                 Operator::OpenParen => 50,
                 Operator::Dot => 60,
                 _ => 0,
             }
         }
-        pub fn precedence_of_operator_for_ty(&self, operator: &Operator) -> u32 {
-            match operator {
-                Operator::Ampersand => 20,
-                _ => 0,
-            }
+        pub fn precedence_of_operator_for_ty(&self, operator: &Operator)
+            -> u32 {
+            match operator { Operator::Ampersand => 20, _ => 0, }
         }
     }
 }
 pub mod parse_types {
     use crate::{
-        ast::{EnclosedList, EnclosedPunctuationList, GenericParameter, Type},
-        parser::Parser,
-        restore,
-        token::{Operator, Token},
+        ast::{EnclosedPunctuationList, GenericParameter, Type},
+        parser::Parser, restore, token::{Operator, Token},
     };
     impl Parser {
         pub fn parse_type(&self) -> Option<Type> {
             let mut ty = self.parse_type_primary();
-            if let Some(Token::Operator(Operator::Pipe)) = self.tokens.peek() {
-                let p = self.parse_punctutation_list(ty, Operator::Pipe, || {
-                    let index = self.tokens.get_index();
-                    let res = self.parse_type_primary().map(|ty| (ty, true));
-                    if res.is_none() {
-                        index.restore(&self.tokens);
-                    }
-                    res
-                });
-                if let Some(p) = p {
-                    return Some(Type::Union(p));
-                } else {
-                    return None;
+            if let Some(Token::Operator(Operator::Pipe)) = self.tokens.peek()
+                    {
+                    let p =
+                        self.parse_punctutation_list(ty, Operator::Pipe,
+                            ||
+                                {
+                                    {
+                                        let index = self.tokens.get_index();
+                                        let res = self.parse_type_primary().map(|ty| (ty, true));
+                                        if res.is_none() { index.restore(&self.tokens); }
+                                        res
+                                    }
+                                });
+                    if let Some(p) = p {
+                            return Some(Type::Union(p));
+                        } else { return None; }
                 }
-            }
-            let ty = loop {
-                ty = match self.tokens.peek() {
-                    Some(Token::Operator(Operator::Ampersand)) => Some(Type::Ref {
-                        ref_token: self.tokens.next().unwrap().clone(),
-                        mutable: false,
-                        base_type: ty.map(Box::new),
-                    }),
-                    Some(Token::Operator(Operator::Multiply)) => Some(Type::Ref {
-                        ref_token: self.tokens.next().unwrap().clone(),
-                        mutable: true,
-                        base_type: ty.map(Box::new),
-                    }),
-                    Some(Token::Operator(Operator::Question)) => Some(Type::Option {
-                        question: self.tokens.next().unwrap().clone(),
-                        base_type: ty.map(Box::new),
-                    }),
-                    Some(Token::Operator(Operator::OpenAngle)) => {
-                        let enclosed_list = self.parse_enclosed_punctuation_list(
-                            Operator::OpenAngle,
-                            Operator::Comma,
-                            Operator::CloseAngle,
-                            || self.parse_type().map(|ty| (ty, true)),
-                        );
-                        enclosed_list.map(|el| Type::Generic {
-                            base_type: ty.map(Box::new),
-                            list: el,
-                        })
-                    }
-                    _ => break ty,
+            let ty =
+                loop {
+                    ty =
+                        match self.tokens.peek() {
+                            Some(Token::Operator(Operator::Ampersand)) =>
+                                Some(Type::Ref {
+                                        ref_token: self.tokens.next().unwrap().clone(),
+                                        mutable: false,
+                                        base_type: ty.map(Box::new),
+                                    }),
+                            Some(Token::Operator(Operator::Multiply)) =>
+                                Some(Type::Ref {
+                                        ref_token: self.tokens.next().unwrap().clone(),
+                                        mutable: true,
+                                        base_type: ty.map(Box::new),
+                                    }),
+                            Some(Token::Operator(Operator::Question)) =>
+                                Some(Type::Option {
+                                        question: self.tokens.next().unwrap().clone(),
+                                        base_type: ty.map(Box::new),
+                                    }),
+                            Some(Token::Operator(Operator::OpenAngle)) => {
+                                let enclosed_list =
+                                    self.parse_enclosed_punctuation_list(Operator::OpenAngle,
+                                        Operator::Comma, Operator::CloseAngle,
+                                        || self.parse_type().map(|ty| (ty, true)));
+                                enclosed_list.map(|el|
+                                        Type::Generic { base_type: ty.map(Box::new), list: el })
+                            }
+                            _ => break ty,
+                        };
                 };
-            };
             ty
         }
         pub fn parse_type_primary(&self) -> Option<Type> {
-            if let Some(Token::Operator(Operator::OpenParen)) = self.tokens.peek() {
-                let _open = self.tokens.next().unwrap();
-                let expr = self.parse_type();
-                let _close = self.tokens.next().unwrap();
-                expr
-            } else {
-                self.parse_type_lit()
-            }
+            if let Some(Token::Operator(Operator::OpenParen)) =
+                        self.tokens.peek() {
+                    let _open = self.tokens.next().unwrap();
+                    let expr = self.parse_type();
+                    let _close = self.tokens.next().unwrap();
+                    expr
+                } else { self.parse_type_lit() }
         }
         pub fn parse_type_lit(&self) -> Option<Type> {
-            let ty_first = match self.tokens.peek() {
-                Some(Token::Operator(Operator::OpenSquare)) => {
-                    let enclosed_list = self.parse_enclosed_punctuation_list(
-                        Operator::OpenSquare,
-                        Operator::Comma,
-                        Operator::CloseSquare,
-                        || self.parse_type().map(|ty| (ty, true)),
-                    );
-                    enclosed_list.map(Type::Array)
-                }
-                Some(Token::Operator(Operator::OpenBrace)) => {
-                    let enclosed_list = self.parse_enclosed_punctuation_list(
-                        Operator::OpenBrace,
-                        Operator::Comma,
-                        Operator::CloseBrace,
-                        || self.parse_type().map(|ty| (ty, true)),
-                    );
-                    enclosed_list.map(Type::Tuple)
-                }
-                Some(Token::Ident(id)) => match id.as_str() {
-                    "int" => Some(Type::Integer {
-                        width: 32,
-                        signed: true,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "int8" => Some(Type::Integer {
-                        width: 8,
-                        signed: true,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "int16" => Some(Type::Integer {
-                        width: 16,
-                        signed: true,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "int32" => Some(Type::Integer {
-                        width: 32,
-                        signed: true,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "int64" => Some(Type::Integer {
-                        width: 64,
-                        signed: true,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "uint" => Some(Type::Integer {
-                        width: 32,
-                        signed: false,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "uint8" => Some(Type::Integer {
-                        width: 8,
-                        signed: false,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "uint16" => Some(Type::Integer {
-                        width: 16,
-                        signed: false,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "uint32" => Some(Type::Integer {
-                        width: 32,
-                        signed: false,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "uint64" => Some(Type::Integer {
-                        width: 64,
-                        signed: false,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "float32" | "float" => Some(Type::Float {
-                        width: 32,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "float64" => Some(Type::Float {
-                        width: 64,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "fixed32" | "fixed" => Some(Type::Fixed {
-                        width: 32,
-                        decimals: 16,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "fixed64" => Some(Type::Fixed {
-                        width: 64,
-                        decimals: 32,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "bool" => Some(Type::Boolean(self.tokens.next().unwrap().clone())),
-                    "char" => Some(Type::Char {
-                        width: 32,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    "char8" => Some(Type::Char {
-                        width: 8,
-                        token: self.tokens.next().unwrap().clone(),
-                    }),
-                    _ => Some(Type::Ident(self.tokens.next().unwrap().clone())),
-                },
-                Some(_) => {
-                    let expr = {
-                        let index = self.tokens.get_index();
-                        let res = self.parse_literal();
-                        if res.is_none() {
-                            index.restore(&self.tokens);
-                        }
-                        res
-                    };
-                    expr.map(|expr| Type::Expression(Box::new(expr)))
-                }
-                _ => None,
-            };
+            let ty_first =
+                match self.tokens.peek() {
+                    Some(Token::Operator(Operator::OpenSquare)) => {
+                        let enclosed_list =
+                            self.parse_enclosed_punctuation_list(Operator::OpenSquare,
+                                Operator::Comma, Operator::CloseSquare,
+                                || self.parse_type().map(|ty| (ty, true)));
+                        enclosed_list.map(Type::Array)
+                    }
+                    Some(Token::Operator(Operator::OpenBrace)) => {
+                        let enclosed_list =
+                            self.parse_enclosed_punctuation_list(Operator::OpenBrace,
+                                Operator::Comma, Operator::CloseBrace,
+                                || self.parse_type().map(|ty| (ty, true)));
+                        enclosed_list.map(Type::Tuple)
+                    }
+                    Some(Token::Ident(id)) =>
+                        match id.as_str() {
+                            "int" =>
+                                Some(Type::Integer {
+                                        width: 32,
+                                        signed: true,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "int8" =>
+                                Some(Type::Integer {
+                                        width: 8,
+                                        signed: true,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "int16" =>
+                                Some(Type::Integer {
+                                        width: 16,
+                                        signed: true,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "int32" =>
+                                Some(Type::Integer {
+                                        width: 32,
+                                        signed: true,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "int64" =>
+                                Some(Type::Integer {
+                                        width: 64,
+                                        signed: true,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "uint" =>
+                                Some(Type::Integer {
+                                        width: 32,
+                                        signed: false,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "uint8" =>
+                                Some(Type::Integer {
+                                        width: 8,
+                                        signed: false,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "uint16" =>
+                                Some(Type::Integer {
+                                        width: 16,
+                                        signed: false,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "uint32" =>
+                                Some(Type::Integer {
+                                        width: 32,
+                                        signed: false,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "uint64" =>
+                                Some(Type::Integer {
+                                        width: 64,
+                                        signed: false,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "float32" | "float" =>
+                                Some(Type::Float {
+                                        width: 32,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "float64" =>
+                                Some(Type::Float {
+                                        width: 64,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "fixed32" | "fixed" =>
+                                Some(Type::Fixed {
+                                        width: 32,
+                                        decimals: 16,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "fixed64" =>
+                                Some(Type::Fixed {
+                                        width: 64,
+                                        decimals: 32,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "bool" =>
+                                Some(Type::Boolean(self.tokens.next().unwrap().clone())),
+                            "char" =>
+                                Some(Type::Char {
+                                        width: 32,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            "char8" =>
+                                Some(Type::Char {
+                                        width: 8,
+                                        token: self.tokens.next().unwrap().clone(),
+                                    }),
+                            _ => Some(Type::Ident(self.tokens.next().unwrap().clone())),
+                        },
+                    Some(_) => {
+                        let expr =
+                            {
+                                let index = self.tokens.get_index();
+                                let res = self.parse_literal();
+                                if res.is_none() { index.restore(&self.tokens); }
+                                res
+                            };
+                        expr.map(|expr| Type::Expression(Box::new(expr)))
+                    }
+                    _ => None,
+                };
             ty_first
         }
-        pub fn parse_generic_parameters(
-            &self,
-        ) -> Option<EnclosedPunctuationList<GenericParameter>> {
-            self.parse_enclosed_punctuation_list(
-                Operator::OpenAngle,
-                Operator::Comma,
-                Operator::CloseAngle,
-                || self.parse_generic_parameter().map(|gn| (gn, true)),
-            )
+        pub fn parse_generic_parameters(&self)
+            -> Option<EnclosedPunctuationList<GenericParameter>> {
+            self.parse_enclosed_punctuation_list(Operator::OpenAngle,
+                Operator::Comma, Operator::CloseAngle,
+                || self.parse_generic_parameter().map(|gn| (gn, true)))
         }
         pub fn parse_generic_parameter(&self) -> Option<GenericParameter> {
-            let ident = match self.tokens.peek() {
-                Some(Token::Ident(_)) => self.tokens.next().unwrap().clone(),
-                _ => return None,
-            };
+            let ident =
+                match self.tokens.peek() {
+                    Some(Token::Ident(_)) =>
+                        self.tokens.next().unwrap().clone(),
+                    _ => return None,
+                };
             match self.tokens.peek() {
                 Some(Token::Operator(Operator::Colon)) => {
                     let colon = self.tokens.next().unwrap().clone();
-                    let first = if let Some(Token::Ident(_)) = self.tokens.peek() {
-                        self.tokens.next().cloned()
-                    } else {
-                        None
-                    };
-                    if let Some(Token::Operator(Operator::Ampersand)) = self.tokens.peek() {
-                        let list = {
-                            let index = self.tokens.get_index();
-                            let res =
-                                self.parse_punctutation_list(first, Operator::Ampersand, || {
-                                    if let Some(Token::Ident(_)) = self.tokens.peek() {
-                                        Some((self.tokens.next().unwrap().clone(), true))
-                                    } else {
-                                        None
-                                    }
-                                });
-                            if res.is_none() {
-                                index.restore(&self.tokens);
-                            }
-                            res
-                        };
-                        if let Some(list) = list {
-                            return Some(GenericParameter::Bounded {
-                                ident,
-                                colon,
-                                bounds: list,
-                            });
-                        } else {
-                            return None;
+                    let first =
+                        if let Some(Token::Ident(_)) = self.tokens.peek() {
+                                self.tokens.next().cloned()
+                            } else { None };
+                    if let Some(Token::Operator(Operator::Ampersand)) =
+                                self.tokens.peek() {
+                            let list =
+                                {
+                                    let index = self.tokens.get_index();
+                                    let res =
+                                        self.parse_punctutation_list(first, Operator::Ampersand,
+                                            ||
+                                                {
+                                                    if let Some(Token::Ident(_)) = self.tokens.peek() {
+                                                            Some((self.tokens.next().unwrap().clone(), true))
+                                                        } else { None }
+                                                });
+                                    if res.is_none() { index.restore(&self.tokens); }
+                                    res
+                                };
+                            if let Some(list) = list {
+                                    return Some(GenericParameter::Bounded {
+                                                ident,
+                                                colon,
+                                                bounds: list,
+                                            });
+                                } else { return None; }
                         }
-                    }
                     return first.map(GenericParameter::Unbounded);
                 }
                 _ => (),
@@ -3092,8 +3385,9 @@ pub mod parser {
     use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
     use crate::{
         ast::{
-            ArgList, AstNode, EnclosedList, EnclosedPunctuationList, Modifer, ModiferStatement,
-            Param, ParamaterList, PunctuationList, Statement, Type,
+            ArgList, AstNode, EnclosedList, EnclosedPunctuationList, Modifer,
+            ModiferStatement, Param, ParamaterList, PunctuationList,
+            Statement, Type,
         },
         error::{ParseError, ParseErrorKind},
         token::{Operator, Range, SpannedToken, Token, TokenIndex, TokenStream},
@@ -3101,6 +3395,27 @@ pub mod parser {
     pub struct Parser {
         pub(crate) tokens: TokenStream,
         pub(crate) errors: RwLock<Vec<ParseError>>,
+    }
+    #[macro_export]
+    macro_rules! restore {
+        ($self : expr, $e : expr) =>
+        {
+            {
+                let index = $self.tokens.get_index() ; let res = $e ; if
+                res.is_none() { index.restore(& $self.tokens) ; } res
+            }
+        } ;
+    }
+    #[macro_export]
+    macro_rules! fallback {
+        ($self : expr, $e : expr) =>
+        {
+            {
+                let index = $self.tokens.get_index() ; let res = $e ; if
+                res.is_none()
+                { index.restore(& $self.tokens) ; return None ; } res
+            }
+        } ;
     }
     impl Parser {
         pub fn new(token_stream: impl Into<TokenStream>) -> Self {
@@ -3112,7 +3427,8 @@ pub mod parser {
         pub fn get_errors(&self) -> RwLockReadGuard<'_, Vec<ParseError>> {
             self.errors.read().unwrap()
         }
-        pub fn get_errors_mut(&self) -> RwLockWriteGuard<'_, Vec<ParseError>> {
+        pub fn get_errors_mut(&self)
+            -> RwLockWriteGuard<'_, Vec<ParseError>> {
             self.errors.write().unwrap()
         }
         pub fn add_error(&self, error: ParseError) {
@@ -3125,196 +3441,196 @@ pub mod parser {
             while let Some(stmt) = self.parse_statement() {
                 statements.push(stmt);
                 if let Some(Token::Newline) = self.tokens.peek() {
-                    self.tokens.next();
-                }
+                        self.tokens.next();
+                    }
                 self.ignore_ws();
             }
             Some(statements)
         }
         pub fn parse_statement(&self) -> Option<Statement> {
-            if let Some(modifer) = self.parse_modifier(Self::parse_statement) {
-                return Some(Statement::Modifer(modifer));
-            }
+            if let Some(modifer) = self.parse_modifier(Self::parse_statement)
+                    {
+                    return Some(Statement::Modifer(modifer));
+                }
             match self.tokens.peek() {
                 Some(Token::Ident(s)) if s == "import" => {
-                    if let Some(us) = self.parse_import() {
-                        return Some(us);
-                    }
+                    if let Some(us) = self.parse_import() { return Some(us); }
                 }
                 Some(Token::Ident(s)) if s == "return" => {
                     let tok = self.tokens.next().unwrap();
                     let expr = self.parse_expression();
                     return Some(Statement::Return {
-                        ret_token: tok.clone(),
-                        expr,
-                    });
+                                ret_token: tok.clone(),
+                                expr,
+                            });
                 }
                 Some(Token::Ident(s)) if s == "class" => {
                     if let Some(strct) = self.parse_class_declaration() {
-                        return Some(strct);
-                    }
+                            return Some(strct);
+                        }
                 }
                 Some(Token::Ident(s)) if s == "type" => {
                     let ty_tok = self.tokens.next().unwrap();
-                    let symb = self.expect(Token::Ident(String::new())).unwrap();
+                    let symb =
+                        self.expect(Token::Ident(String::new())).unwrap();
                     let generic =
-                        if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek() {
-                            self.parse_generic_parameters()
-                        } else {
-                            None
-                        };
-                    if let Some(Token::Operator(Operator::OpenBrace)) = self.tokens.peek() {
-                    } else {
-                        if let Some(us) = self.parse_type() {
-                            let eq = self.expect_operator(Operator::Equals).unwrap();
-                            return Some(Statement::TypeAlias {
-                                ty_tok: ty_tok.clone(),
-                                ident: symb.clone(),
-                                generic,
-                                eq: Some(eq.clone()),
-                                ty: Box::new(us),
-                            });
-                        }
-                    }
+                        if let Some(Token::Operator(Operator::OpenAngle)) =
+                                    self.tokens.peek() {
+                                self.parse_generic_parameters()
+                            } else { None };
+                    if let Some(Token::Operator(Operator::OpenBrace)) =
+                                self.tokens.peek()
+                            {} else {
+                           if let Some(us) = self.parse_type() {
+                                   let eq = self.expect_operator(Operator::Equals).unwrap();
+                                   return Some(Statement::TypeAlias {
+                                               ty_tok: ty_tok.clone(),
+                                               ident: symb.clone(),
+                                               generic,
+                                               eq: Some(eq.clone()),
+                                               ty: Box::new(us),
+                                           });
+                               }
+                       }
                 }
                 Some(Token::Ident(_)) => {
-                    if let Some(decl) = {
-                        let index = self.tokens.get_index();
-                        let res = self.parse_variable_or_function_declaration();
-                        if res.is_none() {
-                            index.restore(&self.tokens);
+                    if let Some(decl) =
+                                {
+                                    let index = self.tokens.get_index();
+                                    let res = self.parse_variable_or_function_declaration();
+                                    if res.is_none() { index.restore(&self.tokens); }
+                                    res
+                                } {
+                            return Some(decl);
                         }
-                        res
-                    } {
-                        return Some(decl);
-                    }
                 }
                 Some(Token::Operator(Operator::OpenBrace)) => {
-                    if let Some(stmt) = self
-                        .parse_enclosed_list(Operator::OpenBrace, Operator::CloseBrace, || {
-                            self.parse_statement().map(|stmt| (stmt, true))
-                        })
-                        .map(|list| Statement::Block(list))
-                    {
-                        return Some(stmt);
-                    }
+                    if let Some(stmt) =
+                                self.parse_enclosed_list(Operator::OpenBrace,
+                                        Operator::CloseBrace,
+                                        ||
+                                            {
+                                                self.parse_statement().map(|stmt| (stmt, true))
+                                            }).map(|list| Statement::Block(list)) {
+                            return Some(stmt);
+                        }
                 }
                 _ => (),
             };
             let expression = self.parse_operator_expression(0);
             if expression.is_some() {
-                return expression.map(Statement::Expression);
-            }
+                    return expression.map(Statement::Expression);
+                }
             None
         }
-        pub fn parse_modifier(
-            &self,
-            f: impl Fn(&Parser) -> Option<Statement>,
-        ) -> Option<ModiferStatement> {
+        pub fn parse_modifier(&self, f: impl Fn(&Parser) -> Option<Statement>)
+            -> Option<ModiferStatement> {
             match self.tokens.peek() {
                 Some(Token::Ident(modifier)) => {
-                    let modifier = match modifier.as_str() {
-                        "public" => Modifer::Public,
-                        "protected" => Modifer::Protected,
-                        "const" => Modifer::Const,
-                        "unique" => Modifer::Unique,
-                        _ => return None,
-                    };
+                    let modifier =
+                        match modifier.as_str() {
+                            "public" => Modifer::Public,
+                            "protected" => Modifer::Protected,
+                            "const" => Modifer::Const,
+                            "unique" => Modifer::Unique,
+                            _ => return None,
+                        };
                     let token = self.tokens.next().unwrap();
                     let statement = f(self);
                     Some(ModiferStatement {
-                        modifier,
-                        modifier_token: token.clone(),
-                        statement: statement.map(|f| Box::new(f)),
-                    })
+                            modifier,
+                            modifier_token: token.clone(),
+                            statement: statement.map(|f| Box::new(f)),
+                        })
                 }
                 _ => None,
             }
         }
-        pub fn parse_variable_or_function_declaration(&self) -> Option<Statement> {
+        pub fn parse_variable_or_function_declaration(&self)
+            -> Option<Statement> {
             let ty = self.parse_type();
-            let ident = match self.tokens.peek() {
-                Some(Token::Ident(_)) => self.tokens.next(),
-                _ => return None,
-            };
-            if let (Some(ty), Some(ident)) = (ty, ident) {
-                let eq = match self.tokens.peek() {
-                    Some(Token::Operator(Operator::Equals)) => self.tokens.next().cloned().unwrap(),
-                    _ => return self.parse_function_declaration(ty, ident.clone()),
+            let ident =
+                match self.tokens.peek() {
+                    Some(Token::Ident(_)) => self.tokens.next(),
+                    _ => return None,
                 };
-                let expr = self.parse_expression();
-                return Some(Statement::Declaration {
-                    ty,
-                    ident: ident.clone(),
-                    eq,
-                    expr,
-                });
-            }
+            if let (Some(ty), Some(ident)) = (ty, ident) {
+                    let eq =
+                        match self.tokens.peek() {
+                            Some(Token::Operator(Operator::Equals)) =>
+                                self.tokens.next().cloned().unwrap(),
+                            _ =>
+                                return self.parse_function_declaration(ty, ident.clone()),
+                        };
+                    let expr = self.parse_expression();
+                    return Some(Statement::VariableDeclaration {
+                                ty,
+                                ident: ident.clone(),
+                                eq,
+                                expr,
+                            });
+                }
             None
         }
-        pub fn parse_function_declaration(
-            &self,
-            ty: Type,
-            ident: SpannedToken,
-        ) -> Option<Statement> {
+        pub fn parse_function_declaration(&self, ty: Type,
+            ident: SpannedToken) -> Option<Statement> {
             let parameters = self.parse_parameters().unwrap();
-            let arrow = if let Some(Token::Operator(Operator::Arrow)) = self.tokens.peek() {
-                let arrow = self.tokens.next().unwrap().clone();
-                Some(arrow)
-            } else {
-                None
-            };
+            let arrow =
+                if let Some(Token::Operator(Operator::Arrow)) =
+                            self.tokens.peek() {
+                        let arrow = self.tokens.next().unwrap().clone();
+                        Some(arrow)
+                    } else { None };
             let body = self.parse_statement().map(|bd| Box::new(bd));
             Some(Statement::Function {
-                generic: None,
-                ident,
-                parameters,
-                arrow,
-                return_type: ty,
-                body,
-            })
+                    generic: None,
+                    ident,
+                    parameters,
+                    arrow,
+                    return_type: ty,
+                    body,
+                })
         }
         pub fn parse_class_declaration(&self) -> Option<Statement> {
             let token = self.tokens.next()?;
             let ident = self.tokens.next()?;
-            let generic = if let Some(Token::Operator(Operator::OpenAngle)) = self.tokens.peek() {
-                self.parse_generic_parameters()
-            } else {
-                None
-            };
-            let body = self.parse_enclosed_list(Operator::OpenBrace, Operator::CloseBrace, || {
-                self.parse_statement().map(|f| (f, true))
-            });
+            let generic =
+                if let Some(Token::Operator(Operator::OpenAngle)) =
+                            self.tokens.peek() {
+                        self.parse_generic_parameters()
+                    } else { None };
+            let body =
+                self.parse_enclosed_list(Operator::OpenBrace,
+                    Operator::CloseBrace,
+                    || { self.parse_statement().map(|f| (f, true)) });
             if let Some(body) = body {
-                Some(Statement::Class {
-                    token: token.clone(),
-                    ident: ident.clone(),
-                    generic,
-                    body,
-                })
-            } else {
-                None
-            }
+                    Some(Statement::Class {
+                            token: token.clone(),
+                            ident: ident.clone(),
+                            generic,
+                            body,
+                        })
+                } else { None }
         }
         pub fn parse_impl(&self) -> Option<Statement> {
-            let token = match self.tokens.peek() {
-                Some(Token::Ident(id)) if id == "impl" => self.tokens.next().cloned().unwrap(),
-                _ => return None,
-            };
-            let generics = match self.tokens.peek() {
-                Some(Token::Operator(Operator::OpenAngle)) => self.parse_generic_parameters(),
-                _ => None,
-            };
+            let token =
+                match self.tokens.peek() {
+                    Some(Token::Ident(id)) if id == "impl" =>
+                        self.tokens.next().cloned().unwrap(),
+                    _ => return None,
+                };
+            let generics =
+                match self.tokens.peek() {
+                    Some(Token::Operator(Operator::OpenAngle)) =>
+                        self.parse_generic_parameters(),
+                    _ => None,
+                };
             let ty = self.parse_type();
-            let body = self.parse_enclosed_list(Operator::OpenBrace, Operator::CloseBrace, || {
-                self.parse_statement().map(|f| (f, true))
-            });
-            Some(Statement::Impl {
-                impl_tok: token,
-                generics,
-                ty,
-                body,
-            })
+            let body =
+                self.parse_enclosed_list(Operator::OpenBrace,
+                    Operator::CloseBrace,
+                    || { self.parse_statement().map(|f| (f, true)) });
+            Some(Statement::Impl { impl_tok: token, generics, ty, body })
         }
         pub fn parse_import(&self) -> Option<Statement> {
             let token = self.tokens.next();
@@ -3330,296 +3646,234 @@ pub mod parser {
                     (_, Some(id)) => {
                         let lline = *last_line.get_or_insert(id.span().line_num);
                         if lline == id.span().line_num {
-                            args.push(id.clone(), None);
-                        } else {
-                            self.tokens.back();
-                        }
+                                args.push(id.clone(), None);
+                            } else { self.tokens.back(); }
                         break;
                     }
                     _ => break,
                 }
             }
-            Some(Statement::ImportStatement {
-                token: token.cloned(),
-                args,
-            })
+            Some(Statement::ImportStatement { token: token.cloned(), args })
         }
         pub fn parse_parameters(&self) -> Option<ParamaterList> {
             let open = self.expect_operator(Operator::OpenParen);
-            let args = match self.tokens.peek() {
-                Some(Token::Operator(Operator::CloseParen)) => PunctuationList::default(),
-                _ => {
-                    let mut args = PunctuationList::default();
-                    while let Some(arg) = self.parse_parameter() {
-                        if arg.name.is_none() && arg.ty.is_none() {
-                            return None;
-                        }
-                        let comma =
-                            if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
-                                self.tokens.next().cloned()
-                            } else {
-                                None
-                            };
-                        if let Some(Token::Operator(Operator::CloseParen)) = self.tokens.peek() {
+            let args =
+                match self.tokens.peek() {
+                    Some(Token::Operator(Operator::CloseParen)) =>
+                        PunctuationList::default(),
+                    _ => {
+                        let mut args = PunctuationList::default();
+                        while let Some(arg) = self.parse_parameter() {
+                            if arg.ty.is_none() { return None; }
+                            let comma =
+                                if let Some(Token::Operator(Operator::Comma)) =
+                                            self.tokens.peek() {
+                                        self.tokens.next().cloned()
+                                    } else { None };
+                            if let Some(Token::Operator(Operator::CloseParen)) =
+                                        self.tokens.peek() {
+                                    args.push(arg, comma);
+                                    break;
+                                }
+                            if comma.is_none() {
+                                    self.add_error(ParseError {
+                                            kind: ParseErrorKind::InvalidSyntax("Expected comma in arguments!".to_string()),
+                                            range: Range::default(),
+                                        });
+                                }
                             args.push(arg, comma);
-                            break;
                         }
-                        if comma.is_none() {
-                            self.add_error(ParseError {
-                                kind: ParseErrorKind::InvalidSyntax(
-                                    "Expected comma in arguments!".to_string(),
-                                ),
-                                range: Range::default(),
-                            });
-                        }
-                        args.push(arg, comma);
+                        args
                     }
-                    args
-                }
-            };
+                };
             let close = self.expect_operator(Operator::CloseParen);
             if let (Some(open), Some(close)) = (open, close) {
-                Some(ParamaterList {
-                    items: args,
-                    range: Range {
-                        start: open.0,
-                        end: close.0,
-                    },
-                })
-            } else {
-                self.add_error(ParseError {
-                    kind: ParseErrorKind::InvalidSyntax(
-                        "Unable to parse parameters brackets!".to_string(),
-                    ),
-                    range: Range::default(),
-                });
-                Some(ParamaterList {
-                    items: args,
-                    range: Range::default(),
-                })
-            }
+                    Some(ParamaterList {
+                            items: args,
+                            range: Range { start: open.0, end: close.0 },
+                        })
+                } else {
+                   self.add_error(ParseError {
+                           kind: ParseErrorKind::InvalidSyntax("Unable to parse parameters brackets!".to_string()),
+                           range: Range::default(),
+                       });
+                   Some(ParamaterList { items: args, range: Range::default() })
+               }
         }
         pub fn parse_parameter(&self) -> Option<Param> {
-            let ty = {
-                let index = self.tokens.get_index();
-                let res = self.parse_type();
-                if res.is_none() {
-                    index.restore(&self.tokens);
-                    return None;
-                }
-                res
-            };
-            let ident = {
-                let index = self.tokens.get_index();
-                let res = self.expect(Token::Ident("".into()));
-                if res.is_none() {
-                    index.restore(&self.tokens);
-                    return None;
-                }
-                res
-            };
+            let ty =
+                {
+                    let index = self.tokens.get_index();
+                    let res = self.parse_type();
+                    if res.is_none() {
+                            index.restore(&self.tokens);
+                            return None;
+                        }
+                    res
+                };
+            let ident =
+                {
+                    let index = self.tokens.get_index();
+                    let res = self.expect(Token::Ident("".into()));
+                    if res.is_none() {
+                            index.restore(&self.tokens);
+                            return None;
+                        }
+                    res
+                };
             match (ident, ty) {
-                (Some(ident), Some(ty)) => Some(Param {
-                    ty: Some(ty),
-                    name: Some(ident.clone()),
-                }),
+                (Some(ident), ty) => Some(Param { ty, name: ident.clone() }),
                 (ident, ty) => {
                     self.add_error(ParseError {
-                        kind: ParseErrorKind::InvalidSyntax(
-                            "Unable to parse arg fields!".to_string(),
-                        ),
-                        range: Range::default(),
-                    });
-                    Some(Param {
-                        ty,
-                        name: ident.cloned(),
-                    })
+                            kind: ParseErrorKind::InvalidSyntax("Unable to parse arg fields!".to_string()),
+                            range: Range::default(),
+                        });
+                    return None;
                 }
             }
         }
         pub fn parse_arguments(&self) -> Option<ArgList> {
             let open = self.expect_operator(Operator::OpenParen);
-            let args = match self.tokens.peek() {
-                Some(Token::Operator(Operator::CloseParen)) => PunctuationList::default(),
-                _ => {
-                    let mut args = PunctuationList::default();
-                    while let Some(arg) = self.parse_operator_expression(0) {
-                        let comma =
-                            if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
-                                self.tokens.next().cloned()
-                            } else {
-                                None
-                            };
-                        if let Some(Token::Operator(Operator::CloseParen)) = self.tokens.peek() {
-                            args.push(arg, comma);
-                            break;
+            let args =
+                match self.tokens.peek() {
+                    Some(Token::Operator(Operator::CloseParen)) =>
+                        PunctuationList::default(),
+                    _ => {
+                        let mut args = PunctuationList::default();
+                        while let Some(arg) = self.parse_operator_expression(0) {
+                            let comma =
+                                if let Some(Token::Operator(Operator::Comma)) =
+                                            self.tokens.peek() {
+                                        self.tokens.next().cloned()
+                                    } else { None };
+                            if let Some(Token::Operator(Operator::CloseParen)) =
+                                        self.tokens.peek() {
+                                    args.push(arg, comma);
+                                    break;
+                                }
+                            if comma.is_none() {
+                                    self.add_error(ParseError {
+                                            kind: ParseErrorKind::InvalidSyntax("Expected comma in arguments!".to_string()),
+                                            range: Range::default(),
+                                        });
+                                }
+                            args.push_sep(arg, comma.unwrap());
                         }
-                        if comma.is_none() {
-                            self.add_error(ParseError {
-                                kind: ParseErrorKind::InvalidSyntax(
-                                    "Expected comma in arguments!".to_string(),
-                                ),
-                                range: Range::default(),
-                            });
-                        }
-                        args.push_sep(arg, comma.unwrap());
+                        args
                     }
-                    args
-                }
-            };
+                };
             let close = self.expect_operator(Operator::CloseParen);
             if let (Some(open), Some(close)) = (open, close) {
-                Some(ArgList {
-                    items: args,
-                    range: Range {
-                        start: open.0,
-                        end: close.0,
-                    },
-                })
-            } else {
-                self.add_error(ParseError {
-                    kind: ParseErrorKind::InvalidSyntax(
-                        "Unable to parse arg brackets!".to_string(),
-                    ),
-                    range: Range::default(),
-                });
-                Some(ArgList {
-                    items: args,
-                    range: Range::default(),
-                })
-            }
+                    Some(ArgList {
+                            items: args,
+                            range: Range { start: open.0, end: close.0 },
+                        })
+                } else {
+                   self.add_error(ParseError {
+                           kind: ParseErrorKind::InvalidSyntax("Unable to parse arg brackets!".to_string()),
+                           range: Range::default(),
+                       });
+                   Some(ArgList { items: args, range: Range::default() })
+               }
         }
-        pub fn parse_list<T: AstNode>(
-            &self,
-            mut cb: impl FnMut() -> Option<(T, bool)>,
-        ) -> Option<Vec<T>> {
+        pub fn parse_list<T: AstNode>(&self,
+            mut cb: impl FnMut() -> Option<(T, bool)>) -> Option<Vec<T>> {
             let mut items = Vec::new();
             while let Some((arg, valid)) = cb() {
-                if !valid {
-                    return None;
-                }
+                if !valid { return None; }
                 items.push(arg);
             }
             Some(items)
         }
-        pub fn parse_punctutation_list<T: AstNode>(
-            &self,
-            first: Option<T>,
-            punc: Operator,
-            mut cb: impl FnMut() -> Option<(T, bool)>,
-        ) -> Option<PunctuationList<T>> {
+        pub fn parse_punctutation_list<T: AstNode>(&self, first: Option<T>,
+            punc: Operator, mut cb: impl FnMut() -> Option<(T, bool)>)
+            -> Option<PunctuationList<T>> {
             let mut args = PunctuationList::default();
             if let Some(first) = first {
-                match self.tokens.peek() {
-                    Some(Token::Operator(op)) if op == &punc => {
-                        args.push(first, self.tokens.next().cloned())
+                    match self.tokens.peek() {
+                        Some(Token::Operator(op)) if op == &punc => {
+                            args.push(first, self.tokens.next().cloned())
+                        }
+                        _ => return None,
                     }
-                    _ => return None,
                 }
-            }
             while let Some((arg, valid)) = cb() {
-                if !valid {
-                    return None;
-                }
-                let punctuation = if let Some(Token::Operator(op)) = self.tokens.peek() {
-                    if op == &punc {
-                        self.tokens.next().cloned()
-                    } else if args.len() == 0 {
-                        return None;
-                    } else {
-                        args.push_term(arg);
-                        break;
-                    }
-                } else if args.len() == 0 {
-                    return None;
-                } else {
-                    args.push_term(arg);
-                    break;
-                };
+                if !valid { return None; }
+                let punctuation =
+                    if let Some(Token::Operator(op)) = self.tokens.peek() {
+                            if op == &punc {
+                                    self.tokens.next().cloned()
+                                } else if args.len() == 0 {
+                                   return None;
+                               } else { args.push_term(arg); break; }
+                        } else if args.len() == 0 {
+                           return None;
+                       } else { args.push_term(arg); break; };
                 args.push(arg, punctuation);
             }
             Some(args)
         }
-        pub fn parse_enclosed_list<T: AstNode>(
-            &self,
-            open: Operator,
-            close: Operator,
-            cb: impl FnMut() -> Option<(T, bool)>,
-        ) -> Option<EnclosedList<T>> {
+        pub fn parse_enclosed_list<T: AstNode>(&self, open: Operator,
+            close: Operator, cb: impl FnMut() -> Option<(T, bool)>)
+            -> Option<EnclosedList<T>> {
             let open = self.expect_operator(open);
             let list = self.parse_list(cb);
             let close = self.expect_operator(close);
-            if let (Some(open), Some(items), Some(close)) = (open, list, close) {
-                Some(EnclosedList {
-                    open: open.clone(),
-                    items,
-                    close: close.clone(),
-                })
-            } else {
-                None
-            }
+            if let (Some(open), Some(items), Some(close)) =
+                        (open, list, close) {
+                    Some(EnclosedList {
+                            open: open.clone(),
+                            items,
+                            close: close.clone(),
+                        })
+                } else { None }
         }
-        pub fn parse_enclosed_punctuation_list<T: AstNode>(
-            &self,
-            open: Operator,
-            punc: Operator,
-            close: Operator,
-            mut cb: impl FnMut() -> Option<(T, bool)>,
-        ) -> Option<EnclosedPunctuationList<T>> {
+        pub fn parse_enclosed_punctuation_list<T: AstNode>(&self,
+            open: Operator, punc: Operator, close: Operator,
+            mut cb: impl FnMut() -> Option<(T, bool)>)
+            -> Option<EnclosedPunctuationList<T>> {
             let open = self.expect_operator(open);
-            let args = match self.tokens.peek() {
-                Some(Token::Operator(op)) if op == &close => PunctuationList::default(),
-                _ => {
-                    let mut args = PunctuationList::default();
-                    while let Some((arg, valid)) = cb() {
-                        if !valid {
-                            return None;
+            let args =
+                match self.tokens.peek() {
+                    Some(Token::Operator(op)) if op == &close =>
+                        PunctuationList::default(),
+                    _ => {
+                        let mut args = PunctuationList::default();
+                        while let Some((arg, valid)) = cb() {
+                            if !valid { return None; }
+                            let comma =
+                                if let Some(Token::Operator(op)) = self.tokens.peek() {
+                                        if op == &punc { self.tokens.next().cloned() } else { None }
+                                    } else { None };
+                            if let Some(Token::Operator(cl)) = self.tokens.peek() {
+                                    if cl == &close { args.push(arg, comma); break; }
+                                }
+                            if comma.is_none() {
+                                    self.add_error(ParseError {
+                                            kind: ParseErrorKind::InvalidSyntax("Expected comma in arguments!".to_string()),
+                                            range: Range::default(),
+                                        });
+                                }
+                            args.push(arg, comma);
                         }
-                        let comma = if let Some(Token::Operator(op)) = self.tokens.peek() {
-                            if op == &punc {
-                                self.tokens.next().cloned()
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-                        if let Some(Token::Operator(cl)) = self.tokens.peek() {
-                            if cl == &close {
-                                args.push(arg, comma);
-                                break;
-                            }
-                        }
-                        if comma.is_none() {
-                            self.add_error(ParseError {
-                                kind: ParseErrorKind::InvalidSyntax(
-                                    "Expected comma in arguments!".to_string(),
-                                ),
-                                range: Range::default(),
-                            });
-                        }
-                        args.push(arg, comma);
+                        args
                     }
-                    args
-                }
-            };
+                };
             let close = self.expect_operator(close);
             if let (Some(open), Some(close)) = (open, close) {
-                Some(EnclosedPunctuationList {
-                    open: open.clone(),
-                    items: args,
-                    close: close.clone(),
-                })
-            } else {
-                None
-            }
+                    Some(EnclosedPunctuationList {
+                            open: open.clone(),
+                            items: args,
+                            close: close.clone(),
+                        })
+                } else { None }
         }
-        pub(crate) fn expect_operator(&self, operator: Operator) -> Option<&SpannedToken> {
+        pub(crate) fn expect_operator(&self, operator: Operator)
+            -> Option<&SpannedToken> {
             self.ignore_ws();
-            let Some (Token :: Operator (o)) = self . tokens . peek () else { return None ; } ;
-            if o == &operator {
-                return self.tokens.next();
-            }
+            let Some(Token::Operator(o)) =
+                self.tokens.peek() else { return None; };
+            if o == &operator { return self.tokens.next(); }
             None
         }
         pub fn ignore_ws(&self) {
@@ -3627,27 +3881,28 @@ pub mod parser {
                 self.tokens.next();
             }
         }
-        pub fn save_state(&self) -> TokenIndex {
-            self.tokens.get_index()
-        }
-        pub(crate) fn expect(&self, token_type: Token) -> Option<&SpannedToken> {
+        pub fn save_state(&self) -> TokenIndex { self.tokens.get_index() }
+        pub(crate) fn expect(&self, token_type: Token)
+            -> Option<&SpannedToken> {
             self.ignore_ws();
-            let Some (tok) = self . tokens . peek () else { return None ; } ;
-            if std::mem::discriminant(tok) == std::mem::discriminant(&token_type) {
-                return self.tokens.next();
-            }
+            let Some(tok) = self.tokens.peek() else { return None; };
+            if std::mem::discriminant(tok) ==
+                        std::mem::discriminant(&token_type) {
+                    return self.tokens.next();
+                }
             None
         }
         pub(crate) fn expect_ident(&self) -> Option<&SpannedToken> {
             self.ignore_ws();
-            let Some (Token :: Ident (_)) = self . tokens . peek () else { return None ; } ;
+            let Some(Token::Ident(_)) =
+                self.tokens.peek() else { return None; };
             self.tokens.next()
         }
     }
 }
 pub mod token {
     use std::{fmt::Display, sync::RwLock};
-    use tl_util::format::{NodeDisplay, TreeDisplay};
+    use tl_util::format::{Config, FormatType, NodeDisplay, TreeDisplay};
     use crate::lexer::Template;
     pub enum Operator {
         OpenSquare,
@@ -3695,55 +3950,87 @@ pub mod token {
     impl ::core::fmt::Debug for Operator {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
             match self {
-                Operator::OpenSquare => ::core::fmt::Formatter::write_str(f, "OpenSquare"),
-                Operator::CloseSquare => ::core::fmt::Formatter::write_str(f, "CloseSquare"),
-                Operator::OpenParen => ::core::fmt::Formatter::write_str(f, "OpenParen"),
-                Operator::CloseParen => ::core::fmt::Formatter::write_str(f, "CloseParen"),
-                Operator::OpenBrace => ::core::fmt::Formatter::write_str(f, "OpenBrace"),
-                Operator::CloseBrace => ::core::fmt::Formatter::write_str(f, "CloseBrace"),
-                Operator::OpenAngle => ::core::fmt::Formatter::write_str(f, "OpenAngle"),
-                Operator::CloseAngle => ::core::fmt::Formatter::write_str(f, "CloseAngle"),
+                Operator::OpenSquare =>
+                    ::core::fmt::Formatter::write_str(f, "OpenSquare"),
+                Operator::CloseSquare =>
+                    ::core::fmt::Formatter::write_str(f, "CloseSquare"),
+                Operator::OpenParen =>
+                    ::core::fmt::Formatter::write_str(f, "OpenParen"),
+                Operator::CloseParen =>
+                    ::core::fmt::Formatter::write_str(f, "CloseParen"),
+                Operator::OpenBrace =>
+                    ::core::fmt::Formatter::write_str(f, "OpenBrace"),
+                Operator::CloseBrace =>
+                    ::core::fmt::Formatter::write_str(f, "CloseBrace"),
+                Operator::OpenAngle =>
+                    ::core::fmt::Formatter::write_str(f, "OpenAngle"),
+                Operator::CloseAngle =>
+                    ::core::fmt::Formatter::write_str(f, "CloseAngle"),
                 Operator::Dot => ::core::fmt::Formatter::write_str(f, "Dot"),
-                Operator::DoubleDot => ::core::fmt::Formatter::write_str(f, "DoubleDot"),
-                Operator::DoubleDotEqual => ::core::fmt::Formatter::write_str(f, "DoubleDotEqual"),
-                Operator::TripleDot => ::core::fmt::Formatter::write_str(f, "TripleDot"),
-                Operator::Colon => ::core::fmt::Formatter::write_str(f, "Colon"),
-                Operator::Comma => ::core::fmt::Formatter::write_str(f, "Comma"),
-                Operator::Arrow => ::core::fmt::Formatter::write_str(f, "Arrow"),
-                Operator::Plus => ::core::fmt::Formatter::write_str(f, "Plus"),
-                Operator::Minus => ::core::fmt::Formatter::write_str(f, "Minus"),
-                Operator::Multiply => ::core::fmt::Formatter::write_str(f, "Multiply"),
-                Operator::Divide => ::core::fmt::Formatter::write_str(f, "Divide"),
-                Operator::Exponent => ::core::fmt::Formatter::write_str(f, "Exponent"),
+                Operator::DoubleDot =>
+                    ::core::fmt::Formatter::write_str(f, "DoubleDot"),
+                Operator::DoubleDotEqual =>
+                    ::core::fmt::Formatter::write_str(f, "DoubleDotEqual"),
+                Operator::TripleDot =>
+                    ::core::fmt::Formatter::write_str(f, "TripleDot"),
+                Operator::Colon =>
+                    ::core::fmt::Formatter::write_str(f, "Colon"),
+                Operator::Comma =>
+                    ::core::fmt::Formatter::write_str(f, "Comma"),
+                Operator::Arrow =>
+                    ::core::fmt::Formatter::write_str(f, "Arrow"),
+                Operator::Plus =>
+                    ::core::fmt::Formatter::write_str(f, "Plus"),
+                Operator::Minus =>
+                    ::core::fmt::Formatter::write_str(f, "Minus"),
+                Operator::Multiply =>
+                    ::core::fmt::Formatter::write_str(f, "Multiply"),
+                Operator::Divide =>
+                    ::core::fmt::Formatter::write_str(f, "Divide"),
+                Operator::Exponent =>
+                    ::core::fmt::Formatter::write_str(f, "Exponent"),
                 Operator::Or => ::core::fmt::Formatter::write_str(f, "Or"),
                 Operator::And => ::core::fmt::Formatter::write_str(f, "And"),
-                Operator::Ampersand => ::core::fmt::Formatter::write_str(f, "Ampersand"),
-                Operator::Exclamation => ::core::fmt::Formatter::write_str(f, "Exclamation"),
+                Operator::Ampersand =>
+                    ::core::fmt::Formatter::write_str(f, "Ampersand"),
+                Operator::Exclamation =>
+                    ::core::fmt::Formatter::write_str(f, "Exclamation"),
                 Operator::At => ::core::fmt::Formatter::write_str(f, "At"),
-                Operator::Pound => ::core::fmt::Formatter::write_str(f, "Pound"),
-                Operator::Dollar => ::core::fmt::Formatter::write_str(f, "Dollar"),
-                Operator::Percent => ::core::fmt::Formatter::write_str(f, "Percent"),
-                Operator::Carot => ::core::fmt::Formatter::write_str(f, "Carot"),
-                Operator::Pipe => ::core::fmt::Formatter::write_str(f, "Pipe"),
-                Operator::SemiColon => ::core::fmt::Formatter::write_str(f, "SemiColon"),
-                Operator::Tilde => ::core::fmt::Formatter::write_str(f, "Tilde"),
-                Operator::BackTick => ::core::fmt::Formatter::write_str(f, "BackTick"),
-                Operator::Quote => ::core::fmt::Formatter::write_str(f, "Quote"),
-                Operator::SingleQuote => ::core::fmt::Formatter::write_str(f, "SingleQuote"),
-                Operator::Question => ::core::fmt::Formatter::write_str(f, "Question"),
-                Operator::LineComment => ::core::fmt::Formatter::write_str(f, "LineComment"),
-                Operator::BlockCommentOpen => {
-                    ::core::fmt::Formatter::write_str(f, "BlockCommentOpen")
-                }
-                Operator::BlockCommentClose => {
-                    ::core::fmt::Formatter::write_str(f, "BlockCommentClose")
-                }
-                Operator::Equals => ::core::fmt::Formatter::write_str(f, "Equals"),
+                Operator::Pound =>
+                    ::core::fmt::Formatter::write_str(f, "Pound"),
+                Operator::Dollar =>
+                    ::core::fmt::Formatter::write_str(f, "Dollar"),
+                Operator::Percent =>
+                    ::core::fmt::Formatter::write_str(f, "Percent"),
+                Operator::Carot =>
+                    ::core::fmt::Formatter::write_str(f, "Carot"),
+                Operator::Pipe =>
+                    ::core::fmt::Formatter::write_str(f, "Pipe"),
+                Operator::SemiColon =>
+                    ::core::fmt::Formatter::write_str(f, "SemiColon"),
+                Operator::Tilde =>
+                    ::core::fmt::Formatter::write_str(f, "Tilde"),
+                Operator::BackTick =>
+                    ::core::fmt::Formatter::write_str(f, "BackTick"),
+                Operator::Quote =>
+                    ::core::fmt::Formatter::write_str(f, "Quote"),
+                Operator::SingleQuote =>
+                    ::core::fmt::Formatter::write_str(f, "SingleQuote"),
+                Operator::Question =>
+                    ::core::fmt::Formatter::write_str(f, "Question"),
+                Operator::LineComment =>
+                    ::core::fmt::Formatter::write_str(f, "LineComment"),
+                Operator::BlockCommentOpen =>
+                    ::core::fmt::Formatter::write_str(f, "BlockCommentOpen"),
+                Operator::BlockCommentClose =>
+                    ::core::fmt::Formatter::write_str(f, "BlockCommentClose"),
+                Operator::Equals =>
+                    ::core::fmt::Formatter::write_str(f, "Equals"),
             }
         }
     }
     #[automatically_derived]
-    impl ::core::marker::StructuralPartialEq for Operator {}
+    impl ::core::marker::StructuralPartialEq for Operator { }
     #[automatically_derived]
     impl ::core::cmp::PartialEq for Operator {
         #[inline]
@@ -3854,9 +4141,7 @@ pub mod token {
             unsafe { ::core::intrinsics::unreachable() }
         }
     }
-    pub enum Unit {
-        Pixel,
-    }
+    pub enum Unit { Pixel, }
     #[automatically_derived]
     impl ::core::fmt::Debug for Unit {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
@@ -3866,17 +4151,13 @@ pub mod token {
     #[automatically_derived]
     impl ::core::clone::Clone for Unit {
         #[inline]
-        fn clone(&self) -> Unit {
-            *self
-        }
+        fn clone(&self) -> Unit { *self }
     }
     #[automatically_derived]
-    impl ::core::marker::Copy for Unit {}
+    impl ::core::marker::Copy for Unit { }
     impl Display for Unit {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Unit::Pixel => f.write_str("px"),
-            }
+            match self { Unit::Pixel => f.write_str("px"), }
         }
     }
     pub enum Token {
@@ -3893,28 +4174,27 @@ pub mod token {
     impl ::core::fmt::Debug for Token {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
             match self {
-                Token::Ident(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(f, "Ident", &__self_0)
-                }
-                Token::Integer(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(f, "Integer", &__self_0)
-                }
-                Token::Float(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(f, "Float", &__self_0)
-                }
-                Token::Operator(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(f, "Operator", &__self_0)
-                }
-                Token::String => ::core::fmt::Formatter::write_str(f, "String"),
-                Token::TemplateString(__self_0) => {
-                    ::core::fmt::Formatter::debug_tuple_field1_finish(
-                        f,
-                        "TemplateString",
-                        &__self_0,
-                    )
-                }
-                Token::Newline => ::core::fmt::Formatter::write_str(f, "Newline"),
-                Token::Whitespace => ::core::fmt::Formatter::write_str(f, "Whitespace"),
+                Token::Ident(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "Ident", &__self_0),
+                Token::Integer(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "Integer", &__self_0),
+                Token::Float(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "Float", &__self_0),
+                Token::Operator(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "Operator", &__self_0),
+                Token::String =>
+                    ::core::fmt::Formatter::write_str(f, "String"),
+                Token::TemplateString(__self_0) =>
+                    ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                        "TemplateString", &__self_0),
+                Token::Newline =>
+                    ::core::fmt::Formatter::write_str(f, "Newline"),
+                Token::Whitespace =>
+                    ::core::fmt::Formatter::write_str(f, "Whitespace"),
             }
         }
     }
@@ -3923,36 +4203,37 @@ pub mod token {
         #[inline]
         fn clone(&self) -> Token {
             match self {
-                Token::Ident(__self_0) => Token::Ident(::core::clone::Clone::clone(__self_0)),
-                Token::Integer(__self_0) => Token::Integer(::core::clone::Clone::clone(__self_0)),
-                Token::Float(__self_0) => Token::Float(::core::clone::Clone::clone(__self_0)),
-                Token::Operator(__self_0) => Token::Operator(::core::clone::Clone::clone(__self_0)),
+                Token::Ident(__self_0) =>
+                    Token::Ident(::core::clone::Clone::clone(__self_0)),
+                Token::Integer(__self_0) =>
+                    Token::Integer(::core::clone::Clone::clone(__self_0)),
+                Token::Float(__self_0) =>
+                    Token::Float(::core::clone::Clone::clone(__self_0)),
+                Token::Operator(__self_0) =>
+                    Token::Operator(::core::clone::Clone::clone(__self_0)),
                 Token::String => Token::String,
-                Token::TemplateString(__self_0) => {
-                    Token::TemplateString(::core::clone::Clone::clone(__self_0))
-                }
+                Token::TemplateString(__self_0) =>
+                    Token::TemplateString(::core::clone::Clone::clone(__self_0)),
                 Token::Newline => Token::Newline,
                 Token::Whitespace => Token::Whitespace,
             }
         }
     }
     impl NodeDisplay for Token {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config)
+            -> std::fmt::Result {
             match self {
                 Self::Ident(s) => f.write_str(s),
                 Self::Operator(o) => f.write_str(o.as_str()),
-                Self::Integer(i) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &[""],
-                    &[::core::fmt::ArgumentV1::new_display(&i)],
-                )),
-                Self::Float(fl) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &[""],
-                    &[::core::fmt::ArgumentV1::new_display(&fl)],
-                )),
-                Self::TemplateString(s) => f.write_fmt(::core::fmt::Arguments::new_v1(
-                    &["`", "`"],
-                    &[::core::fmt::ArgumentV1::new_debug(&s)],
-                )),
+                Self::Integer(i) =>
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&[""],
+                            &[::core::fmt::ArgumentV1::new_display(&i)])),
+                Self::Float(fl) =>
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&[""],
+                            &[::core::fmt::ArgumentV1::new_display(&fl)])),
+                Self::TemplateString(s) =>
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["`", "`"],
+                            &[::core::fmt::ArgumentV1::new_debug(&s)])),
                 Self::Newline => f.write_str("Newline"),
                 Self::String => f.write_str("String"),
                 Self::Whitespace => f.write_str("Whitespace"),
@@ -3972,22 +4253,15 @@ pub mod token {
     #[automatically_derived]
     impl ::core::fmt::Debug for TokenStream {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-            ::core::fmt::Formatter::debug_struct_field2_finish(
-                f,
-                "TokenStream",
-                "tokens",
-                &&self.tokens,
-                "next_index",
-                &&self.next_index,
-            )
+            ::core::fmt::Formatter::debug_struct_field2_finish(f,
+                "TokenStream", "tokens", &&self.tokens, "next_index",
+                &&self.next_index)
         }
     }
     impl<'a> TokenStream {
         pub fn next(&self) -> Option<&SpannedToken> {
             let next_index = *self.next_index.read().unwrap();
-            if next_index >= self.tokens.len() {
-                return None;
-            }
+            if next_index >= self.tokens.len() { return None; }
             let r = &self.tokens[next_index];
             let mut s = self.next_index.write().unwrap();
             *s += 1;
@@ -3995,9 +4269,7 @@ pub mod token {
         }
         pub fn peek(&'a self) -> Option<&'a Token> {
             let next_index = *self.next_index.read().unwrap();
-            if next_index >= self.tokens.len() {
-                return None;
-            }
+            if next_index >= self.tokens.len() { return None; }
             Some(self.tokens[next_index].tok())
         }
         pub fn back(&'a self) {
@@ -4010,73 +4282,63 @@ pub mod token {
     }
     impl From<Vec<SpannedToken>> for TokenStream {
         fn from(value: Vec<SpannedToken>) -> Self {
-            TokenStream {
-                tokens: value,
-                next_index: RwLock::new(0),
-            }
+            TokenStream { tokens: value, next_index: RwLock::new(0) }
         }
     }
     pub struct SpannedToken(pub Span, pub Token);
     #[automatically_derived]
     impl ::core::fmt::Debug for SpannedToken {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-            ::core::fmt::Formatter::debug_tuple_field2_finish(f, "SpannedToken", &&self.0, &&self.1)
+            ::core::fmt::Formatter::debug_tuple_field2_finish(f,
+                "SpannedToken", &&self.0, &&self.1)
         }
     }
     #[automatically_derived]
     impl ::core::clone::Clone for SpannedToken {
         #[inline]
         fn clone(&self) -> SpannedToken {
-            SpannedToken(
-                ::core::clone::Clone::clone(&self.0),
-                ::core::clone::Clone::clone(&self.1),
-            )
+            SpannedToken(::core::clone::Clone::clone(&self.0),
+                ::core::clone::Clone::clone(&self.1))
         }
     }
     impl SpannedToken {
-        pub fn new(token: Token, span: Span) -> Self {
-            Self(span, token)
-        }
+        pub fn new(token: Token, span: Span) -> Self { Self(span, token) }
         #[inline]
-        pub fn tok(&self) -> &Token {
-            &self.1
-        }
+        pub fn tok(&self) -> &Token { &self.1 }
         #[inline]
-        pub fn span(&self) -> &Span {
-            &self.0
-        }
+        pub fn span(&self) -> &Span { &self.0 }
         #[inline]
         pub fn as_op_str(&self) -> &str {
             match &self.1 {
                 Token::Operator(op) => op.as_str(),
-                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
-                    &["Expected to be identifier"],
-                    &[],
-                )),
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Expected to be identifier"],
+                            &[])),
             }
         }
         #[inline]
         pub fn as_str(&self) -> &str {
             match &self.1 {
                 Token::Ident(id) => id,
-                _ => ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(
-                    &["Expected to be identifier"],
-                    &[],
-                )),
+                _ =>
+                    ::core::panicking::panic_fmt(::core::fmt::Arguments::new_v1(&["Expected to be identifier"],
+                            &[])),
             }
         }
     }
     impl NodeDisplay for SpannedToken {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config)
+            -> std::fmt::Result {
             f.write_fmt(::core::fmt::Arguments::new_v1(&["Token: "], &[]))?;
-            self.1.fmt(f)
+            self.1.fmt(f, _cfg)
         }
     }
     impl TreeDisplay for SpannedToken {
         fn num_children(&self, _cfg: &Config) -> usize {
-            1
+            if let FormatType::Display = _cfg.format_type { 0 } else { 1 }
         }
-        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn child_at(&self, _index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             Some(&self.0)
         }
     }
@@ -4089,18 +4351,9 @@ pub mod token {
     #[automatically_derived]
     impl ::core::fmt::Debug for Span {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-            ::core::fmt::Formatter::debug_struct_field4_finish(
-                f,
-                "Span",
-                "line_num",
-                &&self.line_num,
-                "position",
-                &&self.position,
-                "length",
-                &&self.length,
-                "token_index",
-                &&self.token_index,
-            )
+            ::core::fmt::Formatter::debug_struct_field4_finish(f, "Span",
+                "line_num", &&self.line_num, "position", &&self.position,
+                "length", &&self.length, "token_index", &&self.token_index)
         }
     }
     #[automatically_derived]
@@ -4112,7 +4365,7 @@ pub mod token {
         }
     }
     #[automatically_derived]
-    impl ::core::marker::Copy for Span {}
+    impl ::core::marker::Copy for Span { }
     #[automatically_derived]
     impl ::core::default::Default for Span {
         #[inline]
@@ -4126,19 +4379,18 @@ pub mod token {
         }
     }
     #[automatically_derived]
-    impl ::core::marker::StructuralPartialEq for Span {}
+    impl ::core::marker::StructuralPartialEq for Span { }
     #[automatically_derived]
     impl ::core::cmp::PartialEq for Span {
         #[inline]
         fn eq(&self, other: &Span) -> bool {
-            self.line_num == other.line_num
-                && self.position == other.position
-                && self.length == other.length
-                && self.token_index == other.token_index
+            self.line_num == other.line_num && self.position == other.position
+                    && self.length == other.length &&
+                self.token_index == other.token_index
         }
     }
     #[automatically_derived]
-    impl ::core::marker::StructuralEq for Span {}
+    impl ::core::marker::StructuralEq for Span { }
     #[automatically_derived]
     impl ::core::cmp::Eq for Span {
         #[inline]
@@ -4150,45 +4402,46 @@ pub mod token {
     }
     impl Span {
         pub fn contains(&self, other: &Span) -> bool {
-            if self.line_num == other.line_num && other.position < self.position + self.length {
-                return true;
-            }
+            if self.line_num == other.line_num &&
+                        other.position < self.position + self.length {
+                    return true;
+                }
             false
         }
         pub fn before(&self, other: &Span) -> bool {
-            if self.line_num == other.line_num && other.position >= self.position + self.length {
-                return true;
-            }
+            if self.line_num == other.line_num &&
+                        other.position >= self.position + self.length {
+                    return true;
+                }
             false
         }
         pub fn right_before(&self, other: &Span) -> bool {
-            if self.line_num == other.line_num && other.position == self.position + self.length {
-                return true;
-            }
+            if self.line_num == other.line_num &&
+                        other.position == self.position + self.length {
+                    return true;
+                }
             false
         }
         pub fn after(&self, other: &Span) -> bool {
-            if self.line_num == other.line_num && other.position + other.length < self.position {
-                return true;
-            }
+            if self.line_num == other.line_num &&
+                        other.position + other.length < self.position {
+                    return true;
+                }
             false
         }
         pub fn right_after(&self, other: &Span) -> bool {
-            if self.line_num == other.line_num && other.position + other.length == self.position {
-                return true;
-            }
+            if self.line_num == other.line_num &&
+                        other.position + other.length == self.position {
+                    return true;
+                }
             false
         }
     }
     impl From<SpannedToken> for Span {
-        fn from(value: SpannedToken) -> Self {
-            value.0
-        }
+        fn from(value: SpannedToken) -> Self { value.0 }
     }
     impl From<&SpannedToken> for Span {
-        fn from(value: &SpannedToken) -> Self {
-            value.0
-        }
+        fn from(value: &SpannedToken) -> Self { value.0 }
     }
     impl Ord for Span {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -4205,23 +4458,32 @@ pub mod token {
         }
     }
     impl NodeDisplay for Span {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.write_fmt(::core::fmt::Arguments::new_v1(
-                &["Span line: ", ", character: ", ", ", " long, token: "],
-                &[
-                    ::core::fmt::ArgumentV1::new_display(&self.line_num),
-                    ::core::fmt::ArgumentV1::new_display(&self.position),
-                    ::core::fmt::ArgumentV1::new_display(&self.length),
-                    ::core::fmt::ArgumentV1::new_display(&self.token_index),
-                ],
-            ))
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cfg: &Config)
+            -> std::fmt::Result {
+            match &cfg.format_type {
+                FormatType::Debug => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Span line: ",
+                                        ", character: ", ", ", " long, token: "],
+                            &[::core::fmt::ArgumentV1::new_display(&self.line_num),
+                                        ::core::fmt::ArgumentV1::new_display(&self.position),
+                                        ::core::fmt::ArgumentV1::new_display(&self.length),
+                                        ::core::fmt::ArgumentV1::new_display(&self.token_index)]))
+                }
+                FormatType::Display => {
+                    f.write_fmt(::core::fmt::Arguments::new_v1(&["Span line: ",
+                                        ", character: ", ", ", " long, token: "],
+                            &[::core::fmt::ArgumentV1::new_display(&self.line_num),
+                                        ::core::fmt::ArgumentV1::new_display(&self.position),
+                                        ::core::fmt::ArgumentV1::new_display(&self.length),
+                                        ::core::fmt::ArgumentV1::new_display(&self.token_index)]))
+                }
+            }
         }
     }
     impl TreeDisplay for Span {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            0
-        }
-        fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn num_children(&self, _cfg: &Config) -> usize { 0 }
+        fn child_at(&self, _index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             ::core::panicking::panic("explicit panic")
         }
     }
@@ -4232,14 +4494,8 @@ pub mod token {
     #[automatically_derived]
     impl ::core::fmt::Debug for Range {
         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-            ::core::fmt::Formatter::debug_struct_field2_finish(
-                f,
-                "Range",
-                "start",
-                &&self.start,
-                "end",
-                &&self.end,
-            )
+            ::core::fmt::Formatter::debug_struct_field2_finish(f, "Range",
+                "start", &&self.start, "end", &&self.end)
         }
     }
     #[automatically_derived]
@@ -4251,7 +4507,7 @@ pub mod token {
         }
     }
     #[automatically_derived]
-    impl ::core::marker::Copy for Range {}
+    impl ::core::marker::Copy for Range { }
     #[automatically_derived]
     impl ::core::default::Default for Range {
         #[inline]
@@ -4263,81 +4519,47 @@ pub mod token {
         }
     }
     impl Range {
-        pub fn new(start: Span, end: Span) -> Range {
-            Range { start, end }
-        }
+        pub fn new(start: Span, end: Span) -> Range { Range { start, end } }
         pub fn contains(&self, span: &Span) -> bool {
             span >= &self.start && span <= &self.end
         }
     }
     impl From<(&Range, &Range)> for Range {
         fn from(value: (&Range, &Range)) -> Self {
-            Range {
-                start: value.0.start,
-                end: value.1.end,
-            }
+            Range { start: value.0.start, end: value.1.end }
         }
     }
-    impl<T> From<(&Range, T)> for Range
-    where
-        T: Into<Span>,
-    {
+    impl<T> From<(&Range, T)> for Range where T: Into<Span> {
         fn from(value: (&Range, T)) -> Self {
-            Range {
-                start: value.0.start,
-                end: value.1.into(),
-            }
+            Range { start: value.0.start, end: value.1.into() }
         }
     }
-    impl<T> From<(T, &Range)> for Range
-    where
-        T: Into<Span>,
-    {
+    impl<T> From<(T, &Range)> for Range where T: Into<Span> {
         fn from(value: (T, &Range)) -> Self {
-            Range {
-                start: value.0.into(),
-                end: value.1.end,
-            }
+            Range { start: value.0.into(), end: value.1.end }
         }
     }
-    impl<T, U> From<(T, U)> for Range
-    where
-        T: Into<Span>,
-        U: Into<Span>,
-    {
+    impl<T, U> From<(T, U)> for Range where T: Into<Span>, U: Into<Span> {
         fn from(value: (T, U)) -> Self {
-            Range {
-                start: value.0.into(),
-                end: value.1.into(),
-            }
+            Range { start: value.0.into(), end: value.1.into() }
         }
     }
     impl From<&Span> for Range {
-        fn from(value: &Span) -> Self {
-            Range {
-                start: *value,
-                end: *value,
-            }
-        }
+        fn from(value: &Span) -> Self { Range { start: *value, end: *value } }
     }
     impl From<Span> for Range {
-        fn from(value: Span) -> Self {
-            Range {
-                start: value,
-                end: value,
-            }
-        }
+        fn from(value: Span) -> Self { Range { start: value, end: value } }
     }
     impl NodeDisplay for Range {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config)
+            -> std::fmt::Result {
             f.write_fmt(::core::fmt::Arguments::new_v1(&["Range"], &[]))
         }
     }
     impl TreeDisplay for Range {
-        fn num_children(&self, _cfg: &Config) -> usize {
-            2
-        }
-        fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        fn num_children(&self, _cfg: &Config) -> usize { 2 }
+        fn child_at(&self, index: usize, _cfg: &Config)
+            -> Option<&dyn TreeDisplay> {
             match index {
                 0 => Some(&self.start),
                 1 => Some(&self.end),
@@ -4349,47 +4571,18 @@ pub mod token {
 use error::ParseError;
 pub use pollster;
 impl Module {
-    pub fn parse_str(input: &str, mod_name: &str) -> (Module, Vec<ParseError>) {
+    pub fn parse_str(input: &str, mod_name: &str)
+        -> (Module, Vec<ParseError>) {
         let lexer = Lexer {};
         let tokens = lexer.lex(input);
-        for p in &tokens {
-            {
-                ::std::io::_print(::core::fmt::Arguments::new_v1_formatted(
-                    &["", "\n"],
-                    &[::core::fmt::ArgumentV1::new_debug(&p)],
-                    &[::core::fmt::rt::v1::Argument {
-                        position: 0usize,
-                        format: ::core::fmt::rt::v1::FormatSpec {
-                            fill: ' ',
-                            align: ::core::fmt::rt::v1::Alignment::Unknown,
-                            flags: 4u32,
-                            precision: ::core::fmt::rt::v1::Count::Implied,
-                            width: ::core::fmt::rt::v1::Count::Implied,
-                        },
-                    }],
-                    unsafe { ::core::fmt::UnsafeArg::new() },
-                ));
-            };
-        }
         let parser = Parser::new(tokens);
         let parsed = parser.parse().unwrap();
-        for p in &parsed {
-            {
-                ::std::io::_print(::core::fmt::Arguments::new_v1(
-                    &["", "\n"],
-                    &[::core::fmt::ArgumentV1::new_display(&p.format())],
-                ));
-            };
-        }
         let er = parser.get_errors().clone();
-        (
-            Module {
+        (Module {
                 name: mod_name.to_string(),
                 content: input.to_string(),
                 stmts: parsed,
-            },
-            er,
-        )
+            }, er)
     }
 }
 pub fn set_logger(logger: Box<dyn Log>) -> Result<(), SetLoggerError> {
@@ -4400,6 +4593,20 @@ pub struct Module {
     pub content: String,
     pub stmts: Vec<Statement>,
 }
+impl NodeDisplay for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _config: &Config)
+        -> std::fmt::Result {
+        f.write_fmt(::core::fmt::Arguments::new_v1(&["Module: \'", "\'"],
+                &[::core::fmt::ArgumentV1::new_display(&self.name)]))
+    }
+}
+impl TreeDisplay for Module {
+    fn num_children(&self, _cfg: &Config) -> usize { self.stmts.len() }
+    fn child_at(&self, index: usize, _cfg: &Config)
+        -> Option<&dyn TreeDisplay<()>> {
+        self.stmts.get(index).map::<&dyn TreeDisplay, _>(|s| &*s)
+    }
+}
 impl Module {
     pub fn empty(name: &str) -> Module {
         Module {
@@ -4408,25 +4615,17 @@ impl Module {
             stmts: Vec::new(),
         }
     }
-    pub fn format(&self) -> String {
-        self.stmts
-            .iter()
-            .map(|f| {
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &["", "\n"],
-                    &[::core::fmt::ArgumentV1::new_display(&f.format())],
-                ));
-                res
-            })
-            .collect()
-    }
 }
 pub enum SymbolKind {
     Record,
     Function,
     Variable,
-    Parameter { ty: Type },
-    ReturnParameter { ty: Type },
+    Parameter {
+        ty: Type,
+    },
+    ReturnParameter {
+        ty: Type,
+    },
     Use(Vec<String>),
     Root,
 }
@@ -4437,30 +4636,27 @@ pub struct Symbol {
     pub children: LinkedHashMap<String, Rf<Symbol>>,
 }
 impl NodeDisplay for Symbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config)
+        -> std::fmt::Result {
         match &self.kind {
             SymbolKind::Root => f.write_str("Root"),
-            SymbolKind::Record { .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                &["Record `", "`"],
-                &[::core::fmt::ArgumentV1::new_display(&self.name)],
-            )),
-            SymbolKind::Function { .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                &["Function `", "`"],
-                &[::core::fmt::ArgumentV1::new_display(&self.name)],
-            )),
-            SymbolKind::Variable { .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                &["Variable `", "`"],
-                &[::core::fmt::ArgumentV1::new_display(&self.name)],
-            )),
-            SymbolKind::Parameter { .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                &["Parameter `", "`"],
-                &[::core::fmt::ArgumentV1::new_display(&self.name)],
-            )),
-            SymbolKind::ReturnParameter { .. } => f.write_fmt(::core::fmt::Arguments::new_v1(
-                &["Return Parameter`", "`"],
-                &[::core::fmt::ArgumentV1::new_display(&self.name)],
-            )),
-            SymbolKind::Use(_) => f.write_fmt(::core::fmt::Arguments::new_v1(&["Use"], &[])),
+            SymbolKind::Record { .. } =>
+                f.write_fmt(::core::fmt::Arguments::new_v1(&["Record `", "`"],
+                        &[::core::fmt::ArgumentV1::new_display(&self.name)])),
+            SymbolKind::Function { .. } =>
+                f.write_fmt(::core::fmt::Arguments::new_v1(&["Function `",
+                                    "`"], &[::core::fmt::ArgumentV1::new_display(&self.name)])),
+            SymbolKind::Variable { .. } =>
+                f.write_fmt(::core::fmt::Arguments::new_v1(&["Variable `",
+                                    "`"], &[::core::fmt::ArgumentV1::new_display(&self.name)])),
+            SymbolKind::Parameter { .. } =>
+                f.write_fmt(::core::fmt::Arguments::new_v1(&["Parameter `",
+                                    "`"], &[::core::fmt::ArgumentV1::new_display(&self.name)])),
+            SymbolKind::ReturnParameter { .. } =>
+                f.write_fmt(::core::fmt::Arguments::new_v1(&["Return Parameter`",
+                                    "`"], &[::core::fmt::ArgumentV1::new_display(&self.name)])),
+            SymbolKind::Use(_) =>
+                f.write_fmt(::core::fmt::Arguments::new_v1(&["Use"], &[])),
         }
     }
 }
@@ -4472,14 +4668,16 @@ impl TreeDisplay for Symbol {
             _ => self.children.len(),
         }
     }
-    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config)
+        -> Option<&dyn TreeDisplay> {
         match &self.kind {
             SymbolKind::Parameter { ty } => Some(ty),
             SymbolKind::ReturnParameter { ty } => Some(ty),
             _ => None,
         }
     }
-    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'a> {
+    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config)
+        -> Box<dyn TreeDisplay + 'a> {
         let p = self.children.values().nth(index).unwrap().borrow();
         Box::new(p)
     }
@@ -4487,57 +4685,55 @@ impl TreeDisplay for Symbol {
 impl Symbol {
     pub fn new_root() -> Rf<Symbol> {
         Rf::new(Symbol {
-            name: "root".to_string(),
-            kind: SymbolKind::Root,
-            parent: None,
-            children: LinkedHashMap::new(),
-        })
-    }
-    pub fn insert_unnamed(symb: &Rf<Symbol>, name: &str, kind: SymbolKind) -> Option<Rf<Symbol>> {
-        let insert_index = {
-            let symb = symb.borrow();
-            [0; 128]
-                .into_iter()
-                .enumerate()
-                .map(|(i, _)| i)
-                .find_map(|v| {
-                    let val = {
-                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                            &[""],
-                            &[::core::fmt::ArgumentV1::new_display(&v)],
-                        ));
-                        res
-                    };
-                    if symb.children.get(&val).is_none() {
-                        Some(val)
-                    } else {
-                        None
-                    }
-                })
-        };
-        if let Some(insert_index) = insert_index {
-            let new = Rf::new(Symbol {
-                name: name.into(),
-                kind,
-                parent: Some(symb.clone()),
+                name: "root".to_string(),
+                kind: SymbolKind::Root,
+                parent: None,
                 children: LinkedHashMap::new(),
-            });
-            symb.borrow_mut().children.insert(insert_index, new.clone());
-            Some(new)
-        } else {
-            None
-        }
+            })
     }
-    pub fn insert(symb: &Rf<Symbol>, name: &str, kind: SymbolKind) -> Rf<Symbol> {
-        let new = Rf::new(Symbol {
-            name: name.to_string(),
-            kind,
-            parent: Some(symb.clone()),
-            children: LinkedHashMap::new(),
-        });
-        symb.borrow_mut()
-            .children
-            .insert(name.to_string(), new.clone());
+    pub fn insert_unnamed(symb: &Rf<Symbol>, name: &str, kind: SymbolKind)
+        -> Option<Rf<Symbol>> {
+        let insert_index =
+            {
+                let symb = symb.borrow();
+                [0;
+                                        128].into_iter().enumerate().map(|(i, _)|
+                            i).find_map(|v|
+                        {
+                            let val =
+                                {
+                                    let res =
+                                        ::alloc::fmt::format(::core::fmt::Arguments::new_v1(&[""],
+                                                &[::core::fmt::ArgumentV1::new_display(&v)]));
+                                    res
+                                };
+                            if symb.children.get(&val).is_none() {
+                                    Some(val)
+                                } else { None }
+                        })
+            };
+        if let Some(insert_index) = insert_index {
+                let new =
+                    Rf::new(Symbol {
+                            name: name.into(),
+                            kind,
+                            parent: Some(symb.clone()),
+                            children: LinkedHashMap::new(),
+                        });
+                symb.borrow_mut().children.insert(insert_index, new.clone());
+                Some(new)
+            } else { None }
+    }
+    pub fn insert(symb: &Rf<Symbol>, name: &str, kind: SymbolKind)
+        -> Rf<Symbol> {
+        let new =
+            Rf::new(Symbol {
+                    name: name.to_string(),
+                    kind,
+                    parent: Some(symb.clone()),
+                    children: LinkedHashMap::new(),
+                });
+        symb.borrow_mut().children.insert(name.to_string(), new.clone());
         new
     }
 }
@@ -4550,7 +4746,8 @@ pub struct ModuleDescender<U: Clone> {
     on_return_parameters: Option<Box<dyn FnMut(&ParamaterList, U) -> U>>,
 }
 #[automatically_derived]
-impl<U: ::core::default::Default + Clone> ::core::default::Default for ModuleDescender<U> {
+impl<U: ::core::default::Default + Clone> ::core::default::Default for
+    ModuleDescender<U> {
     #[inline]
     fn default() -> ModuleDescender<U> {
         ModuleDescender {
@@ -4574,87 +4771,69 @@ impl<U: Clone> ModuleDescender<U> {
             on_return_parameters: None,
         }
     }
-    pub fn with_on_statement(
-        mut self,
-        on_statement: impl FnMut(&Statement, U) -> (U, U) + 'static,
-    ) -> ModuleDescender<U> {
+    pub fn with_on_statement(mut self,
+        on_statement: impl FnMut(&Statement, U) -> (U, U) + 'static)
+        -> ModuleDescender<U> {
         self.on_statement = Some(Box::new(on_statement));
         self
     }
-    pub fn with_on_expression(
-        mut self,
-        on_value: impl FnMut(&Expression, U) -> U + 'static,
-    ) -> ModuleDescender<U> {
+    pub fn with_on_expression(mut self,
+        on_value: impl FnMut(&Expression, U) -> U + 'static)
+        -> ModuleDescender<U> {
         self.on_expression = Some(Box::new(on_value));
         self
     }
-    pub fn with_on_parameters(
-        mut self,
-        on_parameters: impl FnMut(&ParamaterList, U) -> U + 'static,
-    ) -> ModuleDescender<U> {
+    pub fn with_on_parameters(mut self,
+        on_parameters: impl FnMut(&ParamaterList, U) -> U + 'static)
+        -> ModuleDescender<U> {
         self.on_parameters = Some(Box::new(on_parameters));
         self
     }
-    pub fn with_on_struct_members(
-        mut self,
-        on_struct_memebers: impl FnMut(&EnclosedList<Param>, U) -> U + 'static,
-    ) -> ModuleDescender<U> {
+    pub fn with_on_struct_members(mut self,
+        on_struct_memebers:
+            impl FnMut(&EnclosedList<Param>, U) -> U + 'static)
+        -> ModuleDescender<U> {
         self.on_struct_members = Some(Box::new(on_struct_memebers));
         self
     }
-    pub fn with_on_return_parameters(
-        mut self,
-        on_return_parameters: impl FnMut(&ParamaterList, U) -> U + 'static,
-    ) -> ModuleDescender<U> {
+    pub fn with_on_return_parameters(mut self,
+        on_return_parameters: impl FnMut(&ParamaterList, U) -> U + 'static)
+        -> ModuleDescender<U> {
         self.on_return_parameters = Some(Box::new(on_return_parameters));
         self
     }
     pub fn descend(mut self, node: &Vec<Statement>) -> U {
-        for node in node {
-            self.descend_statement(node)
-        }
+        for node in node { self.descend_statement(node) }
         self.user_data
     }
     pub fn descend_expression(&mut self, node: &Expression) {
-        match node {
-            Expression::Record(parameters) => {}
-            _ => (),
-        }
+        match node { Expression::Record(parameters) => {} _ => (), }
         if let Some(on_value) = &mut self.on_expression {
-            self.user_data = on_value(node, self.user_data.clone())
-        }
+                self.user_data = on_value(node, self.user_data.clone())
+            }
     }
     pub fn descend_statement(&mut self, node: &Statement) {
-        let sets = if let Some(on_statement) = &mut self.on_statement {
-            Some(on_statement(node, self.user_data.clone()))
-        } else {
-            None
-        };
-        let sets = if let Some(sets) = sets {
-            self.user_data = sets.0;
-            Some(sets.1)
-        } else {
-            None
-        };
+        let sets =
+            if let Some(on_statement) = &mut self.on_statement {
+                    Some(on_statement(node, self.user_data.clone()))
+                } else { None };
+        let sets =
+            if let Some(sets) = sets {
+                    self.user_data = sets.0;
+                    Some(sets.1)
+                } else { None };
         match node {
-            Statement::Declaration {
-                expr: Some(expr), ..
-            } => self.descend_expression(expr),
+            Statement::VariableDeclaration { expr: Some(expr), .. } =>
+                self.descend_expression(expr),
             Statement::Expression(e) => self.descend_expression(e),
-            Statement::Function {
-                parameters,
-                return_type,
-                ..
-            } => {
+            Statement::Function { parameters, return_type, .. } => {
                 if let Some(on_prm) = &mut self.on_parameters {
-                    on_prm(parameters, self.user_data.clone());
-                }
+                        on_prm(parameters, self.user_data.clone());
+                    }
             }
             _ => (),
         }
-        if let Some(sets) = sets {
-            self.user_data = sets;
-        }
+        if let Some(sets) = sets { self.user_data = sets; }
     }
 }
 pub struct MutModuleDescender<U: Clone> {
@@ -4664,7 +4843,8 @@ pub struct MutModuleDescender<U: Clone> {
     on_expression: Option<Box<dyn FnMut(&mut Expression, U) -> U>>,
 }
 #[automatically_derived]
-impl<U: ::core::default::Default + Clone> ::core::default::Default for MutModuleDescender<U> {
+impl<U: ::core::default::Default + Clone> ::core::default::Default for
+    MutModuleDescender<U> {
     #[inline]
     fn default() -> MutModuleDescender<U> {
         MutModuleDescender {
@@ -4684,69 +4864,61 @@ impl<U: Clone> MutModuleDescender<U> {
             on_expression: None,
         }
     }
-    pub fn with_on_statement(
-        mut self,
-        on_statement: impl FnMut(&mut Statement, U) -> (U, U) + 'static,
-    ) -> MutModuleDescender<U> {
+    pub fn with_on_statement(mut self,
+        on_statement: impl FnMut(&mut Statement, U) -> (U, U) + 'static)
+        -> MutModuleDescender<U> {
         self.on_statement = Some(Box::new(on_statement));
         self
     }
-    pub fn with_on_expression(
-        mut self,
-        on_value: impl FnMut(&mut Expression, U) -> U + 'static,
-    ) -> MutModuleDescender<U> {
+    pub fn with_on_expression(mut self,
+        on_value: impl FnMut(&mut Expression, U) -> U + 'static)
+        -> MutModuleDescender<U> {
         self.on_expression = Some(Box::new(on_value));
         self
     }
-    pub fn with_callback_first(mut self, callback_first: bool) -> MutModuleDescender<U> {
+    pub fn with_callback_first(mut self, callback_first: bool)
+        -> MutModuleDescender<U> {
         self.callback_first = callback_first;
         self
     }
     pub fn descend(mut self, node: &mut Vec<Statement>) -> U {
-        for node in node {
-            self.descend_statement(node)
-        }
+        for node in node { self.descend_statement(node) }
         self.user_data
     }
     pub fn descend_expression(&mut self, node: &mut Expression) {
         if let Some(on_value) = &mut self.on_expression {
-            self.user_data = on_value(node, self.user_data.clone())
-        }
+                self.user_data = on_value(node, self.user_data.clone())
+            }
     }
     pub fn descend_statement(&mut self, node: &mut Statement) {
         if self.callback_first {
-            let sets = if let Some(on_statement) = &mut self.on_statement {
-                Some(on_statement(node, self.user_data.clone()))
+                let sets =
+                    if let Some(on_statement) = &mut self.on_statement {
+                            Some(on_statement(node, self.user_data.clone()))
+                        } else { None };
+                let sets =
+                    if let Some(sets) = sets {
+                            self.user_data = sets.0;
+                            Some(sets.1)
+                        } else { None };
+                match node {
+                    Statement::VariableDeclaration { expr: Some(expr), .. } =>
+                        self.descend_expression(expr),
+                    Statement::Expression(e) => self.descend_expression(e),
+                    _ => (),
+                }
+                if let Some(sets) = sets { self.user_data = sets; }
             } else {
-                None
-            };
-            let sets = if let Some(sets) = sets {
-                self.user_data = sets.0;
-                Some(sets.1)
-            } else {
-                None
-            };
-            match node {
-                Statement::Declaration {
-                    expr: Some(expr), ..
-                } => self.descend_expression(expr),
-                Statement::Expression(e) => self.descend_expression(e),
-                _ => (),
-            }
-            if let Some(sets) = sets {
-                self.user_data = sets;
-            }
-        } else {
-            match node {
-                Statement::Declaration {
-                    expr: Some(expr), ..
-                } => self.descend_expression(expr),
-                Statement::Expression(e) => self.descend_expression(e),
-                _ => (),
-            }
-            if let Some(on_statement) = &mut self.on_statement {
-                self.user_data = on_statement(node, self.user_data.clone()).1
-            }
-        }
+               match node {
+                   Statement::VariableDeclaration { expr: Some(expr), .. } =>
+                       self.descend_expression(expr),
+                   Statement::Expression(e) => self.descend_expression(e),
+                   _ => (),
+               }
+               if let Some(on_statement) = &mut self.on_statement {
+                       self.user_data =
+                           on_statement(node, self.user_data.clone()).1
+                   }
+           }
     }
 }

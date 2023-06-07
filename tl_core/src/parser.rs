@@ -193,7 +193,7 @@ impl Parser {
 
             let expr = self.parse_expression();
 
-            return Some(Statement::Declaration {
+            return Some(Statement::VariableDeclaration {
                 ty,
                 ident: ident.clone(),
                 eq,
@@ -328,62 +328,12 @@ impl Parser {
     }
 
     pub fn parse_parameters(&self) -> Option<ParamaterList> {
-        let open = self.expect_operator(Operator::OpenParen);
-
-        let args = match self.tokens.peek() {
-            Some(Token::Operator(Operator::CloseParen)) => PunctuationList::default(),
-            _ => {
-                let mut args = PunctuationList::default();
-
-                while let Some(arg) = self.parse_parameter() {
-                    if arg.ty.is_none() {
-                        return None;
-                    }
-                    let comma = if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
-                        self.tokens.next().cloned()
-                    } else {
-                        None
-                    };
-                    if let Some(Token::Operator(Operator::CloseParen)) = self.tokens.peek() {
-                        args.push(arg, comma);
-                        break;
-                    }
-                    if comma.is_none() {
-                        self.add_error(ParseError {
-                            kind: ParseErrorKind::InvalidSyntax(
-                                "Expected comma in arguments!".to_string(),
-                            ),
-                            range: Range::default(),
-                        });
-                    }
-                    args.push(arg, comma);
-                }
-                args
-            }
-        };
-
-        let close = self.expect_operator(Operator::CloseParen);
-
-        if let (Some(open), Some(close)) = (open, close) {
-            Some(ParamaterList {
-                items: args,
-                range: Range {
-                    start: open.0,
-                    end: close.0,
-                },
-            })
-        } else {
-            self.add_error(ParseError {
-                kind: ParseErrorKind::InvalidSyntax(
-                    "Unable to parse parameters brackets!".to_string(),
-                ),
-                range: Range::default(),
-            });
-            Some(ParamaterList {
-                items: args,
-                range: Range::default(),
-            })
-        }
+        self.parse_enclosed_punctuation_list(
+            Operator::OpenParen,
+            Operator::Comma,
+            Operator::CloseParen,
+            || self.parse_parameter().map(|f| (f, true)),
+        )
     }
 
     pub fn parse_parameter(&self) -> Option<Param> {
@@ -406,57 +356,12 @@ impl Parser {
     }
 
     pub fn parse_arguments(&self) -> Option<ArgList> {
-        let open = self.expect_operator(Operator::OpenParen);
-
-        let args = match self.tokens.peek() {
-            Some(Token::Operator(Operator::CloseParen)) => PunctuationList::default(),
-            _ => {
-                let mut args = PunctuationList::default();
-
-                while let Some(arg) = self.parse_operator_expression(0) {
-                    let comma = if let Some(Token::Operator(Operator::Comma)) = self.tokens.peek() {
-                        self.tokens.next().cloned()
-                    } else {
-                        None
-                    };
-                    if let Some(Token::Operator(Operator::CloseParen)) = self.tokens.peek() {
-                        args.push(arg, comma);
-                        break;
-                    }
-                    if comma.is_none() {
-                        self.add_error(ParseError {
-                            kind: ParseErrorKind::InvalidSyntax(
-                                "Expected comma in arguments!".to_string(),
-                            ),
-                            range: Range::default(),
-                        });
-                    }
-                    args.push_sep(arg, comma.unwrap());
-                }
-                args
-            }
-        };
-
-        let close = self.expect_operator(Operator::CloseParen);
-
-        if let (Some(open), Some(close)) = (open, close) {
-            Some(ArgList {
-                items: args,
-                range: Range {
-                    start: open.0,
-                    end: close.0,
-                },
-            })
-        } else {
-            self.add_error(ParseError {
-                kind: ParseErrorKind::InvalidSyntax("Unable to parse arg brackets!".to_string()),
-                range: Range::default(),
-            });
-            Some(ArgList {
-                items: args,
-                range: Range::default(),
-            })
-        }
+        self.parse_enclosed_punctuation_list(
+            Operator::OpenParen,
+            Operator::Comma,
+            Operator::CloseParen,
+            || self.parse_expression().map(|f| (f, true)),
+        )
     }
 
     pub fn parse_list<T: AstNode>(
