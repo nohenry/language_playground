@@ -7,7 +7,8 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
     parse_macro_input,
     punctuated::Punctuated,
-    Attribute, Data, DeriveInput, Fields, GenericArgument, GenericParam, ReturnType, Type,
+    Attribute, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericArgument,
+    GenericParam, ReturnType, Type,
 };
 
 fn has_attr<'a>(attrs: &'a Vec<Attribute>, st: &[&str]) -> Option<&'a Attribute> {
@@ -311,21 +312,40 @@ pub fn derive_node_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenS
                 let extras = has_many_attr(&variant.attrs, &["extra_format"])
                     .map(|attr| get_write_format(attr).unwrap());
 
+                let mut globber = TokenStream::new();
+
                 let fields_in_variant = match &variant.fields {
-                    Fields::Unnamed(_) => quote::quote! { (..) },
+                    Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
+                        let fields = unnamed
+                            .iter()
+                            .enumerate()
+                            .map(|f| TokenStream::from_str(&format!("a{}", f.0)).unwrap());
+
+                        let glob_fields = fields.clone();
+                        globber.extend(quote::quote! { let this = (#(#glob_fields),*); });
+
+                        quote::quote! { (#(#fields),*) }
+                    }
                     Fields::Unit => quote::quote! {},
-                    Fields::Named(_) => quote::quote! { {..} },
+                    Fields::Named(FieldsNamed { named, .. }) => {
+                        let fields = named.iter().map(|f| &f.ident);
+
+                        quote::quote! { {#(#fields),*} }
+                    }
                 };
 
                 let string = name.to_string();
 
                 tokens.extend(quote::quote! {
-                    #ident::#name #fields_in_variant => { write!(f, #string)?; #(write!(f, #extras)?;)* Ok(()) },
+                    #ident::#name #fields_in_variant => { #globber write!(f, #string)?; #(write!(f, #extras)?;)* Ok(()) },
                 })
             }
 
             quote::quote! {
-                impl NodeDisplay for #ident {
+                impl <#params> NodeDisplay for #ident<#(#struct_args),*> #where_clause {
+                    #![allow(dead_code)]
+                    #![allow(unused_variables)]
+
                     fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
                         match self {
                             #tokens
@@ -340,12 +360,6 @@ pub fn derive_node_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenS
                 .map(|attr| get_write_format(attr).unwrap());
 
             let name = ident.to_string();
-
-            // let params = if params.len() > 0  {
-            //     quote::quote!(<#params>)
-            // } else {
-            //     params.clone().to_token_stream()
-            // };
 
             quote::quote! {
                 impl <#params> NodeDisplay for #ident<#(#struct_args),*> #where_clause {
@@ -371,7 +385,6 @@ fn derive_tree_format_helper(
 ) -> (TokenStream, TokenStream) {
     let mut num_childs = TokenStream::new();
     let mut childs = TokenStream::new();
-    // let name = &variant.ident;
 
     let enum_field = enum_field
         .map(|field| quote::quote!(::#field))
@@ -541,7 +554,10 @@ fn derive_tree_format_helper(
     (num_childs, childs)
 }
 
-#[proc_macro_derive(TreeFormat, attributes(transient, ignore_item, ignore_all, keep_item,))]
+#[proc_macro_derive(
+    TreeFormat,
+    attributes(transient, ignore_item, ignore_all, keep_item, semantic)
+)]
 pub fn derive_tree_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(tokens as DeriveInput);
 
@@ -562,18 +578,33 @@ pub fn derive_tree_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let mut num_childs = TokenStream::new();
     let mut childs = TokenStream::new();
+    let mut semantic_types = TokenStream::new();
     let mut boxed_childs = TokenStream::new();
+
+    let default = if let Some(attr) = has_attr(&input.attrs, &["semantic"]) {
+        let tokens = attr.meta.require_list().unwrap().tokens.clone();
+
+        quote::quote! { _ => #tokens, }
+    } else {
+        quote::quote! { _ => SemanticType::Default }
+    };
 
     match &input.data {
         Data::Enum(node) => {
             for variant in &node.variants {
-
                 if ignore.0.contains(&variant.ident.to_string()) {
                     continue;
                 }
 
                 if has_attr(&variant.attrs, &["ignore_item"]).is_some() {
                     continue;
+                }
+
+                if let Some(attr) = has_attr(&variant.attrs, &["semantic"]) {
+                    let name = &variant.ident;
+                    let tokens = attr.meta.require_list().unwrap().tokens.clone();
+
+                    semantic_types.extend(quote::quote! { #ident::#name { .. } => #tokens, });
                 }
 
                 let (num_child, child) = derive_tree_format_helper(
@@ -598,6 +629,14 @@ pub fn derive_tree_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let tokens = quote::quote! {
         impl <#params> TreeDisplay for #ident<#(#struct_args),*> #where_clause {
+
+            fn semantic_type(&self) -> SemanticType {
+                match self {
+                    #semantic_types
+                    #default
+                }
+            }
+
             fn num_children(&self, _cfg: &Config) -> usize {
                 match self {
                     #num_childs

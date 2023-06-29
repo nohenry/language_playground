@@ -1,10 +1,11 @@
 use std::{fmt::Display, sync::RwLock};
 
+use colored::Colorize;
 use tl_util::format::{Config, FormatType, NodeDisplay, TreeDisplay};
 
 use crate::lexer::Template;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Operator {
     OpenSquare,
     CloseSquare,
@@ -13,7 +14,9 @@ pub enum Operator {
     OpenBrace,
     CloseBrace,
     OpenAngle,
+    OpenAngleEqual,
     CloseAngle,
+    CloseAngleEqual,
 
     Dot,
     DoubleDot,
@@ -22,35 +25,56 @@ pub enum Operator {
     Colon,
     Comma,
     Arrow,
+    EqArrow,
 
     Plus,
+    PlusEqual,
     Minus,
+    MinusEqual,
     Multiply,
+    MultiplyEqual,
     Divide,
+    DivideEqual,
     Exponent,
+    ExponentEqual,
     Or,
+    OrEqual,
     And,
+    AndEqual,
 
     Ampersand,
+    AmpersandEqual,
     Exclamation,
     At,
     Pound,
     Dollar,
     Percent,
+    PercentEqual,
     Carot,
+    CarotEqual,
     Pipe,
+    PipeEqual,
     SemiColon,
     Tilde,
     BackTick,
     Quote,
     SingleQuote,
     Question,
+    Underscore,
 
     LineComment,
     BlockCommentOpen,
     BlockCommentClose,
 
+    Newline,
+
     Equals,
+}
+
+impl PartialEq for Operator {
+    fn eq(&self, other: &Self) -> bool {
+        core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
 }
 
 impl Operator {
@@ -63,7 +87,9 @@ impl Operator {
             Self::OpenBrace => "{",
             Self::CloseBrace => "}",
             Self::OpenAngle => "<",
+            Self::OpenAngleEqual => "<=",
             Self::CloseAngle => ">",
+            Self::CloseAngleEqual => ">=",
 
             Self::Dot => ".",
             Self::DoubleDot => "..",
@@ -72,33 +98,48 @@ impl Operator {
             Self::Colon => ":",
             Self::Comma => ",",
             Self::Arrow => "->",
+            Self::EqArrow => "=>",
 
             Self::Plus => "+",
+            Self::PlusEqual => "+=",
             Self::Minus => "-",
+            Self::MinusEqual => "-=",
             Self::Multiply => "*",
+            Self::MultiplyEqual => "*=",
             Self::Divide => "/",
+            Self::DivideEqual => "/=",
             Self::Exponent => "**",
+            Self::ExponentEqual => "**=",
             Self::Or => "||",
+            Self::OrEqual => "||=",
             Self::And => "&&",
+            Self::AndEqual => "&&=",
 
             Self::Ampersand => "&",
+            Self::AmpersandEqual => "&=",
             Self::Exclamation => "!",
             Self::At => "@",
             Self::Pound => "#",
             Self::Dollar => "$",
             Self::Percent => "%",
+            Self::PercentEqual => "%=",
             Self::Carot => "^",
+            Self::CarotEqual => "^=",
             Self::Pipe => "|",
+            Self::PipeEqual => "|=",
             Self::SemiColon => ";",
             Self::Tilde => "~",
             Self::BackTick => "`",
             Self::SingleQuote => "'",
             Self::Quote => "\"",
             Self::Question => "?",
+            Self::Underscore => "_",
 
             Self::LineComment => "//",
             Self::BlockCommentOpen => "/*",
             Self::BlockCommentClose => "*/",
+
+            Self::Newline => "\\n",
 
             Self::Equals => "=",
         }
@@ -151,6 +192,18 @@ impl NodeDisplay for Token {
     }
 }
 
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as NodeDisplay>::fmt(
+            self,
+            f,
+            &Config {
+                format_type: FormatType::Display,
+            },
+        )
+    }
+}
+
 pub struct TokenIndex(usize);
 
 impl TokenIndex {
@@ -177,7 +230,47 @@ impl<'a> TokenStream {
         Some(r)
     }
 
+    pub fn current(&self) -> Option<&SpannedToken> {
+        let next_index = *self.next_index.read().unwrap();
+        if next_index >= self.tokens.len() {
+            return None;
+        }
+        let r = &self.tokens[next_index];
+        Some(r)
+    }
+
     pub fn peek(&'a self) -> Option<&'a Token> {
+        let next_index = *self.next_index.read().unwrap();
+        if next_index >= self.tokens.len() {
+            return None;
+        }
+        Some(self.tokens[next_index].tok())
+    }
+
+    pub fn next_ignore_ws(&self) -> Option<&SpannedToken> {
+        self.ignore_ws();
+        let next_index = *self.next_index.read().unwrap();
+        if next_index >= self.tokens.len() {
+            return None;
+        }
+        let r = &self.tokens[next_index];
+        let mut s = self.next_index.write().unwrap();
+        *s += 1;
+        Some(r)
+    }
+
+    pub fn current_ignore_ws(&self) -> Option<&SpannedToken> {
+        self.ignore_ws();
+        let next_index = *self.next_index.read().unwrap();
+        if next_index >= self.tokens.len() {
+            return None;
+        }
+        let r = &self.tokens[next_index];
+        Some(r)
+    }
+
+    pub fn peek_ignore_ws(&'a self) -> Option<&'a Token> {
+        self.ignore_ws();
         let next_index = *self.next_index.read().unwrap();
         if next_index >= self.tokens.len() {
             return None;
@@ -192,6 +285,12 @@ impl<'a> TokenStream {
 
     pub fn get_index(&'a self) -> TokenIndex {
         TokenIndex(*self.next_index.read().unwrap())
+    }
+
+    pub fn ignore_ws(&self) {
+        while let Some(Token::Newline) = self.peek() {
+            self.next();
+        }
     }
 }
 
@@ -249,7 +348,7 @@ impl SpannedToken {
 impl NodeDisplay for SpannedToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>, _cfg: &Config) -> std::fmt::Result {
         write!(f, "Token: ",)?;
-        self.1.fmt(f, _cfg)
+        f.write_str(&format!("{}", self.1).blue().to_string())
     }
 }
 

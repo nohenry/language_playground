@@ -24,7 +24,7 @@ use tl_evaluator::{
     },
 };
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay},
+    format::{Config, NodeDisplay, TreeDisplay},
     Rf,
 };
 
@@ -163,7 +163,7 @@ impl<'a> LlvmValueKind<'a> {
 }
 
 impl NodeDisplay for LlvmValueKind<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         match self {
             LlvmValueKind::Empty => write!(f, "Empty"),
             LlvmValueKind::Integer {} => write!(f, "Integer: "),
@@ -221,7 +221,7 @@ impl TreeDisplay for LlvmValueKind<'_> {
         }
     }
 
-    fn child_at_bx<'a>(&'a self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
+    fn child_at_bx<'a>(&'a self, index: usize, cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
             LlvmValueKind::StructInstance { members, .. } => members.child_at_bx(index, cfg),
             LlvmValueKind::StructInitializer { members, .. } => members.child_at_bx(index, cfg),
@@ -241,18 +241,18 @@ pub struct LlvmValue<'a> {
 
 impl Display for LlvmValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        NodeDisplay::fmt(self, f)
+        NodeDisplay::fmt(self, f, &Config::DISPLAY)
     }
 }
 
 impl Debug for LlvmValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        NodeDisplay::fmt(self, f)
+        NodeDisplay::fmt(self, f, &Config::DEBUG)
     }
 }
 
 impl NodeDisplay for LlvmValue<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         // Display::fmt(&self, f)
         Ok(())
     }
@@ -582,7 +582,7 @@ impl<'a> EvaluationValue for LlvmValue<'a> {
     }
 
     fn string<'b>(str: String, tp: &Self::Ctx) -> Self {
-        todo!()
+        // tp.builder.
     }
 
     // fn is_string(&self) -> bool {

@@ -19,18 +19,66 @@ impl Lexer {
         let input_len = input.len();
 
         while start_index < input_len && end_index <= input_len {
-            // let ustart_index = input.char_indices().map(|(i, _)| i).nth(start_index).unwrap();
-            // let uend_index = input.char_indices().map(|(i, _)| i).nth(end_index).unwrap();
-
             let sub_str = &input[start_index..(input.ceil_char_boundary(end_index))];
-            // let sub_str = unsafe { input.get_unchecked(start_index..end_index) };
-            // let sub_str = get_utf8_slice(input, start_index, end_index).expect("Unable to slice unicode string!");
 
-            // let next =
+            if line_comment {
+                let sub_str = &input[start_index..input.ceil_char_boundary(start_index + 1)];
+
+                match sub_str {
+                    "\n" => {
+                        line_comment = false;
+
+                        start_index += sub_str.len();
+                        end_index = start_index + 1;
+
+                        line_num += 1;
+                        position = 0;
+
+                        continue;
+                    }
+                    "\r" => (),
+                    _ => {
+                        start_index += sub_str.len();
+                        end_index = start_index + 1;
+
+                        continue;
+                    }
+                }
+
+                let sub_str = &input[start_index..input.ceil_char_boundary(start_index + 2)];
+
+                if sub_str == "\r\n" {
+                    line_comment = false;
+
+                    line_num += 1;
+                    position = 0;
+                }
+
+                start_index += sub_str.len();
+                end_index = start_index + 1;
+
+                continue;
+            }
+
+            if block_comment {
+                let sub_str = &input[start_index..input.ceil_char_boundary(start_index + 2)];
+
+                if sub_str == "*/" {
+                    block_comment = false;
+
+                    line_num += 1;
+                    position = 0;
+                }
+
+                start_index += sub_str.len();
+                end_index = start_index + 1;
+
+                continue;
+            }
+
             let next = if string {
                 None
             } else {
-                // input.chars().nth(end_index)
                 if end_index + 1 <= input.len() {
                     let end = input.ceil_char_boundary(end_index + 1);
                     if end <= input.len() {
@@ -47,7 +95,9 @@ impl Lexer {
 
             if let (Some(token), lex_length) = self.try_lex(sub_str, next, string) {
                 match token {
-                    Token::Operator(Operator::BlockCommentClose) if block_comment => block_comment = false,
+                    Token::Operator(Operator::BlockCommentClose) if block_comment => {
+                        block_comment = false
+                    }
                     Token::Newline if line_comment => {
                         if end_index + 1 < input_len && &input[start_index..end_index + 1] == "\r\n"
                         {
@@ -80,13 +130,33 @@ impl Lexer {
                     }
                     Token::Whitespace => position += 1,
                     Token::Newline => {
-                        if end_index + 1 < input_len && &input[start_index..end_index + 1] == "\r\n"
+                        let length = if end_index + 1 < input_len
+                            && &input[start_index..end_index + 1] == "\r\n"
                         {
-                            start_index += 1;
-                        }
+                            2
+                        } else {
+                            1
+                        };
+
+                        let token = SpannedToken::new(
+                            token,
+                            Span {
+                                line_num,
+                                position,
+                                length,
+                                token_index: tokens.len() as u32,
+                            },
+                        );
+
+                        tokens.push(token);
 
                         line_num += 1;
                         position = 0;
+
+                        start_index += length as usize;
+                        end_index = start_index + 1;
+
+                        continue;
                     }
                     Token::Ident(_) => {
                         let token = SpannedToken::new(
@@ -178,26 +248,30 @@ impl Lexer {
                     _ => return (Some(Token::Operator(Operator::Dot)), None),
                 },
                 Some(',') => return (Some(Token::Operator(Operator::Comma)), None),
+                Some('_') => return (Some(Token::Operator(Operator::Underscore)), None),
 
-                Some('+') => return (Some(Token::Operator(Operator::Plus)), None),
+                Some('+') => match next {
+                    Some('=') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Plus)), None),
+                },
                 Some('-') => match next {
-                    Some('>') => return (None, None),
+                    Some('>' | '=') => return (None, None),
                     _ => return (Some(Token::Operator(Operator::Minus)), None),
                 },
                 Some('*') => match next {
-                    Some('*') => return (None, None),
+                    Some('*' | '=') => return (None, None),
                     _ => return (Some(Token::Operator(Operator::Multiply)), None),
                 },
                 Some('|') => match next {
-                    Some('|') => return (None, None),
+                    Some('|' | '=') => return (None, None),
                     _ => return (Some(Token::Operator(Operator::Pipe)), None),
                 },
                 Some('&') => match next {
-                    Some('&') => return (None, None),
+                    Some('&' | '=') => return (None, None),
                     _ => return (Some(Token::Operator(Operator::Ampersand)), None),
                 },
                 Some('/') => match next {
-                    Some('/') => return (None, None),
+                    Some('/' | '=') => return (None, None),
                     _ => return (Some(Token::Operator(Operator::Divide)), None),
                 },
 
@@ -214,7 +288,10 @@ impl Lexer {
                 Some('\'') => return (Some(Token::Operator(Operator::Quote)), None),
                 Some('?') => return (Some(Token::Operator(Operator::Question)), None),
 
-                Some('=') => return (Some(Token::Operator(Operator::Equals)), None),
+                Some('=') => match next {
+                    Some('>') => return (None, None),
+                    _ => return (Some(Token::Operator(Operator::Equals)), None),
+                },
 
                 Some('\r' | '\n') => return (Some(Token::Newline), None),
                 Some(c) if c.is_whitespace() => return (Some(Token::Whitespace), None),
@@ -225,11 +302,40 @@ impl Lexer {
         let mut chars = input.chars();
 
         match (chars.next(), chars.next(), chars.next()) {
-            (Some('*'), Some('*'), _) => return (Some(Token::Operator(Operator::Exponent)), None),
-            (Some('|'), Some('|'), _) => return (Some(Token::Operator(Operator::Or)), None),
-            (Some('&'), Some('&'), _) => return (Some(Token::Operator(Operator::And)), None),
-            (Some('-'), Some('>'), _) => return (Some(Token::Operator(Operator::Arrow)), None),
+            (Some('+'), Some('='), _) => return (Some(Token::Operator(Operator::PlusEqual)), None),
 
+            (Some('*'), Some('*'), Some('=')) => {
+                return (Some(Token::Operator(Operator::ExponentEqual)), None)
+            }
+            (Some('*'), Some('*'), _) => return (Some(Token::Operator(Operator::Exponent)), None),
+            (Some('*'), Some('='), _) => {
+                return (Some(Token::Operator(Operator::MultiplyEqual)), None)
+            }
+
+            (Some('|'), Some('|'), Some('=')) => {
+                return (Some(Token::Operator(Operator::OrEqual)), None)
+            }
+            (Some('|'), Some('|'), _) => return (Some(Token::Operator(Operator::Or)), None),
+            (Some('|'), Some('='), _) => return (Some(Token::Operator(Operator::OrEqual)), None),
+
+            (Some('&'), Some('&'), Some('=')) => {
+                return (Some(Token::Operator(Operator::AndEqual)), None)
+            }
+            (Some('&'), Some('&'), _) => return (Some(Token::Operator(Operator::And)), None),
+            (Some('&'), Some('='), _) => {
+                return (Some(Token::Operator(Operator::AmpersandEqual)), None)
+            }
+
+            (Some('-'), Some('>'), _) => return (Some(Token::Operator(Operator::Arrow)), None),
+            (Some('-'), Some('='), _) => {
+                return (Some(Token::Operator(Operator::MinusEqual)), None)
+            }
+
+            (Some('='), Some('>'), _) => return (Some(Token::Operator(Operator::EqArrow)), None),
+
+            (Some('/'), Some('='), _) => {
+                return (Some(Token::Operator(Operator::DivideEqual)), None)
+            }
             (Some('/'), Some('/'), _) => {
                 return (Some(Token::Operator(Operator::LineComment)), None)
             }
@@ -244,7 +350,7 @@ impl Lexer {
                 return (Some(Token::Operator(Operator::TripleDot)), None)
             }
             (Some('.'), Some('.'), Some('=')) => {
-                return (Some(Token::Operator(Operator::TripleDot)), None)
+                return (Some(Token::Operator(Operator::DoubleDotEqual)), None)
             }
             (Some('.'), Some('.'), _) => match next {
                 Some('.' | '=') => return (None, None),
@@ -260,8 +366,8 @@ impl Lexer {
             .fold(0u8, |acc, c| if c == '.' { 1 + acc } else { acc });
 
         if count == 1 && next == Some('.') {
-            let val = input[..input.len() - 1].parse().unwrap_or(0.0f64);
-            return (Some(Token::Float(val)), None);
+            let val = input[..input.len() - 1].parse().unwrap_or(0);
+            return (Some(Token::Integer(val)), Some(1));
         }
 
         if !input.chars().any(|c| !(c.is_numeric() || c == '.')) && count <= 1 && del {

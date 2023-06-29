@@ -9,7 +9,7 @@ use tl_core::{
     Module,
 };
 use tl_util::{
-    format::{BoxedGrouper, BoxedGrouperIter, GrouperIter, NodeDisplay, TreeDisplay},
+    format::{BoxedGrouper, BoxedGrouperIter, Config, GrouperIter, NodeDisplay, TreeDisplay},
     Rf,
 };
 
@@ -46,7 +46,7 @@ pub enum ScopeValue<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> 
 }
 
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for ScopeValue<T, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         match self {
             // ScopeValue::ConstValue(ConstValue {
             //     ty: Type::Function { .. },
@@ -209,7 +209,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> Scope<T, V> {
 }
 
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay for Scope<T, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         write!(f, "Scope - {} {}", self.index, self.children.len())
     }
 }

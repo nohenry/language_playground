@@ -1,11 +1,9 @@
 [package]
-name = "tl_util"
+name = "tl_codegen_llvm"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-colored = "2.0.0"
-linked-hash-map = "0.5.6"
-tl_macro = { path = "../tl_macro" }
+dsl_core = { path = "../dsl_core" }

@@ -1,24 +1,49 @@
 use crate::{
     ast::{
-        EnclosedList, Expression, KeyValue, ParsedTemplate, ParsedTemplateString, PunctuationList,
-        Statement,
+        ElseClause, EnclosedList, Expression, KeyValue, MatchBody, MatchEntry, ParsedTemplate,
+        ParsedTemplateString, PunctuationList, Statement,
     },
     error::{ParseError, ParseErrorKind},
     lexer::Template,
     parser::Parser,
+    restore,
     token::{Operator, Range, SpannedToken, Token},
 };
 
 impl Parser {
-    pub fn parse_expression(&self) -> Option<Expression> {
+    pub fn parse_expression(&self, prec: Option<u32>) -> Option<Expression> {
         match self.tokens.peek() {
-            Some(Token::Operator(Operator::OpenBrace)) => self.parse_struct_initializer(),
-            _ => self.parse_operator_expression(0),
+            Some(Token::Operator(Operator::OpenBrace)) => self.parse_block_expression(),
+            Some(Token::Ident(ident)) if ident == "if" => self.parse_if_expression(),
+            Some(Token::Ident(ident)) if ident == "for" => self.parse_for_loop(),
+            Some(Token::Ident(ident)) if ident == "while" => self.parse_while_loop(),
+            Some(Token::Ident(ident)) if ident == "match" => self.parse_match(),
+            Some(Token::Operator(Operator::OpenParen)) => {
+                restore!(self, self.parse_anon_function())
+                    .or_else(|| self.parse_operator_expression(prec.unwrap_or_default()))
+            }
+            _ => self.parse_operator_expression(prec.unwrap_or_default()),
         }
     }
 
     pub fn parse_operator_expression(&self, last_prec: u32) -> Option<Expression> {
-        let mut left = self.parse_primary_expression();
+        let mut left = if let Some(Token::Operator(op)) = self.tokens.peek() {
+            let prec = self.precedence_of_unary_operator(op);
+
+            if prec > last_prec && prec != 0 {
+                let op_token = self.tokens.next().cloned().unwrap();
+                let expr = self.parse_expression(Some(prec))?;
+
+                Some(Expression::UnaryExpression {
+                    op_token,
+                    expr: Some(Box::new(expr)),
+                })
+            } else {
+                self.parse_primary_expression()
+            }
+        } else {
+            self.parse_primary_expression()
+        };
 
         while let Some(t) = self.tokens.peek() {
             left = match t {
@@ -28,20 +53,30 @@ impl Parser {
                         break;
                     }
 
-                    match (o, left) {
-                        (Operator::OpenParen, Some(expr)) => {
-                            let (cl, skip) = self.parse_function_call(expr);
-                            left = Some(cl);
-                            if skip {
-                                continue;
-                            }
-                        }
-                        (_, l) => left = l,
-                    };
-
                     let op_token = self.tokens.next().unwrap().clone();
 
-                    let right = self.parse_operator_expression(prec);
+                    /* Calling parse_operator_expression instead of parse_expression for cases like:
+                     * if b { 6 } else { 9 }
+                     *    ^^^^^^^ is this a class init or expression then block?
+                     * 
+                     * if (Data { data: [0: 50] }) { 6 } else { 9 }
+                     *    ^----------------------^ parens are needed for this case
+                     * 
+                     * 2 + Data { data: [0: 50] }
+                     * 
+                     * This will be an error and should be written as
+                     * 
+                     * 2 + (Data {data: [0: 50]})
+                     * 
+                     * An exception is assignment because you should be able to say:
+                     * 
+                     * data = Data { ...data }
+                     * 
+                    */
+                    let right = match o {
+                        Operator::Equals => self.parse_expression(None),
+                        _ => self.parse_operator_expression(prec),
+                    };
 
                     Some(Expression::BinaryExpression {
                         left: left.map(Box::new),
@@ -49,79 +84,247 @@ impl Parser {
                         op_token,
                     })
                 }
+                Token::Ident(ident) if ident != "else" && ident != "as" => {
+                    let function_name = self.tokens.next()?.clone();
+                    let right = self.parse_expression(None)?;
+
+                    Some(Expression::FunctionCall {
+                        expr: Box::new(Expression::Ident(function_name)),
+                        args: crate::ast::OneOf::B(Box::new(right)),
+                    })
+                }
                 _ => break,
             }
         }
+
+        // Postfix
+        let left = match self.tokens.peek() {
+            Some(Token::Operator(Operator::OpenParen)) => self.parse_function_call(left?),
+            Some(Token::Operator(Operator::OpenSquare)) => {
+                let open = self.tokens.next().unwrap().clone();
+                let expr = self.parse_operator_expression(0);
+                let close = self.expect_operator(Operator::CloseSquare)?.clone();
+
+                Some(Expression::Index {
+                    expression: Box::new(left?),
+                    open,
+                    indexer: expr.map(Box::new),
+                    close,
+                })
+            }
+            _ => left,
+        };
 
         left
     }
 
     pub fn parse_primary_expression(&self) -> Option<Expression> {
-        if let Some(Token::Operator(Operator::OpenParen)) = self.tokens.peek() {
-            // let state = self.save_state();
-            // if let Some(func) = self.parse_function() {
-            //     return Some(func);
-            // }
-            // state.restore(&self.tokens);
+        match self.tokens.peek() {
+            Some(Token::Operator(Operator::OpenParen)) => {
+                let _open = self.tokens.next().unwrap();
+                let expr = self.parse_expression(None);
+                let _close = self.tokens.next().unwrap(); // TODO: error
 
-            let _open = self.tokens.next().unwrap();
-            let expr = self.parse_operator_expression(0);
-            let _close = self.tokens.next().unwrap(); // TODO: error
+                expr
+            }
+            Some(Token::Operator(Operator::OpenBrace)) => self.parse_struct_initializer(),
+            Some(Token::Operator(Operator::OpenSquare)) => {
+                let list = self.parse_enclosed_punctuation_list(
+                    Operator::OpenSquare,
+                    Operator::Comma,
+                    Operator::CloseSquare,
+                    || self.parse_expression(None).map(|f| (f, true)),
+                )?;
 
-            expr
-        } else {
-            self.parse_literal()
+                Some(Expression::Array(list))
+            }
+            _ => self.parse_literal(),
         }
     }
 
     pub fn parse_struct_initializer(&self) -> Option<Expression> {
-        let open = self.expect_operator(Operator::OpenBrace)?;
-        let list = self.parse_list(|| {
-            let name = match self.tokens.peek() {
-                Some(Token::Ident(_)) => self.tokens.next(),
-                _ => None,
-            };
+        let struct_type = Box::new(self.parse_type()?);
+        let list = self.parse_enclosed_punctuation_list(
+            Operator::OpenBrace,
+            Operator::Comma,
+            Operator::CloseBrace,
+            || {
+                let name = self.expect_ident()?.clone();
+                let colon = self.expect_operator(Operator::Colon)?.clone();
+                let expr = Box::new(self.parse_expression(None)?);
 
-            let colon = self.expect_operator(Operator::Colon);
+                Some((KeyValue { name, colon, expr }, true))
+            },
+        )?;
 
-            let expr = self.parse_expression();
-
-            if let (Some(name), Some(colon), Some(expr)) = (name, colon, expr) {
-                return Some((
-                    KeyValue {
-                        name: Some(name.clone()),
-                        colon: colon.clone(),
-                        expr: Box::new(expr),
-                    },
-                    true,
-                ));
-            }
-
-            None
-        })?;
-        let close = self.expect_operator(Operator::CloseBrace)?;
-
-        Some(Expression::Record(EnclosedList {
-            open: open.clone(),
-            items: list,
-            close: close.clone(),
-        }))
+        Some(Expression::ClassInitializer {
+            struct_type,
+            values: list,
+        })
     }
 
-    pub fn parse_function_call(&self, expression: Expression) -> (Expression, bool) {
-        let Some(args) = self.parse_arguments() else {
-            return (expression, false);
+    pub fn parse_anon_function(&self) -> Option<Expression> {
+        let parameters = self.parse_parameters()?;
+        let arrow = self.expect_operator(Operator::EqArrow)?.clone();
+        let expression = Box::new(self.parse_expression(None)?);
+
+        Some(Expression::AnonFunction {
+            parameters,
+            arrow,
+            expression,
+        })
+    }
+
+    pub fn parse_if_expression(&self) -> Option<Expression> {
+        let if_token = self.tokens.next().unwrap().clone();
+        let expression = Box::new(self.parse_operator_expression(0)?);
+
+        let (colon, statement) = self.parse_if_body(false)?;
+
+        let else_clause = match self.tokens.peek_ignore_ws() {
+            Some(Token::Ident(ident)) if ident == "elseif" => {
+                let else_token = self.tokens.current_ignore_ws().unwrap().clone();
+                let (colon, statement) = self.parse_if_body(true)?;
+
+                Some(ElseClause {
+                    else_token,
+                    colon,
+                    body: Box::new(statement),
+                })
+            }
+            Some(Token::Ident(ident)) if ident == "else" => {
+                let else_token = self.tokens.next_ignore_ws().unwrap().clone();
+                let (colon, statement) = self.parse_if_body(false)?;
+
+                Some(ElseClause {
+                    else_token,
+                    colon,
+                    body: Box::new(statement),
+                })
+            }
+            _ => None,
         };
 
-        (
-            Expression::FunctionCall {
-                expr: Box::new(expression),
-                args,
-            },
-            true,
-        )
+        Some(Expression::If {
+            if_token,
+            expression,
+            colon,
+            body: Box::new(statement),
+            else_clause,
+        })
     }
 
+    pub fn parse_if_body(&self, elseif: bool) -> Option<(Option<SpannedToken>, Statement)> {
+        match self.tokens.peek() {
+            Some(Token::Operator(Operator::Colon)) => {
+                let colon = self.tokens.next().unwrap().clone();
+                let expression = if elseif {
+                    self.parse_if_expression()?
+                } else {
+                    self.parse_operator_expression(0)?
+                };
+
+                Some((Some(colon), Statement::Expression(expression)))
+            }
+            _ => Some((
+                None,
+                if elseif {
+                    Statement::Expression(self.parse_if_expression()?)
+                } else {
+                    self.parse_statement()?
+                },
+            )),
+        }
+    }
+
+    pub fn parse_for_loop(&self) -> Option<Expression> {
+        let for_token = self.tokens.next().unwrap().clone();
+        let binding = self.parse_binding()?;
+        let in_token = self.expect_ident()?.clone();
+
+        if in_token.as_str() != "in" {
+            return None;
+        }
+
+        let expression = Box::new(self.parse_operator_expression(0)?);
+        let body = Box::new(self.parse_statement()?);
+
+        Some(Expression::ForLoop {
+            for_token,
+            binding,
+            in_token,
+            expression,
+            body,
+        })
+    }
+
+    pub fn parse_while_loop(&self) -> Option<Expression> {
+        let while_token = self.tokens.next().unwrap().clone();
+
+        let expression = Box::new(self.parse_operator_expression(0)?);
+        let body = Box::new(self.parse_statement()?);
+
+        Some(Expression::WhileLoop {
+            while_token,
+            expression,
+            body,
+        })
+    }
+
+    pub fn parse_match(&self) -> Option<Expression> {
+        let match_token = self.tokens.next().unwrap().clone();
+        let expression = Box::new(self.parse_operator_expression(0)?);
+        let body = self.parse_match_body()?;
+
+        Some(Expression::Match {
+            match_token,
+            expression,
+            body,
+        })
+    }
+
+    pub fn parse_match_body(&self) -> Option<MatchBody> {
+        match self.tokens.peek() {
+            Some(Token::Operator(Operator::OpenBrace)) => {
+                let body = self.parse_enclosed_punctuation_list(
+                    Operator::OpenBrace,
+                    Operator::Comma,
+                    Operator::CloseBrace,
+                    || self.parse_match_entry().map(|f| (f, true)),
+                )?;
+
+                Some(MatchBody::Patterns(body))
+            }
+            Some(Token::Ident(ident)) if ident == "as" => {
+                let as_token = self.tokens.next().unwrap().clone();
+                let binding = self.parse_match_binding()?;
+
+                Some(MatchBody::AsBinding { as_token, binding })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn parse_match_entry(&self) -> Option<MatchEntry> {
+        let binding = self.parse_match_binding()?;
+        let arrow = self.expect_operator(Operator::EqArrow)?.clone();
+        let expression = Box::new(self.parse_expression(None)?);
+
+        Some(MatchEntry {
+            binding,
+            arrow,
+            expression,
+        })
+    }
+
+    pub fn parse_function_call(&self, expression: Expression) -> Option<Expression> {
+        let args = self.parse_arguments()?;
+
+        Some(Expression::FunctionCall {
+            expr: Box::new(expression),
+            args: crate::ast::OneOf::A(args),
+        })
+    }
 
     pub fn parse_function_body(
         &self,
@@ -186,7 +389,7 @@ impl Parser {
                         Template::Template(t, o, c) => Some(ParsedTemplate::Template(
                             Box::new({
                                 let parser = Parser::new(t.clone());
-                                let expr = parser.parse_operator_expression(0)?;
+                                let expr = parser.parse_expression(None)?;
 
                                 let mut errors = self.errors.write().unwrap();
                                 errors.append(&mut parser.get_errors_mut());
@@ -205,31 +408,42 @@ impl Parser {
     }
 
     pub fn precedence_of_operator(&self, operator: &Operator) -> u32 {
+        use Operator::*;
         match operator {
-            Operator::Equals => 1, // Assignement
+            Equals => 1, // Assignement
+            PlusEqual | MinusEqual | MultiplyEqual | DivideEqual | AndEqual | OrEqual
+            | AmpersandEqual | PipeEqual | CarotEqual | ExponentEqual | PercentEqual => 2,
 
-            Operator::Or => 10,
-            Operator::And => 14,
+            OpenAngle | CloseAngle | OpenAngleEqual | CloseAngleEqual => 5,
 
-            Operator::Plus | Operator::Minus => 20,
+            Or => 10,
+            And => 14,
 
-            Operator::Multiply
-            | Operator::Divide
-            | Operator::Pipe
-            | Operator::Ampersand
-            | Operator::Percent => 30,
+            DoubleDot | DoubleDotEqual | Colon => 16,
 
-            Operator::Exponent => 40,
+            Plus | Minus => 20,
 
-            Operator::OpenParen => 50,
+            Multiply | Divide | Pipe | Ampersand | Percent => 30,
 
-            Operator::Dot => 60,
+            Exponent => 40,
+
+            // OpenParen => 50,
+            Dot => 60,
 
             _ => 0, // TODO: error
         }
     }
 
-    pub fn precedence_of_operator_for_ty(&self, operator: &Operator) -> u32 {
+    pub fn precedence_of_unary_operator(&self, operator: &Operator) -> u32 {
+        match operator {
+            Operator::Plus | Operator::Minus => 10,
+            Operator::Ampersand | Operator::Multiply => 45,
+            Operator::TripleDot => 45,
+            _ => 0, // TODO: error
+        }
+    }
+
+    pub fn precedence_of_type_operator(&self, operator: &Operator) -> u32 {
         match operator {
             Operator::Ampersand => 20,
             _ => 0, // TODO: error

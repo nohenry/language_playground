@@ -340,7 +340,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>>
                     self.recurse_expression(right);
                 }
             }
-            Expression::Record(parameters) => {
+            Expression::ClassInitializer(parameters) => {
                 for kv in parameters.items.iter() {
                     if let Some(name) = &kv.name {
                         self.builder

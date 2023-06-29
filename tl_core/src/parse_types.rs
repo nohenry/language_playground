@@ -9,16 +9,30 @@ impl Parser {
     pub fn parse_type(&self) -> Option<Type> {
         let mut ty = self.parse_type_primary();
 
+        if let (Some(Token::Operator(Operator::Dot)), Some(Type::Ident(ident))) =
+            (self.tokens.peek(), ty.clone())
+        {
+            let p = self.parse_punctutation_list(Some(ident), Operator::Dot, || {
+                restore!(self, self.tokens.next().map(|ty| (ty.clone(), true)))
+            });
+
+            ty = if let Some(p) = p {
+                Some(Type::Path(p))
+            } else {
+                None
+            };
+        }
+
         if let Some(Token::Operator(Operator::Pipe)) = self.tokens.peek() {
             let p = self.parse_punctutation_list(ty, Operator::Pipe, || {
                 restore!(self, self.parse_type_primary().map(|ty| (ty, true)))
             });
 
-            if let Some(p) = p {
-                return Some(Type::Union(p));
+            ty = if let Some(p) = p {
+                Some(Type::Union(p))
             } else {
-                return None;
-            }
+                None
+            };
         }
 
         let ty = loop {
@@ -49,6 +63,28 @@ impl Parser {
                         list: el,
                     })
                 }
+                Some(Token::Operator(Operator::OpenSquare)) => {
+                    let open = self.tokens.next()?.clone();
+                    let size = match self.tokens.peek() {
+                        Some(Token::Operator(Operator::CloseSquare)) => None,
+                        _ => self.parse_expression(None),
+                    };
+                    let close = self.expect_operator(Operator::CloseSquare)?.clone();
+
+                    Some(Type::Array {
+                        open,
+                        size: size.map(Box::new),
+                        close,
+                    })
+                }
+                Some(Token::Operator(Operator::OpenParen)) => {
+                    let parameters = self.parse_parameters()?;
+
+                    Some(Type::Function {
+                        parameters,
+                        return_type: Box::new(ty?),
+                    })
+                }
                 _ => break ty,
             };
         };
@@ -70,15 +106,6 @@ impl Parser {
 
     pub fn parse_type_lit(&self) -> Option<Type> {
         let ty_first = match self.tokens.peek() {
-            Some(Token::Operator(Operator::OpenSquare)) => {
-                let enclosed_list = self.parse_enclosed_punctuation_list(
-                    Operator::OpenSquare,
-                    Operator::Comma,
-                    Operator::CloseSquare,
-                    || self.parse_type().map(|ty| (ty, true)),
-                );
-                enclosed_list.map(Type::Array)
-            }
             Some(Token::Operator(Operator::OpenBrace)) => {
                 let enclosed_list = self.parse_enclosed_punctuation_list(
                     Operator::OpenBrace,
@@ -90,6 +117,8 @@ impl Parser {
             }
 
             Some(Token::Ident(id)) => match id.as_str() {
+                "let" => Some(Type::Let(self.tokens.next()?.clone())),
+                "none" => Some(Type::None(self.tokens.next()?.clone())),
                 "int" => Some(Type::Integer {
                     width: 32,
                     signed: true,
@@ -112,6 +141,10 @@ impl Parser {
                 }),
                 "int64" => Some(Type::Integer {
                     width: 64,
+                    signed: true,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "iptr" => Some(Type::IntegerPointer {
                     signed: true,
                     token: self.tokens.next().unwrap().clone(),
                 }),
@@ -140,12 +173,20 @@ impl Parser {
                     signed: false,
                     token: self.tokens.next().unwrap().clone(),
                 }),
+                "uptr" => Some(Type::IntegerPointer {
+                    signed: false,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
                 "float32" | "float" => Some(Type::Float {
                     width: 32,
                     token: self.tokens.next().unwrap().clone(),
                 }),
                 "float64" => Some(Type::Float {
                     width: 64,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "float128" => Some(Type::Float {
+                    width: 128,
                     token: self.tokens.next().unwrap().clone(),
                 }),
                 "fixed32" | "fixed" => Some(Type::Fixed {
@@ -156,6 +197,11 @@ impl Parser {
                 "fixed64" => Some(Type::Fixed {
                     width: 64,
                     decimals: 32,
+                    token: self.tokens.next().unwrap().clone(),
+                }),
+                "fixed128" => Some(Type::Fixed {
+                    width: 64,
+                    decimals: 64,
                     token: self.tokens.next().unwrap().clone(),
                 }),
                 "bool" => Some(Type::Boolean(self.tokens.next().unwrap().clone())),

@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use inkwell::types::BasicTypeEnum;
+use inkwell::{
+    types::BasicTypeEnum,
+    values::{AnyValue, AnyValueEnum, BasicValue},
+};
 use linked_hash_map::LinkedHashMap;
-use tl_core::ast::{AstNode, Expression, GenericParameter, Statement};
+use tl_core::ast::{AstNode, Expression, GenericParameter, Statement, Type};
 use tl_evaluator::{
     error::{EvaluationError, EvaluationErrorKind, TypeHint},
     evaluation_type::{EvaluationType, EvaluationTypeProvider},
@@ -10,7 +13,10 @@ use tl_evaluator::{
     pass::{EvaluationPass, MemberPass, TypeFirst},
     scope::scope::{Scope, ScopeValue},
 };
-use tl_util::{format::TreeDisplay, Rf};
+use tl_util::{
+    format::{Config, TreeDisplay},
+    Rf,
+};
 
 use crate::{
     llvm_type::LlvmType,
@@ -95,7 +101,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 ..
             } => {
                 let params = self.evaluate_params(parameters);
-                let ty = return_type.as_ref().map(|ty| self.evaluate_type(ty));
+                let ty = self.evaluate_type(&return_type);
 
                 // Cloning references for later
                 let sym = self.wstate().scope.find_symbol(ident.as_str()).unwrap();
@@ -109,18 +115,22 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         return LlvmValue::empty(self.context.as_ref());
                     };
 
-                    let llvm_params: Vec<_> = sym.children.iter().filter_map(|(_, c)| {
-                        if let ScopeValue::EvaluationValue(ref pval) = c.borrow().value {
-                            Some(pval.llvm_value.into_pointer_value())
-                        } else {
-                            None
-                        }
-                    }).collect();
+                    let llvm_params: Vec<_> = sym
+                        .children
+                        .iter()
+                        .filter_map(|(_, c)| {
+                            if let ScopeValue::EvaluationValue(ref pval) = c.borrow().value {
+                                Some(pval.llvm_value.into_pointer_value())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
 
                     (
                         value.ty.function_return().clone(),
                         value.llvm_value.into_function_value(),
-                        llvm_params
+                        llvm_params,
                     )
                 };
 
@@ -146,7 +156,6 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                 for (param, value) in llvm_params.iter().zip(func.get_param_iter()) {
                     self.context.builder.build_store(*param, value);
-
                 }
 
                 // Build the new context for the function
@@ -264,19 +273,79 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 let _ = self.context.wstate().replace(state);
                 self.wstate().scope.pop_scope();
             }
+            Statement::VariableDeclaration {
+                ty: Type::Let(_),
+                ident,
+
+                default: Some((_, raw_expr)),
+            } => {
+                let mut expr = self.evaluate_expression(raw_expr, index);
+
+                let mut scope = self.wstate();
+
+                if let Some(sym) = scope.scope.find_symbol(ident.as_str()) {
+                    let mut sym = sym.borrow_mut();
+
+                    if let ScopeValue::EvaluationValue(value) = &mut sym.value {
+                        let current_block = self
+                            .context
+                            .builder
+                            .get_insert_block()
+                            .expect("Should have block");
+
+                        let instruction = value
+                            .llvm_value
+                            .into_pointer_value()
+                            .as_instruction()
+                            .unwrap();
+                        self.context.builder.position_before(&instruction);
+
+                        let reduced_type = expr.ty.reduce(self.context.as_ref());
+
+                        let alloc = self.context.builder.build_alloca(
+                            reduced_type
+                                .llvm_basic_type()
+                                .expect("Couldn't get llvm type"),
+                            ident.as_str(),
+                        );
+                        instruction.remove_from_basic_block();
+                        self.context.builder.position_at_end(current_block);
+
+                        value.llvm_value = alloc.into();
+                        value.ty = reduced_type;
+
+                        self.context.builder.build_store(
+                            value.llvm_value.into_pointer_value(),
+                            expr.llvm_basc_value().expect("Not a basic value"),
+                        );
+
+                        expr.llvm_value = value.llvm_value;
+                        expr.ty = value.ty.clone();
+                    } else {
+                        panic!("Should be EvaluationValue")
+                    }
+                } else {
+                    panic!("Should have been evaluated in previous pass")
+                }
+
+                scope
+                    .scope
+                    .insert_value(ident.as_str(), ScopeValue::EvaluationValue(expr), index);
+            }
             // Variable declaration
             Statement::VariableDeclaration {
                 ty,
                 ident,
-                expr: Some(raw_expr),
-                ..
+                default: Some((_, raw_expr)),
             } => {
                 let ty = self.evaluate_type(ty);
                 let expr = self.evaluate_expression(raw_expr, index);
 
                 if ty.is_symbol() && expr.is_struct_initializer() {
+                    // Initialize class
+
                     let sym = ty.symbol_rf();
-                    println!("{}", expr.format());
+
                     let args = expr.get_struct_members();
 
                     if let ScopeValue::Struct { members, .. } = &sym.borrow().value {
@@ -285,11 +354,12 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                             members,
                             &LinkedHashMap::from_iter(args),
                             |i| {
-                                if let Expression::Record(r) = raw_expr {
-                                    if let Some(item) = r.iter_items().nth(i) {
-                                        return Some(item.expr.get_range());
-                                    }
-                                }
+                                // if let Expression::ClassInitializer(r) = raw_expr.as_ref() {
+                                //     if let Some(item) = r.iter_items().nth(i) {
+                                //         return Some(item.expr.get_range());
+                                //     }
+                                // }
+                                todo!();
                                 None
                             },
                             raw_expr.get_range(),
@@ -369,7 +439,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
             }
             Statement::Expression(expr) => return self.evaluate_expression(expr, index),
             Statement::List(list) => {
-                if list.num_children(_cfg) == 1 {
+                if list.num_children(&Config::default()) == 1 {
                     let item = list
                         .iter_items()
                         .next()
@@ -438,24 +508,6 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                         }
                         _ => todo!("Throw error"),
                     }
-                }
-            }
-            Statement::Block(list) => {
-                if list.num_children(_cfg) == 0 {
-                    return LlvmValue::empty(self.context.as_ref());
-                } else if list.num_children(_cfg) == 1 {
-                    let item = list
-                        .iter_items()
-                        .next()
-                        .expect("Value should have been present. This is probably a rustc bug");
-                    return self.evaluate_statement(item, 0);
-                } else {
-                    let values: Vec<_> = list
-                        .iter_items()
-                        .enumerate()
-                        .map(|(index, stmt)| self.evaluate_statement(stmt, index))
-                        .collect();
-                    return values.into_iter().rev().next().unwrap();
                 }
             }
             _ => (),
@@ -682,10 +734,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 };
 
                 let eparameters = self.evaluate_params(parameters);
-                let ereturn = return_type
-                    .as_ref()
-                    .map(|ty| self.evaluate_type(ty))
-                    .unwrap_or(self.context.empty());
+                let ereturn = self.evaluate_type(return_type);
 
                 let function = LlvmValue::gen_function(
                     Statement::clone(body),
@@ -723,7 +772,9 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 // };
 
                 // Build the new context for the function
-                let current_block = llvm_func.get_first_basic_block().expect("Unable to get function's first basic block! (compiler bug)");
+                let current_block = llvm_func
+                    .get_first_basic_block()
+                    .expect("Unable to get function's first basic block! (compiler bug)");
                 let new_state = LlvmContextState {
                     current_block,
                     current_function: rf.clone(),
@@ -735,18 +786,24 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 // Push the function scope so we have access to locals when evaluating
                 self.wstate().scope.push_scope(rf);
 
-                self.context
-                    .builder
-                    .position_at_end(current_block);
+                self.context.builder.position_at_end(current_block);
 
                 for (llvm_value, (name, ty)) in llvm_func.get_param_iter().zip(function_params) {
-                    let alloc = self.context.builder.build_alloca(ty.llvm_basic_type().expect("Unable to convert to basic type"), "_param");
+                    let alloc = self.context.builder.build_alloca(
+                        ty.llvm_basic_type()
+                            .expect("Unable to convert to basic type"),
+                        "_param",
+                    );
 
-                    self.wstate().scope.insert_value(name, ScopeValue::EvaluationValue(LlvmValue {
-                        kind:  LlvmValueKind::Empty,
-                        ty: ty.clone(),
-                        llvm_value: alloc.into()
-                    }), index);
+                    self.wstate().scope.insert_value(
+                        name,
+                        ScopeValue::EvaluationValue(LlvmValue {
+                            kind: LlvmValueKind::Empty,
+                            ty: ty.clone(),
+                            llvm_value: alloc.into(),
+                        }),
+                        index,
+                    );
                 }
 
                 let state = self.context.wstate().replace(new_state);
@@ -758,7 +815,6 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
 
                 self.wstate().scope.pop_scope();
 
-
                 self.wstate().scope.update_value(
                     ident.as_str(),
                     ScopeValue::EvaluationValue(function.0),
@@ -766,16 +822,15 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 );
             }
             Statement::VariableDeclaration {
-                ty,
+                ty: Type::Let(_),
                 ident,
                 ..
-                // eq,
-                // expr,
             } => {
-                let ty = self.evaluate_type(ty);
-                let ty = ty.llvm_basic_type().unwrap();
+                let alloc = self
+                    .context
+                    .builder
+                    .build_alloca(self.context.context.i8_type(), ident.as_str());
 
-                let alloc = self.context.builder.build_alloca(ty, ident.as_str());
                 self.wstate().scope.insert_value(
                     ident.as_str(),
                     ScopeValue::EvaluationValue(LlvmValue {
@@ -785,21 +840,38 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                     }),
                     index,
                 );
-            },
-            Statement::Block(list) => {
-                if list.num_children(_cfg) == 0 {
-                } else if list.num_children(_cfg) == 1 {
+            }
+            Statement::VariableDeclaration { ty, ident, .. } => {
+                let llvm_ty = self.evaluate_type(ty);
+                let ty = llvm_ty.llvm_basic_type().unwrap();
+
+                let alloc = self.context.builder.build_alloca(ty, ident.as_str());
+                self.wstate().scope.insert_value(
+                    ident.as_str(),
+                    ScopeValue::EvaluationValue(LlvmValue {
+                        kind: LlvmValueKind::Empty,
+                        ty: llvm_ty,
+                        llvm_value: alloc.into(),
+                    }),
+                    index,
+                );
+            }
+            Statement::Expression(Expression::Block(list)) => {
+                if list.num_children(&Config::default()) == 0 {
+                    // return LlvmValue::empty(self.context.as_ref());
+                } else if list.num_children(&Config::default()) == 1 {
                     let item = list
                         .iter_items()
                         .next()
                         .expect("Value should have been present. This is probably a rustc bug");
-                    self.evaluate_statement(item, 0);
+                    let _value = self.evaluate_statement(item, 0);
                 } else {
-                    let values: Vec<_> = list
+                    let _values: Vec<_> = list
                         .iter_items()
                         .enumerate()
                         .map(|(index, stmt)| self.evaluate_statement(stmt, index))
                         .collect();
+                    // return values.into_iter().rev().next().unwrap();
                 }
             }
             _ => (),
@@ -832,10 +904,7 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                     self.context.rf(self.context.symbol(member_ty.clone())),
                 );
 
-                let ereturn = return_type
-                    .as_ref()
-                    .map(|ty| self.evaluate_type(ty))
-                    .unwrap_or(self.context.empty());
+                let ereturn = self.evaluate_type(return_type);
 
                 self.wstate().scope.update_value(
                     ident.as_str(),

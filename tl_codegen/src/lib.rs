@@ -4,6 +4,7 @@
 #![feature(iter_intersperse)]
 
 use std::{
+    borrow::BorrowMut,
     fs::{File, OpenOptions},
     io::Read,
     path::Path,
@@ -82,6 +83,12 @@ impl<'a> LlvmContext<'a> {
 
     fn wstate(&self) -> RwLockWriteGuard<'_, LlvmContextState<'a>> {
         self.state.write().unwrap()
+    }
+
+    fn char(&self, bits: u32) -> LlvmType<'a> {
+        LlvmType::Char {
+            llvm_type: self.context.custom_width_int_type(bits),
+        }
     }
 }
 
@@ -181,6 +188,9 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
     file.read_to_string(&mut input).unwrap();
 
     let (module, errors) = Module::parse_str(&input, "mymod");
+
+    println!("{}", module.semantic_format());
+
     for error in errors {
         println!("{error}")
     }
@@ -198,9 +208,16 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         let llvm_builder = llvm_context.create_builder();
         let symbol_tree = Rf::new(Scope::<LlvmType, LlvmValue>::root());
 
+        let module_scope = Rf::new(Scope::new(
+            symbol_tree.clone(),
+            module.name.to_string(),
+            ScopeValue::Module(module.clone()),
+            1,
+        ));
+
         let (bb, fn_node) = {
             let cp = Scope::new(
-                symbol_tree.clone(),
+                module_scope.clone(),
                 "main".to_string(),
                 ScopeValue::EvaluationValue(LlvmValue {
                     kind: LlvmValueKind::Empty,
@@ -209,12 +226,29 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
                 }),
                 0,
             );
-            let mut t = symbol_tree.borrow_mut();
+            let mut t = module_scope.borrow_mut();
             let fn_node = t.insert_node(cp);
 
             let ty = llvm_context.void_type().fn_type(&[], false);
             let val = llvm_module.add_function("main", ty, None);
             let bb = llvm_context.append_basic_block(val.clone(), "entry");
+
+            // {
+            //     let mut main_function = fn_node.borrow_mut();
+            //     main_function.value = ScopeValue::EvaluationValue(LlvmValue {
+            //         kind: LlvmValueKind::Function {
+            //             rf: fn_node.clone(),
+            //             body: Statement::List(PunctuationList::default()),
+            //             entry_block: bb.clone(),
+            //         },
+            //         llvm_value: val.into(),
+            //         ty: LlvmType::Function {
+            //             parameters: LinkedHashMap::new(),
+            //             return_type: Box::new(LlvmType::Empty(llvm_context.void_type())),
+            //             llvm_type: ty.into(),
+            //         },
+            //     });
+            // }
 
             llvm_builder.position_at_end(bb);
 
@@ -234,9 +268,12 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
             }),
         });
 
+        println!("{}", symbol_tree.format());
+
         {
             let code_pass = LlvmEvaluator::<TypeFirst>::new(
                 symbol_tree.clone(),
+                module_scope,
                 module.clone(),
                 1,
                 context.clone(),
@@ -271,7 +308,6 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
                 error.print(path.as_ref().as_os_str().to_str().unwrap(), &lines);
             }
         }
-
 
         let path = Path::new("output.bc");
         println!("{}", context.module.print_to_string().to_string());

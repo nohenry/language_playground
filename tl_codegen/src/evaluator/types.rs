@@ -27,7 +27,14 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
             tl_core::ast::Type::Integer { width, signed, .. } => {
                 self.context.integer(*width, *signed)
             }
+            tl_core::ast::Type::IntegerPointer { signed, .. } => {
+                self.context.integer(64, *signed)
+            }
             tl_core::ast::Type::Float { width, .. } => self.context.float(*width),
+            tl_core::ast::Type::Char { width, .. } => self.context.char(*width as _),
+            tl_core::ast::Type::Array { size: Some(size), .. } => {
+                // let size = self.ev
+            }
             tl_core::ast::Type::Ident(id) => {
                 if let Some(sym) = self.rstate().scope.find_symbol(id.as_str()) {
                     return self.context.symbol(sym);

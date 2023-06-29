@@ -3,7 +3,7 @@ use tl_core::{
     token::{Operator, SpannedToken, Token},
 };
 use tl_util::{
-    format::{BoxedGrouperIter, NodeDisplay, TreeDisplay},
+    format::{BoxedGrouperIter, Config, NodeDisplay, TreeDisplay},
     Rf,
 };
 
@@ -148,7 +148,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> ScopeManage
             }
             (
                 Expression::BinaryExpression {
-                    op_token: Some(SpannedToken(_, Token::Operator(Operator::Dot))),
+                    op_token: SpannedToken(_, Token::Operator(Operator::Dot)),
                     left: Some(left),
                     right: Some(right),
                 },
@@ -430,7 +430,7 @@ impl<'a, T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> ScopeManage
 impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> NodeDisplay
     for ScopeManager<T, V>
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         f.write_str("Scope Manager")
     }
 }

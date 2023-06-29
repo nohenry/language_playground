@@ -1,9 +1,7 @@
-use std::fmt::Display;
-
 use inkwell::intrinsics::Intrinsic;
 use linked_hash_map::LinkedHashMap;
 use tl_core::{
-    ast::{AstNode, Expression, ParsedTemplate, ParsedTemplateString},
+    ast::{AstNode, Expression, OneOf, ParsedTemplate, ParsedTemplateString},
     token::{Operator, Range, SpannedToken, Token},
 };
 
@@ -14,10 +12,9 @@ use tl_evaluator::{
     pass::EvaluationPass,
     scope::scope::ScopeValue,
 };
-use tl_util::format::TreeDisplay;
+use tl_util::format::{Config, TreeDisplay};
 
 use crate::{
-    context,
     llvm_type::LlvmType,
     llvm_value::{LlvmValue, LlvmValueKind},
 };
@@ -57,7 +54,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                     let symv = sym.borrow();
                     match &symv.value {
                         ScopeValue::EvaluationValue(cv) => {
-                            let mut rf = LlvmValue::sym_reference(
+                            let rf = LlvmValue::sym_reference(
                                 &sym,
                                 cv.get_type().clone(),
                                 self.context.as_ref(),
@@ -82,22 +79,26 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
             Expression::BinaryExpression {
                 left: Some(left),
                 right: Some(right),
-                op_token: Some(SpannedToken(_, Token::Operator(o))),
+                op_token: SpannedToken(_, Token::Operator(o)),
             } => self.evaluate_binary_expression(left, o, right, index),
-            Expression::Record(r) => {
-                let hmp = LinkedHashMap::from_iter(
-                    r.iter_items()
-                        .map(|f| (f.name().clone(), self.evaluate_expression(&f.expr, index))),
-                );
+            Expression::ClassInitializer { .. } => {
+                // LinkedHashMap::from_iter(
+                //     r.iter_items()
+                //         .map(|f| (f.name().clone(), self.evaluate_expression(&f.expr, index))),
+                // );
 
-                LlvmValue::create_struct_initializer(hmp, self.context.as_ref())
+                // LlvmValue::create_struct_initializer(hmp, self.context.as_ref())
+                todo!("Implement class initializer")
             }
             Expression::FunctionCall {
                 expr,
                 args: raw_args,
             } => {
                 let expr = self.evaluate_expression(expr, index);
-                let args = self.evaluate_args(raw_args, index);
+                let args = match raw_args {
+                    OneOf::A(list) => self.evaluate_args(list, index),
+                    OneOf::B(expr) => vec![self.evaluate_expression(expr, index)],
+                };
 
                 let expr = {
                     let expr = expr.resolve_ref(self.context.as_ref()).unwrap();
@@ -152,11 +153,8 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                                             TypeHint::Parameter,
                                         ),
                                         range: raw_args
-                                            .items
-                                            .iter_items()
-                                            .nth(i)
-                                            .unwrap()
-                                            .get_range(),
+                                            .map_a(|a| a.iter_items().nth(i).unwrap().get_range())
+                                            .a_or(|b| b.get_range()),
                                     });
                                     return None;
                                 }
@@ -219,11 +217,8 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                                             TypeHint::Parameter,
                                         ),
                                         range: raw_args
-                                            .items
-                                            .iter_items()
-                                            .nth(i)
-                                            .unwrap()
-                                            .get_range(),
+                                            .map_a(|a| a.iter_items().nth(i).unwrap().get_range())
+                                            .a_or(|b| b.get_range()),
                                     });
                                     return None;
                                 }
@@ -248,7 +243,27 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 
                         return_val
                     }
+
                     _ => LlvmValue::empty(self.context.as_ref()),
+                }
+            }
+
+            Expression::Block(list) => {
+                if list.num_children(&Config::default()) == 0 {
+                    return LlvmValue::empty(self.context.as_ref());
+                } else if list.num_children(&Config::default()) == 1 {
+                    let item = list
+                        .iter_items()
+                        .next()
+                        .expect("Value should have been present. This is probably a rustc bug");
+                    return self.evaluate_statement(item, 0);
+                } else {
+                    let values: Vec<_> = list
+                        .iter_items()
+                        .enumerate()
+                        .map(|(index, stmt)| self.evaluate_statement(stmt, index))
+                        .collect();
+                    return values.into_iter().rev().next().unwrap();
                 }
             }
             _ => LlvmValue::empty(self.context.as_ref()),
@@ -291,7 +306,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
             (
                 Operator::Equals,
                 Expression::BinaryExpression {
-                    op_token: Some(SpannedToken(_, Token::Operator(Operator::Dot))),
+                    op_token: SpannedToken(_, Token::Operator(Operator::Dot)),
                     left: Some(dleft),
                     right: Some(dright),
                 },

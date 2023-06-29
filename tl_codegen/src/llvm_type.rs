@@ -13,7 +13,7 @@ use tl_evaluator::{
     scope::scope::{Scope, ScopeValue},
 };
 use tl_util::{
-    format::{NodeDisplay, TreeDisplay},
+    format::{Config, NodeDisplay, TreeDisplay},
     Rf,
 };
 
@@ -29,6 +29,9 @@ pub enum LlvmType<'a> {
     },
     Float(FloatType<'a>),
     Boolean(IntType<'a>),
+    Char {
+        llvm_type: IntType<'a>,
+    },
     Function {
         parameters: LinkedHashMap<String, LlvmType<'a>>,
         return_type: Box<LlvmType<'a>>,
@@ -58,7 +61,7 @@ pub enum LlvmType<'a> {
 
 impl Debug for LlvmType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <Self as NodeDisplay>::fmt(self, f)
+        <Self as NodeDisplay>::fmt(self, f, &Config::DEBUG)
     }
 }
 
@@ -178,7 +181,7 @@ impl Display for LlvmType<'_> {
 }
 
 impl NodeDisplay for LlvmType<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         match self {
             Self::Boolean { .. } => f.write_str("bool"),
             // Self::String => f.write_str("string"),
@@ -202,6 +205,7 @@ impl NodeDisplay for LlvmType<'_> {
                 signed: false,
                 llvm_type,
             } => write!(f, "u{}", llvm_type.get_bit_width()),
+            Self::Char { llvm_type } => write!(f, "char{}", llvm_type.get_bit_width()),
             Self::Function { .. } => f.write_str("Function"),
             // Self::Ident(ident) => f.write_str(ident),
             Self::Intrinsic(_) => {
@@ -252,8 +256,8 @@ impl TreeDisplay for LlvmType<'_> {
 
     fn child_at_bx<'a>(&'a self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
         match self {
-            LlvmType::StructInstance { members, .. } => members.child_at_bx(_index),
-            LlvmType::StructInitializer { members, .. } => members.child_at_bx(_index),
+            LlvmType::StructInstance { members, .. } => members.child_at_bx(_index, _cfg),
+            LlvmType::StructInitializer { members, .. } => members.child_at_bx(_index, _cfg),
             _ => panic!(),
         }
     }
@@ -439,6 +443,7 @@ impl<'a> LlvmType<'a> {
             LlvmType::Boolean(bool) => (*bool).into(),
             LlvmType::Float(f) => (*f).into(),
             LlvmType::Integer { llvm_type, .. } => (*llvm_type).into(),
+            LlvmType::Char { llvm_type } => (*llvm_type).into(),
             LlvmType::CoercibleInteger(llvm_type) => (*llvm_type).into(),
             LlvmType::CoercibleFloat(llvm_type) => (*llvm_type).into(),
             LlvmType::Ref {
@@ -507,6 +512,17 @@ impl<'a> LlvmType<'a> {
                 }
             }
             _ => 0,
+        }
+    }
+
+    pub fn reduce(&self, ctx: &LlvmContext<'a>) -> LlvmType<'a> {
+        match self {
+            Self::CoercibleInteger(fl) => LlvmType::Integer {
+                signed: true,
+                llvm_type: ctx.context.i32_type(),
+            },
+            Self::CoercibleFloat(fl) => LlvmType::Float(ctx.context.f32_type()),
+            ty => ty.clone(),
         }
     }
 }

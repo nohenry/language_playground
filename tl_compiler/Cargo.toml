@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+colored = "2.0.0"
 tl_core = { path = "../tl_core" }
 # tl_vm = { path = "../tl_vm" }
-# tl_codegen = { path = "../tl_codegen" }
+tl_codegen = { path = "../tl_codegen" }
 tl_util = { path = "../tl_util" }

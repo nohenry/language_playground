@@ -788,9 +788,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tl_codegen_llvm"
+version = "0.1.0"
+
+[[package]]
 name = "tl_compiler"
 version = "0.1.0"
 dependencies = [
+ "colored",
+ "tl_codegen",
  "tl_core",
  "tl_util",
 ]
@@ -799,6 +805,7 @@ dependencies = [
 name = "tl_core"
 version = "0.1.0"
 dependencies = [
+ "colored",
  "handlebars",
  "linked-hash-map",
  "log",
@@ -831,6 +838,7 @@ dependencies = [
 name = "tl_util"
 version = "0.1.0"
 dependencies = [
+ "colored",
  "linked-hash-map",
  "tl_macro",
 ]

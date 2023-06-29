@@ -42,21 +42,25 @@ impl<'a, P: Pass> Evaluator<P> for LlvmEvaluator<'a, P> {
 impl<'a> LlvmEvaluator<'a, TypeFirst> {
     pub fn new(
         root: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
+
+        module_scope: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
+        // main_scope: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
+
         module: Arc<Module>,
         index: usize,
         context: Rc<LlvmContext<'a>>,
     ) -> LlvmEvaluator<'a, TypeFirst> {
-        let scope = Rf::new(Scope::new(
-            root.clone(),
-            module.name.to_string(),
-            ScopeValue::Module(module.clone()),
-            index,
-        ));
+        // let scope = Rf::new(Scope::new(
+        //     root.clone(),
+        //     module.name.to_string(),
+        //     ScopeValue::Module(module.clone()),
+        //     index,
+        // ));
 
         LlvmEvaluator {
             module,
             state: RwLock::new(EvaluatorState {
-                scope: ScopeManager::new(root, scope),
+                scope: ScopeManager::new(root, module_scope),
                 errors: Vec::new(),
             }),
             pd: PhantomData,
@@ -147,8 +151,8 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
 impl<'a, P: Pass> LlvmEvaluator<'a, P> {
     pub fn evaluate_params(&self, params: &ParamaterList) -> LinkedHashMap<String, LlvmType<'a>> {
         let iter = params.items.iter_items().filter_map(|f| {
-            if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
-                Some((ident.as_str().to_string(), self.evaluate_type(ty)))
+            if let Some(ident) = &f.name {
+                Some((ident.as_str().to_string(), self.evaluate_type(&f.ty)))
             } else {
                 None
             }
@@ -161,8 +165,8 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
         members: &EnclosedList<Param>,
     ) -> LinkedHashMap<String, LlvmType<'a>> {
         let iter = members.iter_items().filter_map(|f| {
-            if let (Some(ident), Some(ty)) = (&f.name, &f.ty) {
-                Some((ident.as_str().to_string(), self.evaluate_type(ty)))
+            if let Some(ident) = &f.name {
+                Some((ident.as_str().to_string(), self.evaluate_type(&f.ty)))
             } else {
                 None
             }

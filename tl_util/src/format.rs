@@ -1,21 +1,47 @@
 use std::{
     cell::{Ref, RefCell},
     collections::HashMap,
-    fmt,
+    default, fmt,
     sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard},
 };
 
+use colored::Colorize;
 use linked_hash_map::LinkedHashMap;
 
 use crate::Rf;
 
+#[derive(Default)]
 pub enum FormatType {
     Debug,
+    #[default]
     Display,
 }
 
+#[derive(Default)]
 pub struct Config {
     pub format_type: FormatType,
+}
+
+impl Config {
+    pub const DEBUG: Config = Config {
+        format_type: FormatType::Debug,
+    };
+
+    pub const DISPLAY: Config = Config {
+        format_type: FormatType::Display,
+    };
+}
+
+pub enum SemanticType {
+    Default,
+    Type,
+    Variable,
+    Function,
+    Keyword,
+    Flow,
+    String,
+    Literal,
+    Module,
 }
 
 pub struct Fmt<F>(pub F)
@@ -108,6 +134,10 @@ pub trait TreeDisplay<U = ()>: NodeDisplay + AsTrait<U> {
         None
     }
 
+    fn semantic_type(&self) -> SemanticType {
+        SemanticType::Default
+    }
+
     fn write(
         &self,
         f: &mut std::fmt::Formatter<'_>,
@@ -176,7 +206,7 @@ pub trait TreeDisplay<U = ()>: NodeDisplay + AsTrait<U> {
         );
 
         let cfg = Config {
-            format_type: FormatType::Display
+            format_type: FormatType::Display,
         };
 
         let val = format!("{}", Fmt(|f, cfg| self.fmt(f, &cfg)));
@@ -237,6 +267,29 @@ pub trait TreeDisplay<U = ()>: NodeDisplay + AsTrait<U> {
             "{}",
             FmtMut::new(|f| self.write_unformatted(f, 0, &String::from(""), false, &mut founc))
         )
+    }
+
+    fn semantic_format(&self) -> String {
+        self.format_unformat(Box::new(|a, b| {
+            match a.semantic_type() {
+                SemanticType::Type => Some(b.bright_yellow().to_string()),
+                SemanticType::Variable => Some(b.purple().to_string()),
+                SemanticType::Flow => Some(b.magenta().to_string()),
+                SemanticType::Function => Some(b.yellow().to_string()),
+                SemanticType::Keyword => Some(b.blue().to_string()),
+                SemanticType::Literal => Some(b.bright_green().to_string()),
+                SemanticType::String => Some(b.bright_red().to_string()),
+                SemanticType::Module => Some(b.bright_green().to_string()),
+                // SemanticType::Variable => Some(b.truecolor(189, 183, 107).to_string()),
+                // SemanticType::Flow => Some(b.truecolor(216, 160, 223).to_string()),
+                // SemanticType::Function => Some(b.truecolor(255, 128, 0).to_string()),
+                // SemanticType::Keyword => Some(b.truecolor(86, 156, 214).to_string()),
+                // SemanticType::Literal => Some(b.truecolor(181, 206, 168).to_string()),
+                // SemanticType::String => Some(b.truecolor(206, 144, 120).to_string()),
+                // SemanticType::Module => Some(b.truecolor(181, 206, 168).to_string()),
+                _ => None,
+            }
+        }))
     }
 }
 
@@ -652,6 +705,52 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         <T as NodeDisplay>::fmt(&self.lock().unwrap(), f, _cfg)
+    }
+}
+
+impl<T> NodeDisplay for Box<T>
+where
+    T: NodeDisplay,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
+        <T as NodeDisplay>::fmt(self.as_ref(), f, _cfg)
+    }
+}
+
+impl<T> TreeDisplay for Box<T>
+where
+    T: NodeDisplay + TreeDisplay,
+{
+    fn num_children(&self, _cfg: &Config) -> usize {
+        <T as TreeDisplay>::num_children(self.as_ref(), _cfg)
+    }
+
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+        <T as TreeDisplay>::child_at(self.as_ref(), index, _cfg)
+    }
+
+    fn child_at_bx<'a>(&'a self, index: usize, cfg: &Config) -> Box<dyn TreeDisplay<()> + 'a> {
+        <T as TreeDisplay>::child_at_bx(self.as_ref(), index, cfg)
+    }
+}
+
+impl<A: NodeDisplay, B: NodeDisplay> NodeDisplay for (A, B) {
+    fn fmt(&self, f: &mut fmt::Formatter, config: &Config) -> fmt::Result {
+        f.write_str("Tuple: 2")
+    }
+}
+
+impl<A: TreeDisplay, B: TreeDisplay> TreeDisplay for (A, B) {
+    fn num_children(&self, cfg: &Config) -> usize {
+        2
+    }
+
+    fn child_at(&self, index: usize, cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+        match index {
+            0 => Some(&self.0),
+            1 => Some(&self.1),
+            _ => None,
+        }
     }
 }
 
