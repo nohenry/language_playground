@@ -790,13 +790,17 @@ dependencies = [
 [[package]]
 name = "tl_codegen_llvm"
 version = "0.1.0"
+dependencies = [
+ "tl_core",
+ "tl_util",
+]
 
 [[package]]
 name = "tl_compiler"
 version = "0.1.0"
 dependencies = [
  "colored",
- "tl_codegen",
+ "tl_codegen_llvm",
  "tl_core",
  "tl_util",
 ]

@@ -143,6 +143,7 @@ impl Parser {
             _ => (),
         };
 
+        println!("{:?}", self.tokens.current());
         let expression = self.parse_expression(None);
         if expression.is_some() {
             return expression.map(Statement::Expression);
@@ -819,11 +820,11 @@ impl Parser {
 
     pub fn parse_binding(&self) -> Option<Binding> {
         match self.tokens.peek() {
-            Some(Token::Operator(Operator::OpenParen)) => {
+            Some(Token::Operator(Operator::OpenSquare)) => {
                 Some(Binding::Tuple(self.parse_enclosed_punctuation_list(
-                    Operator::OpenParen,
+                    Operator::OpenSquare,
                     Operator::Comma,
-                    Operator::CloseParen,
+                    Operator::CloseSquare,
                     || self.parse_binding().map(|f| (f, true)),
                 )?))
             }

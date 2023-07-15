@@ -9,5 +9,5 @@ edition = "2021"
 colored = "2.0.0"
 tl_core = { path = "../tl_core" }
 # tl_vm = { path = "../tl_vm" }
-tl_codegen = { path = "../tl_codegen" }
+tl_codegen_llvm = { path = "../tl_codegen_llvm" }
 tl_util = { path = "../tl_util" }

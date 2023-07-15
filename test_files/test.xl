@@ -49,8 +49,6 @@ int[] slice5 = newArr[..5]
 uint? huh = 5
 uint? huh2 = none
 
-uint val = huh2 or 0
-
 uint& valPtr = &val
 uint* mutValPtr = &val
 
@@ -115,10 +113,10 @@ int(bool) func = (bool b) => {
 }
 
 func = (bool b) => {
-    if b: 0 else: 1
+    if b { 0 } else { 1 }
 }
 
-func = (bool b) => if b: 0 else: 1
+func = (bool b) => if b { 0 } else { 1 }
 
 class Human {
     String name = 'fdsfdf'
@@ -132,15 +130,15 @@ class Data {
     // private
     unique int instances = 0
 
-    public unique create(int[50] data) {
+    public unique none create(int[50] data) {
         for [src, dst] in [data, &self.data] {
-            *src = dst
+            *dst = src
         }
 
         Data.instances += 1
     }
 
-    public unique destroy() {
+    public none destroy() {
         Data.instances -= 1
     }
 }

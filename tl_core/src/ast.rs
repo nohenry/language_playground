@@ -633,8 +633,7 @@ pub struct MatchEntry {
 #[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 pub struct ElseClause {
     pub else_token: SpannedToken,
-    pub colon: Option<SpannedToken>,
-    pub body: Box<Statement>,
+    pub body: Box<Expression>,
 }
 
 #[derive(Clone, NodeFormat, TreeFormat, AstNode)]
@@ -684,8 +683,7 @@ pub enum Expression {
     If {
         if_token: SpannedToken,
         expression: Box<Expression>,
-        colon: Option<SpannedToken>,
-        body: Box<Statement>,
+        body: Box<Expression>,
         else_clause: Option<ElseClause>,
     },
     ForLoop {

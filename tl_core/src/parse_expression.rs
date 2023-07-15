@@ -58,21 +58,21 @@ impl Parser {
                     /* Calling parse_operator_expression instead of parse_expression for cases like:
                      * if b { 6 } else { 9 }
                      *    ^^^^^^^ is this a class init or expression then block?
-                     * 
+                     *
                      * if (Data { data: [0: 50] }) { 6 } else { 9 }
                      *    ^----------------------^ parens are needed for this case
-                     * 
+                     *
                      * 2 + Data { data: [0: 50] }
-                     * 
+                     *
                      * This will be an error and should be written as
-                     * 
+                     *
                      * 2 + (Data {data: [0: 50]})
-                     * 
+                     *
                      * An exception is assignment because you should be able to say:
-                     * 
+                     *
                      * data = Data { ...data }
-                     * 
-                    */
+                     *
+                     */
                     let right = match o {
                         Operator::Equals => self.parse_expression(None),
                         _ => self.parse_operator_expression(prec),
@@ -84,15 +84,15 @@ impl Parser {
                         op_token,
                     })
                 }
-                Token::Ident(ident) if ident != "else" && ident != "as" => {
-                    let function_name = self.tokens.next()?.clone();
-                    let right = self.parse_expression(None)?;
+                // Token::Ident(ident) if ident != "else" && ident != "as" => {
+                //     let function_name = self.tokens.next()?.clone();
+                //     let right = self.parse_expression(None)?;
 
-                    Some(Expression::FunctionCall {
-                        expr: Box::new(Expression::Ident(function_name)),
-                        args: crate::ast::OneOf::B(Box::new(right)),
-                    })
-                }
+                //     Some(Expression::FunctionCall {
+                //         expr: Box::new(Expression::Ident(function_name)),
+                //         args: crate::ast::OneOf::B(Box::new(right)),
+                //     })
+                // }
                 _ => break,
             }
         }
@@ -179,27 +179,25 @@ impl Parser {
         let if_token = self.tokens.next().unwrap().clone();
         let expression = Box::new(self.parse_operator_expression(0)?);
 
-        let (colon, statement) = self.parse_if_body(false)?;
+        let stmt_expression = self.parse_if_body(false)?;
 
         let else_clause = match self.tokens.peek_ignore_ws() {
             Some(Token::Ident(ident)) if ident == "elseif" => {
                 let else_token = self.tokens.current_ignore_ws().unwrap().clone();
-                let (colon, statement) = self.parse_if_body(true)?;
+                let expression = self.parse_if_body(true)?;
 
                 Some(ElseClause {
                     else_token,
-                    colon,
-                    body: Box::new(statement),
+                    body: Box::new(expression),
                 })
             }
             Some(Token::Ident(ident)) if ident == "else" => {
                 let else_token = self.tokens.next_ignore_ws().unwrap().clone();
-                let (colon, statement) = self.parse_if_body(false)?;
+                let expression = self.parse_if_body(false)?;
 
                 Some(ElseClause {
                     else_token,
-                    colon,
-                    body: Box::new(statement),
+                    body: Box::new(expression),
                 })
             }
             _ => None,
@@ -208,32 +206,21 @@ impl Parser {
         Some(Expression::If {
             if_token,
             expression,
-            colon,
-            body: Box::new(statement),
+            body: Box::new(stmt_expression),
             else_clause,
         })
     }
 
-    pub fn parse_if_body(&self, elseif: bool) -> Option<(Option<SpannedToken>, Statement)> {
+    pub fn parse_if_body(&self, elseif: bool) -> Option<Expression> {
         match self.tokens.peek() {
-            Some(Token::Operator(Operator::Colon)) => {
-                let colon = self.tokens.next().unwrap().clone();
-                let expression = if elseif {
-                    self.parse_if_expression()?
-                } else {
-                    self.parse_operator_expression(0)?
-                };
-
-                Some((Some(colon), Statement::Expression(expression)))
+            Some(Token::Operator(Operator::OpenBrace)) => self.parse_block_expression(),
+            _ => {
+                self.add_error(ParseError {
+                    kind: ParseErrorKind::InvalidSyntax("Expected {".into()),
+                    range: self.tokens.current().unwrap().span().into(),
+                });
+                return None;
             }
-            _ => Some((
-                None,
-                if elseif {
-                    Statement::Expression(self.parse_if_expression()?)
-                } else {
-                    self.parse_statement()?
-                },
-            )),
         }
     }
 
@@ -246,8 +233,8 @@ impl Parser {
             return None;
         }
 
-        let expression = Box::new(self.parse_operator_expression(0)?);
-        let body = Box::new(self.parse_statement()?);
+        let expression = Box::new(self.parse_expression(None)?);
+        let body = Box::new(self.parse_block()?);
 
         Some(Expression::ForLoop {
             for_token,

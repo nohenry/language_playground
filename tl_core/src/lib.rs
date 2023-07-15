@@ -1,10 +1,4 @@
-#![feature(trait_upcasting)]
-#![feature(iter_intersperse)]
-#![feature(box_patterns)]
 #![feature(round_char_boundary)]
-#![feature(trace_macros)]
-
-// trace_macros!(true);
 
 use ast::{EnclosedList, Expression, Param, ParamaterList, Statement, Type};
 use lexer::Lexer;
