@@ -23,13 +23,13 @@ float32 f32 = 4.5
 float64 f64 = 4.5
 float128 f128 = 4.5
 
-fixed fx = 5.3
-fixed32 fx32 = 5.3
-fixed64 fx64 = 5.3
-fixed128 fx64 = 5.3
+// fixed fx = 5.3
+// fixed32 fx32 = 5.3
+// fixed64 fx64 = 5.3
+// fixed128 fx64 = 5.3
 
-fixed<2> fx32 = 5.35
-fixed<8> fx32 = 5.98732038
+// fixed<2> fx32 = 5.35
+// fixed<8> fx32 = 5.98732038
 
 char c = '😂'
 char c1 = 'é'
@@ -116,7 +116,9 @@ func = (bool b) => {
     if b { 0 } else { 1 }
 }
 
-func = (bool b) => if b { 0 } else { 1 }
+func = (UserData<bool> b) => if b { 0 } else { 1 }
+
+
 
 class Human {
     String name = 'fdsfdf'
@@ -191,4 +193,5 @@ public closed class File: Write {
         amount
     }
 }
+
 

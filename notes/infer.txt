@@ -1,0 +1,94 @@
+Case 1:
+	let i = 4 // i infered to have type of size iptr
+Lowered to:
+	iptr i = 4
+
+Case 2:
+	let a = 4 // a inferred to have type uint32
+	uint32 i = a + 3
+Lowered to:
+	uint32 a = 4
+	uint32 i = a + 3
+
+Case 3:
+	class Data {
+		uint8[32] data
+	}
+
+	let data = Data {
+		data: [0: 32]
+	}
+Lowered to:
+	class Data {
+		uint8[32] data
+	}
+
+	Data data = Data {
+		data: [0: 32]
+	}
+
+Case 4:
+	class List<T> {
+		T& data
+
+		List<T> create(T[] data) { /* impl */ }
+	}
+
+	let list = List<uint32>.create([0, 1, 2, 3])
+Lowered To:
+	class List<T> {
+		T& data
+	}
+
+	List<uint32> list = List<uint32>.create([0, 1, 2, 3])
+
+Case 5:
+	List<uint32> list = .create([0, 1, 2, 3])
+Lowered To:
+	List<uint32> list = List<uint32>.create([0, 1, 2, 3])
+
+Case 6:
+	uint64 a = 5
+
+	List list = .create([a, 1, 2, 3])
+Lowered To:
+	uint64 a = 5
+
+	List<uint64> list = List<uint64>.create([a, 1, 2, 3])
+
+Case 7:
+	uint64[] arr = [1, 2, 3, 4]
+
+	List list = .create(arr)
+Lowered To:
+	uint64[] arr = [1, 2, 3, 4]
+
+	List<uint64> list = List<uint64>.create(arr)
+
+Case 8:
+	uint64[] arr = [1, 2, 3, 4]
+
+	let list = List.create(arr)
+Lowered To:
+	uint64[] arr = [1, 2, 3, 4]
+
+	List<uint64> list = List<uint64>.create(arr)
+
+Case 9: (error)
+	uint64[] arr = [1, 2, 3, 4]
+
+	List<uint32> list = .create(arr)
+Error: expected uint32[] found uint64[]
+
+Case 10:
+	uint16[] someData = [1, 2, 3, 4]
+
+	let list = List {
+		data: someData
+	}
+Lowered To:
+	uint16[] someData = [1, 2, 3, 4]
+
+	List<uint16> list = List<uint16> {
+		data: someData
+	}

@@ -220,6 +220,10 @@ impl<T: AstNode + TreeDisplay> PunctuationList<T> {
         self.tokens.push((val, None))
     }
 
+    pub fn into_iter_items(self) -> impl Iterator<Item = T> {
+        self.tokens.into_iter().map(|(v, _)| v)
+    }
+
     pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
         self.tokens.iter().map(|(v, _)| v)
     }
@@ -341,6 +345,10 @@ impl<T: AstNode + TreeDisplay> EnclosedPunctuationList<T> {
     pub fn iter_items(&self) -> impl Iterator<Item = &T> + '_ {
         self.items.iter_items()
     }
+
+    pub fn into_iter_items(self) -> impl Iterator<Item = T> {
+        self.items.into_iter_items()
+    }
 }
 
 impl<T: PartialEq + AstNode + TreeDisplay> PartialEq for EnclosedPunctuationList<T> {
@@ -433,6 +441,7 @@ pub enum Type {
         base_type: Option<Box<Type>>,
     },
     Array {
+        base_type: Box<Type>,
         open: SpannedToken,
         size: Option<Box<Expression>>,
         close: SpannedToken,
@@ -601,20 +610,33 @@ impl TreeDisplay for ParsedTemplateString {
 
 #[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 pub enum Binding {
+    /// for item in items
     Variable(SpannedToken),
+    /// for [a, b] in  [aItems, bItems] 
     Tuple(EnclosedPunctuationList<Binding>),
+    /// for _ in items
     Ignore(SpannedToken),
 }
 
 #[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 pub enum MatchBody {
+    /// match expression {
+    ///     1 => 'one',
+    ///     2 => 'two',
+    ///     3 => 'three',
+    ///     4 => 'four',
+    ///     _ => 'other,
+    /// }
+    ///    
     Patterns(EnclosedPunctuationList<MatchEntry>),
+    /// let isOne: bool = match numeric as 1
     AsBinding {
         as_token: SpannedToken,
         binding: MatchBinding,
     },
 }
 
+/// Represents the left hand binding in a match case
 #[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 pub enum MatchBinding {
     Variable(SpannedToken),
@@ -623,6 +645,10 @@ pub enum MatchBinding {
     Ignore(SpannedToken),
 }
 
+/// Represents a case in a match expression.
+/// 5 => 'value'
+/// [1, 2] => 'oneAndTwo'
+/// _ => 'nothing'
 #[derive(Clone, NodeFormat, TreeFormat, AstNode)]
 pub struct MatchEntry {
     pub binding: MatchBinding,

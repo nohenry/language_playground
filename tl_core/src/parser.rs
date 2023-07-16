@@ -116,19 +116,16 @@ impl Parser {
                     None
                 };
 
-                if let Some(Token::Operator(Operator::OpenBrace)) = self.tokens.peek() {
-                } else {
-                    if let Some(us) = self.parse_type() {
-                        let eq = self.expect_operator(Operator::Equals).unwrap();
-                        return Some(Statement::TypeAlias {
-                            ty_tok: ty_tok.clone(),
-                            ident: symb.clone(),
-                            generic,
-                            eq: Some(eq.clone()),
-                            ty: Box::new(us),
-                        });
-                    }
-                }
+                let eq = self.expect_operator(Operator::Equals)?;
+                let ty = self.parse_type()?;
+
+                return Some(Statement::TypeAlias {
+                    ty_tok: ty_tok.clone(),
+                    ident: symb.clone(),
+                    generic,
+                    eq: Some(eq.clone()),
+                    ty: Box::new(ty),
+                })
             }
             Some(Token::Ident(_)) => {
                 if let Some(decl) = restore!(self, self.parse_variable_or_function_declaration()) {

@@ -1,0 +1,20 @@
+
+AST -> IR process:
+- Resolve Base Types
+	- Classes
+	- Interfaces
+	- Only keep track of paths to types because fields within may depend on other types
+- Resolve Generic Type Instances
+	- Analyze AST to find each distinct instance of a generic type. std.List<u32> is separate from std.List<bool>
+- Resolve Type Aliases
+- Resolve Function Signatures
+	- Now that we have every type resolved, we can start resolving function signatures (not the bodies).
+- Resolve Type Inferences
+	- Build new AST with `let` declarations replaced with their inferred types.
+	- Generic instances are also added here
+	- See `infer.txt`
+- Resolve Local Variables
+	- This is only used for `alloca` insertion at the beginning of the function; Variables can only be used after they are declared.
+- AST can now easily be walked and emit IR
+
+

@@ -72,6 +72,7 @@ impl Parser {
                     let close = self.expect_operator(Operator::CloseSquare)?.clone();
 
                     Some(Type::Array {
+                        base_type: Box::new(ty?),
                         open,
                         size: size.map(Box::new),
                         close,

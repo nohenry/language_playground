@@ -21,7 +21,7 @@ fn main() {
 
     // tl_vm::run_file("test_files/test.xl");
     // tl_codegen::run_file("test_files/llvm_test.xl");
-    tl_codegen_llvm::run_file("test_files/test.xl")
+    tl_codegen_llvm::run_file("test_files/test1.xl")
 }
 
 // pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
