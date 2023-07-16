@@ -145,7 +145,7 @@ fn is_optional_box(ty: &Type) -> bool {
             };
 
             let Some(GenericArgument::Type(arg)) = angs.args.first() else {
-                return false
+                return false;
             };
 
             is_box(arg)
@@ -258,18 +258,6 @@ mod test {
 
         println!("{}", types_match(&p, &s));
     }
-}
-
-#[proc_macro]
-pub fn mcr(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let p =
-        syn::parse::<Type>(proc_macro::TokenStream::from_str("Option<Box<(_, bool)>>").unwrap())
-            .unwrap();
-    let s =
-        syn::parse::<Type>(proc_macro::TokenStream::from_str("Option<Box<(i32, bool)>>").unwrap())
-            .unwrap();
-
-    tokens
 }
 
 #[proc_macro_derive(
@@ -579,7 +567,7 @@ pub fn derive_tree_format(tokens: proc_macro::TokenStream) -> proc_macro::TokenS
     let mut num_childs = TokenStream::new();
     let mut childs = TokenStream::new();
     let mut semantic_types = TokenStream::new();
-    let mut boxed_childs = TokenStream::new();
+    let boxed_childs = TokenStream::new();
 
     let default = if let Some(attr) = has_attr(&input.attrs, &["semantic"]) {
         let tokens = attr.meta.require_list().unwrap().tokens.clone();

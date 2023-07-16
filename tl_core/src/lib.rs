@@ -454,11 +454,7 @@ impl<U: Clone> ModuleDescender<U> {
                 ..
             } => self.descend_expression(expr),
             Statement::Expression(e) => self.descend_expression(e),
-            Statement::Function {
-                parameters,
-                return_type,
-                ..
-            } => {
+            Statement::Function { parameters, .. } => {
                 if let Some(on_prm) = &mut self.on_parameters {
                     on_prm(parameters, self.user_data.clone());
                 }

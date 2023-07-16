@@ -94,7 +94,7 @@ impl LanguageServer for Backend {
             let map = &*self.documents.read().unwrap();
 
             let Some(mods) = map.get(&params.text_document.uri) else {
-                return Ok(None)
+                return Ok(None);
             };
 
             let index = if let Some(id) = mods.1.index_of_mod(&mods.0.name) {
@@ -129,7 +129,7 @@ impl LanguageServer for Backend {
         let res = {
             let map = &*self.documents.read().unwrap();
             let Some(mods) = map.get(&params.text_document_position.text_document.uri) else {
-                return Ok(None)
+                return Ok(None);
             };
             let sp = Span {
                 line_num: params.text_document_position.position.line,

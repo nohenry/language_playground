@@ -93,16 +93,15 @@ impl<A: TreeDisplay + AstNode + Clone, B: TreeDisplay + AstNode + Clone> NodeDis
     fn fmt(&self, f: &mut std::fmt::Formatter, _cfg: &Config) -> std::fmt::Result {
         match self {
             OneOf::A(a0) => {
-                let this = (a0);
+                let this = a0;
                 write!(f, "A")?;
                 Ok(())
             }
             OneOf::B(a0) => {
-                let this = (a0);
+                let this = a0;
                 write!(f, "B")?;
                 Ok(())
             }
-            _ => Ok(()),
         }
     }
 }
@@ -136,7 +135,7 @@ impl<A: TreeDisplay + AstNode + Clone, B: TreeDisplay + AstNode + Clone> TreeDis
         }
     }
 
-    fn child_at_bx<'b>(&'b self, index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'b> {
+    fn child_at_bx<'b>(&'b self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay + 'b> {
         match self {
             _ => panic!("Unexpected index for enum!"),
         }
@@ -612,7 +611,7 @@ impl TreeDisplay for ParsedTemplateString {
 pub enum Binding {
     /// for item in items
     Variable(SpannedToken),
-    /// for [a, b] in  [aItems, bItems] 
+    /// for [a, b] in  [aItems, bItems]
     Tuple(EnclosedPunctuationList<Binding>),
     /// for _ in items
     Ignore(SpannedToken),
@@ -737,20 +736,20 @@ impl PartialEq for Expression {
             (
                 Self::BinaryExpression {
                     left: l_left,
-                    op_token: l_op_token,
                     right: l_right,
+                    ..
                 },
                 Self::BinaryExpression {
                     left: r_left,
-                    op_token: r_op_token,
                     right: r_right,
+                    ..
                 },
             ) => l_left == r_left && l_right == r_right,
-            (Self::Boolean(l0, l1), Self::Boolean(r0, r1)) => l0 == r0,
-            (Self::Integer(l0, l1, l2), Self::Integer(r0, r1, r2)) => l0 == r0,
-            (Self::Float(l0, l1, l2), Self::Float(r0, r1, r2)) => l0 == r0,
+            (Self::Boolean(l0, _), Self::Boolean(r0, _)) => l0 == r0,
+            (Self::Integer(l0, _, _), Self::Integer(r0, _, _)) => l0 == r0,
+            (Self::Float(l0, _, _), Self::Float(r0, _, _)) => l0 == r0,
             (Self::Ident(l0), Self::Ident(r0)) => l0.as_str() == r0.as_str(),
-            (Self::String(l0, l1), Self::String(r0, r1)) => l1.as_str() == r1.as_str(),
+            (Self::String(_, l1), Self::String(_, r1)) => l1.as_str() == r1.as_str(),
             (
                 Self::FunctionCall {
                     expr: l_expr,

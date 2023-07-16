@@ -1,13 +1,17 @@
 #![feature(type_changing_struct_update)]
-use std::{fs::File, io::{Write, Read}, path::Path};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 use tl_util::format::TreeDisplay;
 
-mod code_type;
+// mod code_type;
 mod module;
 mod resolve;
-mod symbol;
-mod type_check;
+// mod symbol;
+// mod type_check;
 // mod lower;
 
 pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
@@ -50,8 +54,7 @@ pub fn run_file<P: AsRef<Path> + std::fmt::Display>(path: P) {
         .expect("Unable to create target machine");
 
     let codegen_module = module::Module::new(&ctx, target_machine);
-    let resolve =
-        resolve::Resolve::<resolve::TypePass>::new(&module, codegen_module);
+    let resolve = resolve::Resolve::<resolve::TypePass>::new(&module, codegen_module);
     let resolve = resolve.resolve(&module);
     let resolve = resolve.resolve(&module);
     let resolve = resolve.resolve(&module);
@@ -103,7 +106,7 @@ impl<'ctx> Type<'ctx> {
         Type {
             llvm: inkwell::types::BasicTypeEnum::try_from(self.llvm)
                 .expect("Unable to convert to basic type!")
-                .ptr_type(inkwell::AddressSpace::default())
+                .ptr_type(address_space)
                 .as_any_type_enum(),
             signed: false,
             mutable: self.mutable,

@@ -45,7 +45,6 @@ impl<'a> LlvmEvaluator<'a, TypeFirst> {
 
         module_scope: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
         // main_scope: Rf<Scope<LlvmType<'a>, LlvmValue<'a>>>,
-
         module: Arc<Module>,
         index: usize,
         context: Rc<LlvmContext<'a>>,

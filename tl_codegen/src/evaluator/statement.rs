@@ -639,8 +639,8 @@ impl<'a> LlvmEvaluator<'a, MemberPass> {
                 ..
             } => {
                 let Some(sym) = ({ self.wstate().scope.find_symbol(ident.as_str()) }) else {
-                            return;
-                        };
+                    return;
+                };
                 self.wstate().scope.push_scope(sym.clone());
 
                 let emembers = self.evaluate_struct_members(members);

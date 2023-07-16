@@ -283,17 +283,18 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                 let right = right.resolve_ref_value(self.context.as_ref()).unwrap();
 
                 let Some(sym) = self.wstate().scope.find_symbol(name.as_str()) else {
-                    self.add_error(EvaluationError { kind: EvaluationErrorKind::SymbolNotFound(name.as_str().to_string()), range: name.get_range() }
-
-                    );
-                    return LlvmValue::empty(self.context.as_ref())
+                    self.add_error(EvaluationError {
+                        kind: EvaluationErrorKind::SymbolNotFound(name.as_str().to_string()),
+                        range: name.get_range(),
+                    });
+                    return LlvmValue::empty(self.context.as_ref());
                 };
 
                 let mut value = sym.borrow_mut();
 
-                let ScopeValue::EvaluationValue(cv)  = &mut value.value else {
+                let ScopeValue::EvaluationValue(cv) = &mut value.value else {
                     // TODO: throw error
-                    return LlvmValue::empty(self.context.as_ref())
+                    return LlvmValue::empty(self.context.as_ref());
                 };
 
                 let right = right
@@ -337,7 +338,7 @@ impl<'a> LlvmEvaluator<'a, EvaluationPass> {
                             let value = val.borrow();
 
                             let ScopeValue::EvaluationValue(cv) = &value.value else {
-                                return LlvmValue::empty(self.context.as_ref())
+                                return LlvmValue::empty(self.context.as_ref());
                             };
 
                             cv.get_type().clone()

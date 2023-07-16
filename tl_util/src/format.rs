@@ -1,7 +1,7 @@
 use std::{
     cell::{Ref, RefCell},
     collections::HashMap,
-    default, fmt,
+    fmt,
     sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard},
 };
 
@@ -126,7 +126,7 @@ impl<T: TreeDisplay<U> + Sized, U> AsTrait<U> for T {
 pub trait TreeDisplay<U = ()>: NodeDisplay + AsTrait<U> {
     fn num_children(&self, cfg: &Config) -> usize;
     fn child_at(&self, index: usize, cfg: &Config) -> Option<&dyn TreeDisplay<U>>;
-    fn child_at_bx<'a>(&'a self, _index: usize, cfg: &Config) -> Box<dyn TreeDisplay<U> + 'a> {
+    fn child_at_bx<'a>(&'a self, _index: usize, _cfg: &Config) -> Box<dyn TreeDisplay<U> + 'a> {
         panic!("This type doesn't used box values!")
     }
 
@@ -468,7 +468,7 @@ impl<'b, K: TreeDisplay + 'b, V: TreeDisplay + 'b> TreeDisplay for HashMap<K, V>
         self.len()
     }
 
-    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
+    fn child_at(&self, _index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay> {
         // if let Some((key, value))
         None
     }
@@ -735,17 +735,17 @@ where
 }
 
 impl<A: NodeDisplay, B: NodeDisplay> NodeDisplay for (A, B) {
-    fn fmt(&self, f: &mut fmt::Formatter, config: &Config) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter, _config: &Config) -> fmt::Result {
         f.write_str("Tuple: 2")
     }
 }
 
 impl<A: TreeDisplay, B: TreeDisplay> TreeDisplay for (A, B) {
-    fn num_children(&self, cfg: &Config) -> usize {
+    fn num_children(&self, _cfg: &Config) -> usize {
         2
     }
 
-    fn child_at(&self, index: usize, cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
+    fn child_at(&self, index: usize, _cfg: &Config) -> Option<&dyn TreeDisplay<()>> {
         match index {
             0 => Some(&self.0),
             1 => Some(&self.1),

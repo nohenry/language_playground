@@ -27,12 +27,12 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
             tl_core::ast::Type::Integer { width, signed, .. } => {
                 self.context.integer(*width, *signed)
             }
-            tl_core::ast::Type::IntegerPointer { signed, .. } => {
-                self.context.integer(64, *signed)
-            }
+            tl_core::ast::Type::IntegerPointer { signed, .. } => self.context.integer(64, *signed),
             tl_core::ast::Type::Float { width, .. } => self.context.float(*width),
             tl_core::ast::Type::Char { width, .. } => self.context.char(*width as _),
-            tl_core::ast::Type::Array { size: Some(size), .. } => {
+            tl_core::ast::Type::Array {
+                size: Some(size), ..
+            } => {
                 // let size = self.ev
             }
             tl_core::ast::Type::Ident(id) => {
@@ -62,7 +62,7 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
                         range: tok.get_range(),
                     });
 
-                    return self.context.empty()
+                    return self.context.empty();
                 };
 
                 let csi = {
@@ -121,12 +121,17 @@ impl<'a, P: Pass> LlvmEvaluator<'a, P> {
                 let hash = hash.finish().to_string();
 
                 let raw_members = {
-                    let ScopeValue::StructTemplate { constructions, raw_members, .. } = &mut sym.value else {
+                    let ScopeValue::StructTemplate {
+                        constructions,
+                        raw_members,
+                        ..
+                    } = &mut sym.value
+                    else {
                         // self.add_error(EvaluationError {
                         //     kind: EvaluationErrorKind::TypeMismatch(Type::Empty, Type::Empty, TypeHint::Record),
                         //     range: tok.get_range(),
                         // });
-                        return self.context.empty()
+                        return self.context.empty();
                     };
 
                     constructions.insert(types.clone(), hash.clone());

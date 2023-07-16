@@ -485,7 +485,7 @@ impl<T: EvaluationType<Value = V>, V: EvaluationValue<Type = T>> SemanticTokenGe
                 let types: Vec<_> = list.iter_items().map(|ty| self.evaluate_type(ty)).collect();
 
                 let Some(symrf) = self.scope.find_symbol(tok.as_str()) else {
-                    return T::empty()
+                    return T::empty();
                 };
 
                 let csi = {

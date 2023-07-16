@@ -376,7 +376,7 @@ impl EvaluationValue for VmValue {
 
                 let base = base.borrow();
                 let Some(child) = base.children.get(index) else {
-                    return None
+                    return None;
                 };
 
                 return Some(child.clone());
@@ -387,7 +387,7 @@ impl EvaluationValue for VmValue {
 
     fn resolve_ref_value(&self) -> Option<Self> {
         let Some(sym) = self.resolve_ref() else {
-            return None
+            return None;
         };
 
         let value = sym.borrow();

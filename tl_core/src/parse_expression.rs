@@ -1,6 +1,6 @@
 use crate::{
     ast::{
-        ElseClause, EnclosedList, Expression, KeyValue, MatchBody, MatchEntry, ParsedTemplate,
+        ElseClause, Expression, KeyValue, MatchBody, MatchEntry, ParsedTemplate,
         ParsedTemplateString, PunctuationList, Statement,
     },
     error::{ParseError, ParseErrorKind},
@@ -179,12 +179,12 @@ impl Parser {
         let if_token = self.tokens.next().unwrap().clone();
         let expression = Box::new(self.parse_operator_expression(0)?);
 
-        let stmt_expression = self.parse_if_body(false)?;
+        let stmt_expression = self.parse_if_body()?;
 
         let else_clause = match self.tokens.peek_ignore_ws() {
             Some(Token::Ident(ident)) if ident == "elseif" => {
                 let else_token = self.tokens.current_ignore_ws().unwrap().clone();
-                let expression = self.parse_if_body(true)?;
+                let expression = self.parse_if_body()?;
 
                 Some(ElseClause {
                     else_token,
@@ -193,7 +193,7 @@ impl Parser {
             }
             Some(Token::Ident(ident)) if ident == "else" => {
                 let else_token = self.tokens.next_ignore_ws().unwrap().clone();
-                let expression = self.parse_if_body(false)?;
+                let expression = self.parse_if_body()?;
 
                 Some(ElseClause {
                     else_token,
@@ -211,7 +211,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_if_body(&self, elseif: bool) -> Option<Expression> {
+    pub fn parse_if_body(&self) -> Option<Expression> {
         match self.tokens.peek() {
             Some(Token::Operator(Operator::OpenBrace)) => self.parse_block_expression(),
             _ => {

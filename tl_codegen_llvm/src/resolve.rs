@@ -123,14 +123,14 @@ impl Path {
     }
 
     /// Mangles a `self` into a string for use in llvm
-    /// 
+    ///
     /// Symbols are separated with an '_'. If there are any generic parameters, the hash of the generics are appended on after a '$'.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run,ignore
     /// use tl_codegen_llvm::resolve::Path;
-    /// 
+    ///
     /// assert_eq!(Path::std("io").with("Data").mangle(), "std_io_Data");
     /// ```
     pub fn mangle(&self) -> String {
@@ -261,7 +261,7 @@ impl<T> std::fmt::Display for SymbolEntry<T> {
 }
 
 /// Used for Resolving symbols by analyzing the provided AST.
-/// 
+///
 /// # Example
 /// ```no_run,ignore
 /// let resolve = Resolve::new(&ast_module, codegen_module);
@@ -289,7 +289,7 @@ pub struct Resolve<'ctx, P: ResolvePass> {
 }
 
 impl<'ctx, P: ResolvePass> Resolve<'ctx, P> {
-    /// Creates a new `Resolve` instance with the first pass (`TypePass`). 
+    /// Creates a new `Resolve` instance with the first pass (`TypePass`).
     pub fn new(module: &tl_core::Module, codegen_module: Module<'ctx>) -> Resolve<'ctx, TypePass> {
         let path = Path::empty().with(&module.name);
 

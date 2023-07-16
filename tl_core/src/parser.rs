@@ -125,7 +125,7 @@ impl Parser {
                     generic,
                     eq: Some(eq.clone()),
                     ty: Box::new(ty),
-                })
+                });
             }
             Some(Token::Ident(_)) => {
                 if let Some(decl) = restore!(self, self.parse_variable_or_function_declaration()) {
