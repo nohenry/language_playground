@@ -280,7 +280,7 @@ impl Lexer {
                 Some('#') => return (Some(Token::Operator(Operator::Pound)), None),
                 Some('$') => return (Some(Token::Operator(Operator::Dollar)), None),
                 Some('%') => return (Some(Token::Operator(Operator::Percent)), None),
-                Some('^') => return (Some(Token::Operator(Operator::Carot)), None),
+                Some('^') => return (Some(Token::Operator(Operator::Caret)), None),
                 Some(';') => return (Some(Token::Operator(Operator::SemiColon)), None),
                 Some('~') => return (Some(Token::Operator(Operator::Tilde)), None),
                 Some('`') => return (Some(Token::Operator(Operator::BackTick)), None),

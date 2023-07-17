@@ -11,7 +11,7 @@ use tl_core::ast::{
 };
 use tl_util::format::{NodeDisplay, TreeDisplay};
 
-use crate::{module::Module, Type, TypeBuilder};
+use crate::{const_eval, module::Module, Type, TypeBuilder};
 
 use colored::Colorize;
 
@@ -936,14 +936,14 @@ impl<'ctx, P: ResolvePass> Resolve<'ctx, P> {
                     _ => panic!("Unknown float type"),
                 };
                 llvm_ty
-                    .to_type()
+                    .as_type()
                     .path(Path::std(&format!("float{}", width)))
             }
             tl_core::ast::Type::Boolean(_) => self
                 .codegen_module
                 .context
                 .i8_type()
-                .to_type()
+                .as_type()
                 .path(Path::std("bool")),
             tl_core::ast::Type::Char { width, .. } => self
                 .codegen_module
@@ -971,8 +971,25 @@ impl<'ctx, P: ResolvePass> Resolve<'ctx, P> {
                 size, base_type, ..
             } => {
                 if let Some(size) = size {
+                    let ce = const_eval::ConstEval::new(&self.codegen_module);
+                    let expr = ce
+                        .evaluate_expression(size)
+                        .expect("Unable to evaluate constant expression");
+
+                    println!("{}", expr.llvm);
+
+                    if !expr.llvm.is_int_value() {
+                        panic!("Expected array size to be an integer!")
+                    }
+
+                    let int = expr
+                        .llvm
+                        .into_int_value()
+                        .get_zero_extended_constant()
+                        .expect("Expected a constant int!");
+
                     self.resolve_types(current_path, &base_type)
-                        .ptr_type(Default::default())
+                        .array_type(int as _)
                 } else {
                     self.resolve_types(current_path, &base_type)
                         .ptr_type(Default::default())

@@ -8,6 +8,7 @@ use std::{
 use tl_util::format::TreeDisplay;
 
 // mod code_type;
+mod const_eval;
 mod module;
 mod resolve;
 // mod symbol;
@@ -115,7 +116,7 @@ impl<'ctx> Type<'ctx> {
         }
     }
 
-    pub fn array_type(&self, size: u32) -> Type<'_> {
+    pub fn array_type(&self, size: u32) -> Type<'ctx> {
         use inkwell::types::{AnyType, BasicType};
         Type {
             llvm: inkwell::types::BasicTypeEnum::try_from(self.llvm)
@@ -134,7 +135,7 @@ pub trait TypeBuilder<'ctx> {
     fn signed(self, signed: bool) -> Type<'ctx>;
     fn mutable(self, mutable: bool) -> Type<'ctx>;
     fn path(self, path: resolve::Path) -> Type<'ctx>;
-    fn to_type(self) -> Type<'ctx>;
+    fn as_type(self) -> Type<'ctx>;
 }
 
 impl<'ctx, T: inkwell::types::AnyType<'ctx>> TypeBuilder<'ctx> for T {
@@ -165,7 +166,7 @@ impl<'ctx, T: inkwell::types::AnyType<'ctx>> TypeBuilder<'ctx> for T {
         }
     }
 
-    fn to_type(self) -> Type<'ctx> {
+    fn as_type(self) -> Type<'ctx> {
         Type {
             llvm: self.as_any_type_enum(),
             signed: false,
@@ -188,7 +189,7 @@ impl<'ctx> TypeBuilder<'ctx> for Type<'ctx> {
         Type { path, ..self }
     }
 
-    fn to_type(self) -> Type<'ctx> {
+    fn as_type(self) -> Type<'ctx> {
         self
     }
 }
@@ -197,3 +198,18 @@ pub struct Value<'a> {
     ty: Type<'a>,
     llvm: inkwell::values::AnyValueEnum<'a>,
 }
+
+pub trait AsValue<'ctx> {
+    fn as_value(&self, ty: Type<'ctx>) -> Value<'ctx>;
+}
+
+impl<'ctx, T: inkwell::values::AnyValue<'ctx>> AsValue<'ctx> for T {
+    fn as_value(&self, ty: Type<'ctx>) -> Value<'ctx> {
+        Value {
+            ty,
+            llvm: self.as_any_value_enum(),
+        }
+    }
+}
+
+// impl From<>
